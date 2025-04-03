@@ -1,6 +1,7 @@
 import asyncio
 import random
 from typing import List, Tuple
+import time
 
 import bittensor as bt
 from async_substrate_interface import AsyncSubstrateInterface
@@ -31,6 +32,7 @@ async def find_targets(events, number_targets: int) -> List[Tuple[str, int]]:
 
 async def generate_targets(substrate: AsyncSubstrateInterface, event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder, num_targets: int = 1):
     bt.logging.info(f"Fetching {num_targets} target addresses.")
+    start_time = time.time() 
 
     block_numbers = await generate_random_block_tuples(substrate, num_targets)
     events = await event_fetcher.fetch_all_events(block_numbers)
@@ -42,6 +44,7 @@ async def generate_targets(substrate: AsyncSubstrateInterface, event_fetcher: Ev
             break  # prevent infinite loop
         target_tuples.append(random.choice(target_tuples))
 
+    bt.logging.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
     return target_tuples
 
 if __name__ == "__main__":
