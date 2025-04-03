@@ -1,8 +1,8 @@
-import bittensor as bt
 import time
 import asyncio
 from typing import Dict, List
-from datetime import datetime
+
+import bittensor as bt
 
 from patrol.constants import Constants
 from patrol.chain_data.event_fetcher import EventFetcher
@@ -22,13 +22,11 @@ class SubgraphGenerator:
         self._max_future_events = max_future_events
         self._max_historic_events = max_historic_events
         self.timeout = timeout
-        self.start_time = None
     
     def generate_block_numbers(self, target_block: int, upper_block_limit: int, lower_block_limit: int = Constants.LOWER_BLOCK_LIMIT) -> List[int]:
 
         bt.logging.info(f"Generating block numbers for target block: {target_block}")
 
-        # Calculate range of blocks
         start_block = max(target_block - self._max_historic_events, lower_block_limit)
         end_block = min(target_block + self._max_future_events, upper_block_limit)
 
@@ -37,7 +35,6 @@ class SubgraphGenerator:
     def generate_adjacency_graph_from_events(self, events: List[Dict]) -> Dict:
 
         start_time = time.time()
-        # Build an undirected graph as an adjacency list.
         graph = {}
 
         # Iterate over the events and add edges based on available keys.
@@ -88,14 +85,18 @@ class SubgraphGenerator:
             for conn in adjacency_graph.get(current, []):
                 neighbor = conn["neighbor"]
                 event = conn["event"]
-                edge_key = (current, neighbor, event.get('id', id(event)))
+                evidence = event['evidence']
+                edge_key = (
+                    event.get('coldkey_source'),
+                    event.get('coldkey_destination'),
+                    event.get('category'),
+                    event.get('type'),
+                    evidence.get('rao_amount'),
+                    evidence.get('block_number')
+                )
 
                 if edge_key not in seen_edges:
-                    subgraph["edges"].append({
-                        "source": current,
-                        "target": neighbor,
-                        "event": event
-                    })
+                    subgraph["edges"].append(event)
                     seen_edges.add(edge_key)
 
                 if neighbor not in seen_nodes and neighbor not in queue:
@@ -142,10 +143,17 @@ if __name__ == "__main__":
         async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
             coldkey_finder = ColdkeyFinder(substrate)
 
-            subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=1000, max_historic_events=1000)
-            output = await subgraph_generator.run(target, target_block, current_block)
+            subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_historic_events=500)
+            subpgraph = await subgraph_generator.run(target, target_block, current_block)
 
-        volume = len(output['nodes']) + len(output['edges'])
+        volume = len(subpgraph['nodes']) + len(subpgraph['edges'])
+
+        filename = 'example_subgraph_output.json'
+        import json
+
+        # Open the file in write mode and dump the dictionary to it
+        with open(filename, 'w') as json_file:
+            json.dump(subpgraph, json_file, indent=4)
 
         # print(f"Volume: {volume}")
 

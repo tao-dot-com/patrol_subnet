@@ -1,81 +1,84 @@
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 import bittensor as bt
 import math
 
+from patrol.validation.graph_validation.validation_models import GraphPayload
+from patrol.validation.graph_validation.errors import ErrorPayload
+from patrol.validation.scoring import MinerScore
 from patrol.constants import Constants
 
 class MinerScoring:
     def __init__(self):
         self.importance = {
-            # 'novelty': X, This will be implemented soon
             'volume': 0.5,
             'responsiveness': 0.5,
         }
-        
+
     def calculate_novelty_score(self, payload: Dict[str, Any]) -> float:
-        """
-        Calculate how novel/unique the submitted data is compared to historical data.
-        Returns score between 0-1.
-        """
-        # TODO: Implement comparison with historical submissions
-        # For now return placeholder score
-        pass
-          
-    def calculate_volume_score(self, payload: Dict[str, Any]) -> float:
-        """
-        Calculate volume score based on amount of valid data submitted.
-        Returns score between 0-1.
-        """
-        def dict_to_hashable(d: Dict[str, Any]) -> Tuple:
-            """Convert a dictionary to a hashable tuple, handling nested dicts."""
-            return tuple(sorted((k, dict_to_hashable(v) if isinstance(v, dict) else v) for k, v in d.items()))
+        # Placeholder for future implementation
+        return 0.0
 
-        def get_unique_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-            seen = set()
-            return [
-                d for d in items 
-                if not (dict_to_hashable({k: v for k, v in d.items() if k not in ['block_number', 'timestamp']}) in seen or seen.add(dict_to_hashable({k: v for k, v in d.items() if k not in ['block_number', 'timestamp']})))
-            ]
+    def calculate_volume_score(self, payload: GraphPayload | Dict) -> float:
+        if isinstance(payload, dict) and "error" in payload:
+            return 0.0
+        total_items = len(payload.nodes) + len(payload.edges)
+        base_score = math.log(total_items + 1) / math.log(101)
+        return min(1.0, base_score)
 
-        unique_nodes = get_unique_items(payload['nodes'])
-        unique_edges = get_unique_items(payload['edges'])
-
-        # Count unique items
-        total_unique_items = len(unique_nodes) + len(unique_edges)
-
-        base_score = math.log(total_unique_items + 1) / math.log(101)  # +1 to avoid log(0), 101 for reference point
-        return min(1.0, base_score)  # Cap at 100 unique items for max score
-    
     def calculate_responsiveness_score(self, response_time: float) -> float:
-        """
-        Calculate responsiveness score based on response time.
-        Returns score between 0-1.
-        """
-
         response_time = min(response_time, Constants.MAX_RESPONSE_TIME)
-
         return 1.0 - (response_time / Constants.MAX_RESPONSE_TIME)
 
-    def calculate_overall_scores(self, payload: Dict[str, Any], response_time: float) -> float:
-        """
-        Calculate total weighted Coverage score for the miner submission.
-        Returns normalized Coverage score between 0-1.
-        """
+    def calculate_score(
+        self,
+        uid: int,
+        coldkey: str,
+        hotkey: str,
+        payload: GraphPayload | ErrorPayload,
+        response_time: float
+    ) -> MinerScore:
 
-        # Just need to check this is how we respond? 
-        if payload is None:
-            return 0.0
-    
-        scores = {
-            'volume': self.calculate_volume_score(payload),
-            'responsiveness': self.calculate_responsiveness_score(response_time)
-        }
+        if isinstance(payload, ErrorPayload):
+            bt.logging.warning(f"Error recieved as output from validation process, adding details to miner {uid} records.")
+            return MinerScore(
+                uid=uid,
+                coldkey=coldkey,
+                hotkey=hotkey,
+                overall_score=0.0,
+                volume_score=0.0,
+                volume=0,
+                responsiveness_score=0.0,
+                response_time_seconds=response_time,
+                novelty_score=None,
+                validation_passed=False,
+                error_msg=payload.message
+            )
 
-        
-        coverage_score = sum(scores[k] * self.importance[k] for k in scores)
+        volume = len(payload.nodes) + len(payload.edges)
+        volume_score = self.calculate_volume_score(payload)
+        responsiveness_score = self.calculate_responsiveness_score(response_time)
 
-        bt.logging.info(f"Total Coverage Score: {coverage_score}")
-        return coverage_score
+        overall_score = sum([
+            volume_score * self.importance["volume"],
+            responsiveness_score * self.importance["responsiveness"]
+        ])
+
+        bt.logging.info(f"Scoring completed for miner {uid}, with overall score: {overall_score}")
+
+        return MinerScore(
+            uid=uid,
+            coldkey=coldkey,
+            hotkey=hotkey,
+            overall_score=overall_score,
+            volume_score=volume_score,
+            volume=volume,
+            responsiveness_score=responsiveness_score,
+            response_time_seconds=response_time,
+            novelty_score=None,
+            validation_passed=True,
+            error_msg=None
+        )
+
     
     def normalize_scores(self, scores: Dict[int, float]) -> List[float]:
         """
