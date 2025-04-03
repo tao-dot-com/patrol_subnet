@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 class Base(DeclarativeBase):
     pass
 
-
 def migrate_db(url: str):
     logging.info("Started DB migration")
 

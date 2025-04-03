@@ -1,6 +1,7 @@
 """Functionality for asynchronously sending requests to a miner"""
 
 import bittensor as bt
+from patrol.validation.scoring import MinerScoreRepository
 from substrateinterface import SubstrateInterface
 from async_substrate_interface import AsyncSubstrateInterface
 import asyncio
@@ -86,16 +87,21 @@ async def query_miner(uid: int,
     logger.info(f"Finished processing {uid}. Final Score: {coverage_score}. Response Time: {response_time}")
 
 
+# FIXME: Why does the dendrite/validator need a forward? Surely it should just run on a acheduled basis?
+# TODO: Why not just use a scheduled job at a fixed interval instead of an infinite loop???
 async def forward(metagraph: bt.metagraph, 
                         dendrite: bt.dendrite, 
                         config: bt.config, 
                         my_uid: int,
-                        wallet: bt.wallet):
+                        wallet: bt.wallet,
+                        miner_score_repository: MinerScoreRepository
+                  ):
 
     weight_watcher = WeightWatcher(config, my_uid, wallet)
     while True:
         start_time = time.time()
-        
+
+        # FIXME: you want to sync the metagraph in case sopme more miners have appeared since th last time we ran.
         axons = metagraph.axons
 
         target_selector = TargetSelector() 
@@ -122,6 +128,7 @@ async def forward(metagraph: bt.metagraph,
         sleep_time = 10 * 60 - (time.time() - start_time)
 
         if sleep_time > 0:
+            # FIXME: This will block the event loop! Use the asycio equivalent.
             time.sleep(sleep_time)
 
 
