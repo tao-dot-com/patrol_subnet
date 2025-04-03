@@ -24,7 +24,7 @@ class _MinerScore(Base, MappedAsDataclass):
     response_time_seconds: Mapped[float]
     novelty_score: Mapped[Optional[float]]
     validation_passed: Mapped[bool]
-    error_msg: Mapped[Optional[str]]
+    error_message: Mapped[Optional[str]]
 
     @classmethod
     def from_miner_score(cls, miner_score: MinerScore):
@@ -42,7 +42,7 @@ class _MinerScore(Base, MappedAsDataclass):
             response_time_seconds=miner_score.response_time_seconds,
             novelty_score=miner_score.novelty_score,
             validation_passed=miner_score.validation_passed,
-            error_msg=miner_score.error_msg
+            error_message=miner_score.error_message
         )
 
     def _to_utc(self, instant):
@@ -67,7 +67,7 @@ class _MinerScore(Base, MappedAsDataclass):
             response_time_seconds=self.response_time_seconds,
             novelty_score=self.novelty_score,
             validation_passed=self.validation_passed,
-            error_msg=self.error_msg
+            error_message=self.error_message
         )
 
 

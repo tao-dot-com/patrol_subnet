@@ -55,7 +55,7 @@ async def test_add_score_sqlite(sqlite_engine):
         response_time_seconds=4.5,
         novelty_score=3.5,
         validation_passed=False,
-        error_msg="Oh dear",
+        error_message="Oh dear",
     )
 
     await repository.add(miner_score)
@@ -79,7 +79,7 @@ async def test_add_score_sqlite(sqlite_engine):
     assert score.response_time_seconds == 4.5
     assert score.novelty_score == 3.5
     assert score.validation_passed == False
-    assert score.error_msg == "Oh dear"
+    assert score.error_message == "Oh dear"
 
 
 async def test_add_score_postgres(clean_pgsql_engine):
@@ -104,7 +104,7 @@ async def test_add_score_postgres(clean_pgsql_engine):
         response_time_seconds=4.5,
         novelty_score=3.5,
         validation_passed=False,
-        error_msg="Oh dear",
+        error_message="Oh dear",
     )
 
     await repository.add(miner_score)
@@ -128,7 +128,7 @@ async def test_add_score_postgres(clean_pgsql_engine):
     assert score.response_time_seconds == 4.5
     assert score.novelty_score == 3.5
     assert score.validation_passed == False
-    assert score.error_msg == "Oh dear"
+    assert score.error_message == "Oh dear"
 
 async def test_find_scores_by_batch_id_sqlite(sqlite_engine):
 
@@ -186,5 +186,5 @@ def make_miner_score(score_id: uuid.UUID, batch_id: uuid.UUID, created_at: datet
         response_time_seconds=4.5,
         novelty_score=3.5,
         validation_passed=False,
-        error_msg="Oh dear",
+        error_message="Oh dear",
     )

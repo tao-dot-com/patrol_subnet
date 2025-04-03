@@ -35,7 +35,7 @@ def upgrade() -> None:
             sa.Column('response_time_seconds', sa.Float),#, nullable=False),
             sa.Column('novelty_score', sa.Float),#, nullable=True),
             sa.Column('validation_passed', sa.Boolean),#, nullable=False),
-            sa.Column('error_msg', sa.String),# nullable=True),
+            sa.Column('error_message', sa.String),# nullable=True),
     )
 
 
