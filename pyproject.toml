@@ -4,12 +4,16 @@ version = "0.1.0"
 description = "Patrol Subnet"
 requires-python = ">=3.11"
 dependencies = [
-    "substrate-interface==1.7.11",
-    "bittensor==9.0.2",
+    #"substrate-interface==1.7.11",
+    "bittensor==9.1.0",
     "docker==7.1.0",
-    "async-substrate-interface>=1.0.0,<2.0.0",
+    #"async-substrate-interface>=1.0.0,<2.0.0",
     "aiochclient[aiohttp]",
     "aiohttp",
+    "sqlalchemy",
+    "aiosqlite",
+    "psycopg2-binary",
+    "asyncpg"
 ]
 
 [project.optional-dependencies]
@@ -23,13 +27,14 @@ build-backend = "setuptools.build_meta"
 enabled = true
 
 [tool.pytest.ini_options]
-asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope="function"
 addopts = "--capture=no"
 log_cli = false
 #log_cli_level = "DEBUG"
 #log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 #log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
-pythonpath = ['src.patrol']
+pythonpath = ['src']
 testpaths = ['test']
 #addopts = ['--strict-config', '-ra']

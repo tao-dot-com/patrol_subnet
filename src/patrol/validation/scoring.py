@@ -1,10 +1,14 @@
-from abc import abstractmethod
+import uuid
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import Optional
+from datetime import datetime
 
-@dataclass
-class MinerScore(frozen=True):
-
+@dataclass(frozen=True)
+class MinerScore:
+    id: uuid.UUID
+    batch_id: uuid.UUID
+    created_at: datetime
     uid: int
     coldkey: str
     hotkey: str
@@ -17,11 +21,10 @@ class MinerScore(frozen=True):
     validation_passed: bool
     error_msg: Optional[str]
 
-class MinerScoreRepository:
+class MinerScoreRepository():
 
     @abstractmethod
     async def add(self, score: MinerScore):
-
         pass
 
     @abstractmethod
