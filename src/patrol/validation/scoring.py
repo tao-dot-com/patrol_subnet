@@ -28,6 +28,5 @@ class MinerScoreRepository():
         pass
 
     @abstractmethod
-    async def find(self):
-        # need to only retrieve the most recent hotkey/coldkey for a UID. 
+    async def find_by_batch_id(self, batch_id: uuid.UUID) -> list[MinerScore]:
         pass

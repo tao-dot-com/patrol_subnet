@@ -1,8 +1,8 @@
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
-from sqlalchemy import DateTime
-from datetime import datetime
+from sqlalchemy import DateTime, select
+from datetime import datetime, UTC
 from patrol.validation.persistence import Base
 import uuid
 from typing import Optional
@@ -45,6 +45,31 @@ class _MinerScore(Base, MappedAsDataclass):
             error_msg=miner_score.error_msg
         )
 
+    def _to_utc(self, instant):
+        """
+        SQLite does not persiste timezone info, so just set the timezone to UTC if the DB did not give us one.
+        """
+        return instant if instant.tzinfo is not None else instant.replace(tzinfo=UTC)
+
+    @property
+    def as_score(self) -> MinerScore:
+        return MinerScore(
+            id=uuid.UUID(self.id),
+            batch_id=uuid.UUID(self.batch_id),
+            created_at=self._to_utc(self.created_at),
+            uid=self.uid,
+            coldkey=self.coldkey,
+            hotkey=self.hotkey,
+            overall_score=self.overall_score,
+            volume=self.volume,
+            volume_score=self.volume_score,
+            responsiveness_score=self.responsiveness_score,
+            response_time_seconds=self.response_time_seconds,
+            novelty_score=self.novelty_score,
+            validation_passed=self.validation_passed,
+            error_msg=self.error_msg
+        )
+
 
 class DatabaseMinerScoreRepository(MinerScoreRepository):
 
@@ -56,3 +81,9 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             obj = _MinerScore.from_miner_score(score)
             session.add(obj)
             await session.commit()
+
+    async def find_by_batch_id(self, batch_id: uuid.UUID) -> list[MinerScore]:
+        async with self.LocalAsyncSession() as session:
+            query = select(_MinerScore).where(_MinerScore.batch_id == str(batch_id))
+            results = await session.scalars(query)
+            return [s.as_score for s in results]

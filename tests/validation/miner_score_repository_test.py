@@ -129,3 +129,62 @@ async def test_add_score_postgres(clean_pgsql_engine):
     assert score.novelty_score == 3.5
     assert score.validation_passed == False
     assert score.error_msg == "Oh dear"
+
+async def test_find_scores_by_batch_id_sqlite(sqlite_engine):
+
+    batch_ids = [uuid.uuid4(), uuid.uuid4()]
+    now = datetime.now(UTC)
+    # add 2 scores for each batch
+    repository = DatabaseMinerScoreRepository(sqlite_engine)
+    for b in batch_ids:
+        miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_1)
+        miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_2)
+
+    scores = await repository.find_by_batch_id(batch_ids[1])
+    assert len(scores) == 2
+    assert scores[0].batch_id == batch_ids[1]
+    assert scores[0].created_at == now
+
+    assert scores[1].batch_id == batch_ids[1]
+    assert scores[1].created_at == now
+
+async def test_find_scores_by_batch_id_postgres(clean_pgsql_engine):
+
+    batch_ids = [uuid.uuid4(), uuid.uuid4()]
+    now = datetime.now(UTC)
+    # add 2 scores for each batch
+    repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+    for b in batch_ids:
+        miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_1)
+        miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_2)
+
+    scores = await repository.find_by_batch_id(batch_ids[1])
+    assert len(scores) == 2
+    assert scores[0].batch_id == batch_ids[1]
+    assert scores[0].created_at == now
+
+    assert scores[1].batch_id == batch_ids[1]
+    assert scores[1].created_at == now
+
+
+def make_miner_score(score_id: uuid.UUID, batch_id: uuid.UUID, created_at: datetime):
+    return MinerScore(
+        id=score_id,
+        batch_id=batch_id,
+        created_at=created_at,
+        uid=42,
+        coldkey="abcdef",
+        hotkey="ghijkl",
+        overall_score=10.0,
+        volume=12,
+        volume_score=4.5,
+        responsiveness_score=2.4,
+        response_time_seconds=4.5,
+        novelty_score=3.5,
+        validation_passed=False,
+        error_msg="Oh dear",
+    )
