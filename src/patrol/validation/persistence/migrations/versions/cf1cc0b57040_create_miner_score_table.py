@@ -23,7 +23,7 @@ def upgrade() -> None:
     """Upgrade schema."""
     op.create_table("miner_score",
             sa.Column('id', sa.String, primary_key=True),
-            sa.Column('batch_id', sa.String, primary_key=True),
+            sa.Column('batch_id', sa.String),
             sa.Column('uid', sa.Integer, nullable=False),
             sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
             sa.Column('coldkey', sa.String, nullable=False),
