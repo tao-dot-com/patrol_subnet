@@ -71,7 +71,7 @@ async def process_staking_events(event: Dict, block_number: int, coldkey_finder:
                             "type": "add",
                             "evidence": {
                                 "rao_amount": details[1],
-                                "delegate_hotkey": delegate_hotkey,
+                                "delegate_hotkey_destination": delegate_hotkey,
                                 "block_number": block_number
                             }
                         })
@@ -84,7 +84,7 @@ async def process_staking_events(event: Dict, block_number: int, coldkey_finder:
                             "type": "add",
                             "evidence": {
                                 "rao_amount": details[2],
-                                "delegate_hotkey": delegate_hotkey,
+                                "delegate_hotkey_destination": delegate_hotkey,
                                 "alpha_amount": details[3],
                                 "destination_net_uid": details[4],
                                 "block_number": block_number
@@ -100,7 +100,7 @@ async def process_staking_events(event: Dict, block_number: int, coldkey_finder:
                             "type": "remove",
                             "evidence": {
                                 "rao_amount": details[1],
-                                "delegate_hotkey": delegate_hotkey,
+                                "delegate_hotkey_source": delegate_hotkey,
                                 "block_number": block_number
                             }
                         })
@@ -113,7 +113,7 @@ async def process_staking_events(event: Dict, block_number: int, coldkey_finder:
                             "type": "remove",
                             "evidence": {
                                 "rao_amount": details[2],
-                                "delegate_hotkey": delegate_hotkey,
+                                "delegate_hotkey_source": delegate_hotkey,
                                 "alpha_amount": details[3],
                                 "source_net_uid": details[4],
                                 "block_number": block_number

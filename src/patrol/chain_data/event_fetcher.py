@@ -4,6 +4,7 @@ from typing import Dict, List, Tuple, Any
 from async_substrate_interface import AsyncSubstrateInterface
 import bittensor as bt
 
+from patrol.chain_data.get_current_block import get_current_block
 from patrol.constants import Constants
 
 GROUP_INIT_BLOCK = {
@@ -115,13 +116,13 @@ class EventFetcher:
                 preprocessed_lst[0].value_scale_type,
                 preprocessed_lst[0].storage_item
             ),
-            timeout=5
+            timeout=3
         )
 
         # Build a mapping from block_number to event response.
         return {
-            block_number: responses[response][0]
-            for (block_number, _), response in zip(block_info, responses)
+            block_number: responses[block_hash][0]
+            for (block_number, block_hash) in block_info
         }
     
 
@@ -136,6 +137,7 @@ class EventFetcher:
             A dictionary mapping block numbers to their event responses.
         """
         start_time = time.time()
+        bt.logging.info(f"\nAttempting to fetching event data, for {len(block_numbers)} blocks...")
 
         # Validate input: check if block_numbers is empty.
         if not block_numbers:
@@ -154,12 +156,6 @@ class EventFetcher:
         block_hashes = await asyncio.gather(
             *[self.substrates[1].get_block_hash(n) for n in block_numbers]
         )
-
-        async def get_current_block(substrate):
-            
-            current_block = await substrate.get_block()
-
-            return current_block['header']['number']
 
         # Need to make sure we always use the latest substrate to get the current block otherwise it can throw off older substrate
         current_block = await get_current_block(self.substrates[6])
@@ -199,7 +195,7 @@ async def example():
     await fetcher.initialise_substrate_connections()
 
     test_cases = [
-        [5163655 + i for i in range(1000)]
+        [5163655 + i for i in range(500)]
         # [3804341, 3804339, 3804340, 3804341, 4264339, 4264340, 4264341, 4920349, 4920350, 4920351, 5163655, 5163656, 5163657, 5228683, 5228684, 5228685]
         # [3804341, 3804341],   # duplicates
         # [3014322],  # block number is too early
