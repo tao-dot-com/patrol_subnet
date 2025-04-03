@@ -8,3 +8,9 @@ bt_addresses.cache.json
 *.DS_Store
 *.egg-info
 .venv
+venv
+tmp
+__pycache__
+.idea
+*.iml
+
