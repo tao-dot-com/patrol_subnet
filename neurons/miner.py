@@ -211,12 +211,10 @@ if __name__ == "__main__":
     parser.add_argument('--external_ip', type=str, default=None, help="External IP for miner to serve on the metagraph.")
     parser.add_argument('--dev_flag', type=bool, default=False, help="Enable developer mode. This will run the miner without needing a blockchain endpoint.")
     parser.add_argument('--network',type=str, default="finney", help="Subtensor Endpoint.")
-    parser.add_argument('--indexer_address', type=str, default="5.9.110.246", help="Address of indexer.")
     parser.add_argument('--archive_node_address', type=str, default="ws://5.9.118.137:9944", help="Address of bittensor archive node.")
     
     args = parser.parse_args()
 
-    Constants.INDEXER_ADDRESS = args.indexer_address
     Constants.ARCHIVE_NODE_ADDRESS = args.archive_node_address
     
     miner = Miner(
