@@ -37,8 +37,10 @@ def upgrade() -> None:
             sa.Column('validation_passed', sa.Boolean),#, nullable=False),
             sa.Column('error_message', sa.String),# nullable=True),
     )
+    op.create_index("idx_miner_score_batch_id", table_name="miner_score", columns=["batch_id"])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
+    op.drop_index("idx_miner_score_batch_id", "miner_score")
     op.drop_table("miner_score")
