@@ -1,10 +1,17 @@
 from async_substrate_interface import AsyncSubstrateInterface
+from patrol.constants import Constants
 
 class ColdkeyFinder:
     _cache = {}
 
-    def __init__(self, substrate):
+    def __init__(self, substrate: AsyncSubstrateInterface = None):
         self.substrate = substrate
+    
+    async def initialise_substrate_connection(self) -> None:
+
+        self.substrate = AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS)
+
+        await self.substrate.initialize()
 
     async def find(self, hotkey: str) -> str:
         if hotkey in self._cache:
@@ -17,28 +24,27 @@ class ColdkeyFinder:
 if __name__ == "__main__":
     import asyncio
     import time
-    from patrol.constants import Constants
     
     hotkey = "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3"
 
     async def example():
 
-        async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
-            finder = ColdkeyFinder(substrate)
-        
-            start_time = time.time()
+        finder = ColdkeyFinder()
+        await finder.initialise_substrate_connection()
+    
+        start_time = time.time()
 
-            coldkey = await finder.find(hotkey)
-            response_time = time.time() - start_time
+        coldkey = await finder.find(hotkey)
+        response_time = time.time() - start_time
 
-            print(f"Fetched {coldkey} for the first time in {response_time} seconds.")
+        print(f"Fetched {coldkey} for the first time in {response_time} seconds.")
 
-            start_time = time.time()
+        start_time = time.time()
 
-            coldkey = await finder.find(hotkey)
+        coldkey = await finder.find(hotkey)
 
-            response_time = time.time() - start_time
+        response_time = time.time() - start_time
 
-            print(f"Fetched {coldkey} for the second time in {response_time} seconds.")
+        print(f"Fetched {coldkey} for the second time in {response_time} seconds.")
 
     asyncio.run(example())

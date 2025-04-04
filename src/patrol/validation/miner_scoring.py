@@ -79,19 +79,18 @@ class MinerScoring:
             error_msg=None
         )
 
+def normalize_scores(scores: Dict[int, float]) -> List[float]:
+    """
+        Normalize a dictionary of miner Coverage scores to ensure fair comparison.
+        Returns list of Coverage scores normalized between 0-1.
+    """
+    if not scores:
+        return []
     
-    def normalize_scores(self, scores: Dict[int, float]) -> List[float]:
-        """
-            Normalize a dictionary of miner Coverage scores to ensure fair comparison.
-            Returns list of Coverage scores normalized between 0-1.
-        """
-        if not scores:
-            return []
-        
-        min_score = min(scores.values())
-        max_score = max(scores.values())
-        
-        if min_score == max_score:
-            return [1.0] * len(scores)
-        
-        return {uid: round((score - min_score) / (max_score - min_score), 6) for uid, score in scores.items()}
+    min_score = min(scores.values())
+    max_score = max(scores.values())
+    
+    if min_score == max_score:
+        return [1.0] * len(scores)
+    
+    return {uid: round((score - min_score) / (max_score - min_score), 6) for uid, score in scores.items()}

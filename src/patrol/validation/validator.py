@@ -1,6 +1,7 @@
 """Functionality for asynchronously sending requests to a miner"""
 
 import bittensor as bt
+from patrol.chain_data import event_fetcher
 from patrol.validation.scoring import MinerScoreRepository
 from substrateinterface import SubstrateInterface
 from async_substrate_interface import AsyncSubstrateInterface
@@ -10,11 +11,12 @@ import time
 
 from patrol.protocol import PatrolSynapse
 from patrol.constants import Constants
-from patrol.validation.target_generation import generate_targets
+from patrol.validation.target_generation import TargetGenerator, generate_targets
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
+from patrol.validation.scoring import MinerScore
 
 async def query_miner(uid: int, 
                       dendrite: bt.dendrite, 
@@ -22,7 +24,7 @@ async def query_miner(uid: int,
                       target_tuple: str,
                       validation_mechanism: BittensorValidationMechanism,
                       scoring_mechanism: MinerScoring,
-                      semaphore: asyncio.Semaphore):
+                      semaphore: asyncio.Semaphore) -> MinerScore:
     
     synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
 
@@ -78,51 +80,38 @@ async def query_miner(uid: int,
     bt.logging.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
 
 # FIXME: Why does the dendrite/validator need a forward? Surely it should just run on a acheduled basis?
-# async def forward(metagraph: bt.metagraph, 
-#                         dendrite: bt.dendrite, 
-#                         config: bt.config, 
-#                         my_uid: int,
-#                         wallet: bt.wallet,
-#                         miner_score_repository: MinerScoreRepository
-#                   ):
+async def query_miners(metagraph: bt.metagraph,
+                        dendrite: bt.dendrite,
+                        my_uid: int,
+                        target_generator: TargetGenerator,
+                        validator_mechanism: BittensorValidationMechanism,
+                        scoring_mechanism: MinerScoring,
+                  ):
 
-#     weight_watcher = WeightWatcher(config, my_uid, wallet)
-#     while True:
-#         start_time = time.time()
+    start_time = time.time()
+    axons = metagraph.axons
 
-#         # FIXME: you want to sync the metagraph in case some more miners have appeared since th last time we ran.
-#         axons = metagraph.axons
-# #     weight_watcher = WeightWatcher(config, my_uid, wallet)
-# #     while True:
-# #         start_time = time.time()
-        
-# #         axons = metagraph.axons
+    targets = await target_generator.generate_targets(10)
 
-# #         target_selector = TargetSelector() 
-# #         targets, target_block_number= target_selector.select_targets(n=len(axons)) 
+    bt.logging.info(f"Selected {len(targets)} targets.")
 
-# #         bt.logging.info(f"Selected {len(targets)} targets for block {target_block_number}")
+    semaphore = asyncio.Semaphore(1)
 
-# #         semaphore = asyncio.Semaphore(1)
+    tasks = []
 
-# #         tasks = []
+    for i, axon in enumerate(axons):
+            if axon.port != 0:
+                target = targets.pop()
+                tasks.append(query_miner(1, dendrite, axon, target, validator_mechanism, scoring_mechanism, semaphore), return_exceptions=True)
 
-# #         for i, axon in enumerate(axons):
-# #                 if axon.port != 0:
-# #                     target = targets.pop()
-# #                     tasks.append(query_miner(i, dendrite, axon, target, target_block_number, semaphore))
+    responses = await asyncio.gather(*tasks)
+    
+    # We want to run this every 10 minutes, so calculate the sleep time. 
+    # Get the difference between the current time and 10 minutes since the start time.
+    sleep_time = 10 * 60 - (time.time() - start_time)
 
-# #         responses = await asyncio.gather(*tasks)
-
-# #         if weight_watcher.should_set_weights():
-# #             weight_watcher.set_weights()
-        
-# #         # We want to run this every 10 minutes, so calculate the sleep time. 
-# #         # Get the difference between the current time and 10 minutes since the start time.
-# #         sleep_time = 10 * 60 - (time.time() - start_time)
-
-# #         if sleep_time > 0:
-# #             time.sleep(sleep_time)
+    if sleep_time > 0:
+        time.sleep(sleep_time)
 
 
 async def test_miner():
@@ -131,25 +120,28 @@ async def test_miner():
 
     fetcher = EventFetcher()
     await fetcher.initialise_substrate_connections()
+    
+    scoring_mechanism = MinerScoring()
 
-    async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
-        coldkey_finder = ColdkeyFinder(substrate)
-        validator_mechanism = BittensorValidationMechanism(fetcher, coldkey_finder)
-        scoring_mechanism = MinerScoring()
+    coldkey_finder = ColdkeyFinder()
+    await coldkey_finder.initialise_substrate_connection()
 
-        targets = await generate_targets(substrate, fetcher, coldkey_finder, 10)
+    validator_mechanism = BittensorValidationMechanism(fetcher, coldkey_finder)
+    target_generator = TargetGenerator(event_fetcher, coldkey_finder)
 
-        target = ("5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD", 5163655)
+    targets = await target_generator.generate_targets(10)
 
-        wallet_2 = bt.wallet(name="miners", hotkey="miner_1")
-        dendrite = bt.dendrite(wallet=wallet_2)
+    target = ("5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD", 5163655)
 
-        wallet = bt.wallet(name="miners", hotkey="miner_1")
-        axon = bt.axon(wallet=wallet, ip="0.0.0.0", port=8000)
+    wallet_2 = bt.wallet(name="miners", hotkey="miner_1")
+    dendrite = bt.dendrite(wallet=wallet_2)
 
-        semaphore = asyncio.Semaphore(1)
+    wallet = bt.wallet(name="miners", hotkey="miner_1")
+    axon = bt.axon(wallet=wallet, ip="0.0.0.0", port=8000)
 
-        await query_miner(1, dendrite, axon, target, validator_mechanism, scoring_mechanism, semaphore)
+    semaphore = asyncio.Semaphore(1)
+
+    await query_miner(1, dendrite, axon, target, validator_mechanism, scoring_mechanism, semaphore)
 
 if __name__ == "__main__":
     

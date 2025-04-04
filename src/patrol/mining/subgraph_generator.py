@@ -140,11 +140,11 @@ if __name__ == "__main__":
         target_block = 5163655
         current_block = 6000000
 
-        async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
-            coldkey_finder = ColdkeyFinder(substrate)
+        coldkey_finder = ColdkeyFinder()
+        await coldkey_finder.initialise_substrate_connection()
 
-            subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_historic_events=500)
-            subpgraph = await subgraph_generator.run(target, target_block, current_block)
+        subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_historic_events=500)
+        subpgraph = await subgraph_generator.run(target, target_block, current_block)
 
         volume = len(subpgraph['nodes']) + len(subpgraph['edges'])
 

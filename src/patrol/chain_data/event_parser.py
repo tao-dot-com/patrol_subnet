@@ -232,14 +232,15 @@ if __name__ == "__main__":
         file_path = "new_event_data.json"
         with open(file_path, "r") as f:
             data = json.load(f)
-        async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
-            coldkey_finder = ColdkeyFinder(substrate)
-            
-            parsed_events = await process_event_data(data, coldkey_finder)
-            bt.logging.info(parsed_events)
 
-            with open("output_dict.json", "w") as f:
-                json.dump(parsed_events, f, indent=4)
+        coldkey_finder = ColdkeyFinder()
+        await coldkey_finder.initialise_substrate_connection()
+        
+        parsed_events = await process_event_data(data, coldkey_finder)
+        bt.logging.info(parsed_events)
+
+        with open("output_dict.json", "w") as f:
+            json.dump(parsed_events, f, indent=4)
 
     asyncio.run(example())
     

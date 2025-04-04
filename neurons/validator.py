@@ -8,7 +8,7 @@ import traceback
 import bittensor as bt
 from substrateinterface import SubstrateInterface
 
-from patrol.validation.forward import run_miner_loop
+from patrol.validation.validator import run_miner_loop
 
 
 class Validator: 
@@ -116,7 +116,8 @@ class Validator:
 
 
     def run(self):
-        run_miner_loop(self.metagraph, self.dendrite, config=self.config, my_uid=self.my_uid, wallet=self.wallet)
+        while True:
+            run_miner_loop(self.metagraph, self.dendrite, config=self.config, my_uid=self.my_uid, wallet=self.wallet)
 
 
 

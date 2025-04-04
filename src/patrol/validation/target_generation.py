@@ -3,7 +3,6 @@ import time
 from typing import List, Tuple
 
 import bittensor as bt
-from async_substrate_interface import AsyncSubstrateInterface
 
 from patrol.chain_data.get_current_block import get_current_block
 from patrol.chain_data.event_parser import process_event_data
@@ -11,13 +10,12 @@ from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 
 class TargetGenerator:
-    def __init__(self, substrate: AsyncSubstrateInterface, event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder):
-        self.substrate = substrate
+    def __init__(self, event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder):
         self.event_fetcher = event_fetcher
         self.coldkey_finder = coldkey_finder
 
     async def generate_random_block_tuples(self, num_targets: int = 1) -> List[int]:
-        current_block = await get_current_block(self.substrate)
+        current_block = await get_current_block(self.coldkey_finder.substrate)   # borrowing the substrate connection
         start_block = random.randint(3_014_342, current_block - num_targets * 4 * 600)
         return [start_block + i * 500 for i in range(num_targets * 4)]
 
@@ -50,7 +48,6 @@ class TargetGenerator:
 
 if __name__ == "__main__":
 
-    from patrol.constants import Constants
     import asyncio
 
     async def example():
@@ -60,14 +57,13 @@ if __name__ == "__main__":
         fetcher = EventFetcher()
         await fetcher.initialise_substrate_connections()
 
-        async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
+        coldkey_finder = ColdkeyFinder()
+        await coldkey_finder.initialise_substrate_connection()
 
-            coldkey_finder = ColdkeyFinder(substrate)
+        target_generator = TargetGenerator(fetcher, coldkey_finder)
 
-            target_generator = TargetGenerator(substrate, fetcher, coldkey_finder)
+        target_tuples = await target_generator.generate_targets(247)
 
-            target_tuples = await target_generator.generate_targets(247)
-
-            bt.logging.info(f"Returned: {len(target_tuples)} targets.")
+        bt.logging.info(f"Returned: {len(target_tuples)} targets.")
 
     asyncio.run(example())
