@@ -56,7 +56,6 @@ class Validator:
     ) -> MinerScore:
 
         synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
-        #axon_info = axon.info()
         processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
 
         url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
@@ -169,9 +168,15 @@ async def start():
     )
 
     while True:
-        await miner_validator.query_miner_batch()
-        await asyncio.sleep(10 * 60)
+        try:
+            await miner_validator.query_miner_batch()
+            await asyncio.sleep(10 * 60)
+        except Exception as ex:
+            logger.exception("Error!")
 
+
+if __name__ == "__main__":
+    asyncio.run(start())
 
 # async def test_miner():
 #
