@@ -33,24 +33,38 @@ def group_block(block: int, current_block: int) -> int:
     return None
 
 def group_blocks(
-        block_numbers: List[int], 
-        block_hashes: List[str],
-        current_block: int
-    ) -> Dict[int, List[Tuple[int, str]]]:
-        """
-        Group blocks by their group id while preserving both block number and hash.
-        
-        Returns:
-            A dictionary mapping group id to a list of tuples (block_number, block_hash).
-        """
-        grouped: Dict[int, List[Tuple[int, str]]] = {}
-        for block_number, block_hash in zip(block_numbers, block_hashes):
-            group = group_block(block_number, current_block)
-            if group:
-                grouped.setdefault(group, []).append((block_number, block_hash))
-            else:
-                bt.logging.warning(f"Block {block_number} is outside current groupings.")
-        return grouped
+    block_numbers: List[int],
+    block_hashes: List[str],
+    current_block: int,
+    batch_size: int = 500
+) -> Dict[int, List[List[Tuple[int, str]]]]:
+    """
+    Groups blocks by group ID and splits each group into batches.
+
+    Args:
+        block_numbers: List of block numbers.
+        block_hashes: Corresponding block hashes.
+        current_block: Current latest block.
+        batch_size: Maximum number of blocks per batch (default 500).
+
+    Returns:
+        Dictionary mapping group ID to list of block batches (each a list of tuples).
+    """
+    grouped: Dict[int, List[Tuple[int, str]]] = {}
+    for block_number, block_hash in zip(block_numbers, block_hashes):
+        group = group_block(block_number, current_block)
+        if group:
+            grouped.setdefault(group, []).append((block_number, block_hash))
+        else:
+            bt.logging.warning(f"Block {block_number} is outside current groupings.")
+
+    batched: Dict[int, List[List[Tuple[int, str]]]] = {}
+    for group_id, block_list in grouped.items():
+        batched[group_id] = [
+            block_list[i:i + batch_size] for i in range(0, len(block_list), batch_size)
+        ]
+
+    return batched
 
 class EventFetcher:
     def __init__(self):
@@ -170,25 +184,26 @@ class EventFetcher:
         grouped = group_blocks(block_numbers, block_hashes, current_block)
 
         all_events: Dict[int, Any] = {}
-        for group, block_info in grouped.items():
-            bt.logging.debug(f"\nFetching events for group {group} ({len(block_info)} blocks)...")
+        for group, batches in grouped.items():
             substrate = self.substrates[group]
-            attempts = 3
-            for attempt in range(attempts):
-                try:
-                    events = await self.get_block_events(substrate, block_info)
-                    all_events.update(events)
-                    bt.logging.debug(f"Successfully fetched events for group {group} on attempt {attempt+1}.")
-                    break  # Exit retry loop on success.
-                except Exception as e:
-                    if attempt < attempts - 1:
-                        bt.logging.error(
-                            f"Error fetching events for group {group} on attempt {attempt+1}: {e}. Retrying..."
-                        )
-                    else:
-                        bt.logging.error(
-                            f"Error fetching events for group {group} on final attempt: {e}. Continuing..."
-                        )
+            for batch in batches:
+                bt.logging.debug(f"\nFetching events for group {group} (batch of {len(batch)} blocks)...")
+                attempts = 3
+                for attempt in range(attempts):
+                    try:
+                        events = await self.get_block_events(substrate, batch)
+                        all_events.update(events)
+                        bt.logging.debug(f"Successfully fetched events for group {group} batch on attempt {attempt+1}.")
+                        break
+                    except Exception as e:
+                        if attempt < attempts - 1:
+                            bt.logging.error(
+                                f"Error fetching events for group {group} batch on attempt {attempt+1}: {e}. Retrying..."
+                            )
+                        else:
+                            bt.logging.error(
+                                f"Error fetching events for group {group} batch on final attempt: {e}. Continuing..."
+                            )
             # Continue to next group even if the current one fails.
         bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
@@ -201,7 +216,7 @@ async def example():
     await fetcher.initialize_substrate_connections()
 
     test_cases = [
-        [5163655 + i for i in range(500)]
+        [5163655 + i for i in range(1000)]
         # [3804341, 3804339, 3804340, 3804341, 4264339, 4264340, 4264341, 4920349, 4920350, 4920351, 5163655, 5163656, 5163657, 5228683, 5228684, 5228685]
         # [3804341, 3804341],   # duplicates
         # [3014322],  # block number is too early
@@ -225,7 +240,7 @@ async def example():
 
         start_time = time.time()
         all_events = await fetcher.fetch_all_events(test_case)
-        bt.logging.info(f"\n✅ Retrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
+        bt.logging.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
         filename = 'new_event_data.json'
         import json
