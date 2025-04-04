@@ -103,7 +103,7 @@ class Validator:
         validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
 
         logger.debug(f"calculating coverage score for miner {uid}")
-        miner_score = self.scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id)
+        miner_score = self.scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, payload_subgraph, response_time, batch_id)
 
         await self.miner_score_repository.add(miner_score)
 

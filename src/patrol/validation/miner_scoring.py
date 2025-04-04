@@ -3,9 +3,7 @@ import bittensor as bt
 import math
 import uuid
 from datetime import datetime, UTC
-
-from patrol.protocol import GraphPayload
-from patrol.protocol import GraphPayload
+from uuid import UUID
 
 from patrol.protocol import GraphPayload
 from patrol.validation.graph_validation.errors import ErrorPayload
@@ -41,13 +39,13 @@ class MinerScoring:
         hotkey: str,
         payload: GraphPayload | ErrorPayload,
         response_time: float,
-        batch_id: str
+        batch_id: UUID
     ) -> MinerScore:
 
         if isinstance(payload, ErrorPayload):
             bt.logging.warning(f"Error recieved as output from validation process, adding details to miner {uid} records.")
             return MinerScore(
-                id=str(uuid.uuid4()),
+                id=uuid.uuid4(),
                 batch_id=batch_id,
                 created_at=datetime.now(UTC),
                 uid=uid,
@@ -75,7 +73,7 @@ class MinerScoring:
         bt.logging.info(f"Scoring completed for miner {uid}, with overall score: {overall_score}")
 
         return MinerScore(
-            id=str(uuid.uuid4()),
+            id=uuid.uuid4(),
             batch_id=batch_id,
             created_at=datetime.now(UTC),
             uid=uid,
@@ -91,7 +89,7 @@ class MinerScoring:
             error_message=None
         )
 
-def normalize_scores(scores: Dict[int, float]) -> List[float]:
+def normalize_scores(scores: Dict[int, float]) -> list[float]:
     """
         Normalize a dictionary of miner Coverage scores to ensure fair comparison.
         Returns list of Coverage scores normalized between 0-1.
