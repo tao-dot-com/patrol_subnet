@@ -119,12 +119,12 @@ async def test_miner():
     bt.debug()
 
     fetcher = EventFetcher()
-    await fetcher.initialise_substrate_connections()
+    await fetcher.initialize_substrate_connections()
     
     scoring_mechanism = MinerScoring()
 
     coldkey_finder = ColdkeyFinder()
-    await coldkey_finder.initialise_substrate_connection()
+    await coldkey_finder.initialize_substrate_connection()
 
     validator_mechanism = BittensorValidationMechanism(fetcher, coldkey_finder)
     target_generator = TargetGenerator(event_fetcher, coldkey_finder)

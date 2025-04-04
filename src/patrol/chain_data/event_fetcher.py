@@ -4,7 +4,6 @@ from typing import Dict, List, Tuple, Any
 from async_substrate_interface import AsyncSubstrateInterface
 import bittensor as bt
 
-from patrol.chain_data.get_current_block import get_current_block
 from patrol.constants import Constants
 
 GROUP_INIT_BLOCK = {
@@ -57,13 +56,20 @@ class EventFetcher:
     def __init__(self):
         self.substrates = {}  # group_id -> AsyncSubstrateInterface
 
-    async def initialise_substrate_connections(self):
+    async def initialize_substrate_connections(self):
+        bt.logging.info("Initializing Event Fetcher")
         for group, init_block in GROUP_INIT_BLOCK.items():
             bt.logging.info(f"Initializing substrate for group {group} @ block {init_block}")
             substrate = AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS)
             init_hash = await substrate.get_block_hash(init_block)
             await substrate.init_runtime(block_hash=init_hash)
             self.substrates[group] = substrate
+
+    async def get_current_block(self) -> int:
+
+        current_block = await self.substrates[6].get_block()
+
+        return current_block['header']['number']
 
     async def get_block_events(
         self, 
@@ -137,7 +143,7 @@ class EventFetcher:
             A dictionary mapping block numbers to their event responses.
         """
         start_time = time.time()
-        bt.logging.info(f"\nAttempting to fetching event data, for {len(block_numbers)} blocks...")
+        bt.logging.debug(f"\nAttempting to fetching event data, for {len(block_numbers)} blocks...")
 
         # Validate input: check if block_numbers is empty.
         if not block_numbers:
@@ -158,21 +164,21 @@ class EventFetcher:
         )
 
         # Need to make sure we always use the latest substrate to get the current block otherwise it can throw off older substrate
-        current_block = await get_current_block(self.substrates[6])
+        current_block = await self.get_current_block()
 
         # Group blocks by group while maintaining the block number alongside its hash.
         grouped = group_blocks(block_numbers, block_hashes, current_block)
 
         all_events: Dict[int, Any] = {}
         for group, block_info in grouped.items():
-            bt.logging.info(f"\nFetching events for group {group} ({len(block_info)} blocks)...")
+            bt.logging.debug(f"\nFetching events for group {group} ({len(block_info)} blocks)...")
             substrate = self.substrates[group]
             attempts = 3
             for attempt in range(attempts):
                 try:
                     events = await self.get_block_events(substrate, block_info)
                     all_events.update(events)
-                    bt.logging.info(f"Successfully fetched events for group {group} on attempt {attempt+1}.")
+                    bt.logging.debug(f"Successfully fetched events for group {group} on attempt {attempt+1}.")
                     break  # Exit retry loop on success.
                 except Exception as e:
                     if attempt < attempts - 1:
@@ -184,7 +190,7 @@ class EventFetcher:
                             f"Error fetching events for group {group} on final attempt: {e}. Continuing..."
                         )
             # Continue to next group even if the current one fails.
-        bt.logging.info(f"All events collected in {time.time() - start_time} seconds.")
+        bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
 
 async def example():
@@ -192,7 +198,7 @@ async def example():
     bt.debug()
 
     fetcher = EventFetcher()
-    await fetcher.initialise_substrate_connections()
+    await fetcher.initialize_substrate_connections()
 
     test_cases = [
         [5163655 + i for i in range(500)]
@@ -227,7 +233,7 @@ async def example():
         # Open the file in write mode and dump the dictionary to it
         with open(filename, 'w') as json_file:
             json.dump(all_events, json_file, indent=4)
-        # bt.logging.info(all_events)
+        # bt.logging.debug(all_events)
 
 if __name__ == "__main__":
     asyncio.run(example())

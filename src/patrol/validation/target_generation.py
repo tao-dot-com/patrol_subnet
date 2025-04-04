@@ -4,7 +4,6 @@ from typing import List, Tuple
 
 import bittensor as bt
 
-from patrol.chain_data.get_current_block import get_current_block
 from patrol.chain_data.event_parser import process_event_data
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
@@ -15,7 +14,7 @@ class TargetGenerator:
         self.coldkey_finder = coldkey_finder
 
     async def generate_random_block_tuples(self, num_targets: int = 1) -> List[int]:
-        current_block = await get_current_block(self.coldkey_finder.substrate)   # borrowing the substrate connection
+        current_block = await self.event_fetcher.get_current_block()
         start_block = random.randint(3_014_342, current_block - num_targets * 4 * 600)
         return [start_block + i * 500 for i in range(num_targets * 4)]
 
@@ -30,7 +29,7 @@ class TargetGenerator:
         return random.sample(list(target_set), min(number_targets, len(target_set)))
 
     async def generate_targets(self, num_targets: int = 1) -> List[Tuple[str, int]]:
-        bt.logging.info(f"Fetching {num_targets} target addresses.")
+        bt.logging.debug(f"Fetching {num_targets} target addresses.")
         start_time = time.time()
 
         block_numbers = await self.generate_random_block_tuples(num_targets)
@@ -55,10 +54,10 @@ if __name__ == "__main__":
         bt.debug()
 
         fetcher = EventFetcher()
-        await fetcher.initialise_substrate_connections()
+        await fetcher.initialize_substrate_connections()
 
         coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialise_substrate_connection()
+        await coldkey_finder.initialize_substrate_connection()
 
         target_generator = TargetGenerator(fetcher, coldkey_finder)
 

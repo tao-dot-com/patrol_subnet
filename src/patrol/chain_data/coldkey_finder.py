@@ -1,4 +1,6 @@
 from async_substrate_interface import AsyncSubstrateInterface
+import bittensor as bt
+
 from patrol.constants import Constants
 
 class ColdkeyFinder:
@@ -7,7 +9,9 @@ class ColdkeyFinder:
     def __init__(self, substrate: AsyncSubstrateInterface = None):
         self.substrate = substrate
     
-    async def initialise_substrate_connection(self) -> None:
+    async def initialize_substrate_connection(self) -> None:
+
+        bt.logging.info("Initializing Coldkey Finder.")
 
         self.substrate = AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS)
 
@@ -30,7 +34,7 @@ if __name__ == "__main__":
     async def example():
 
         finder = ColdkeyFinder()
-        await finder.initialise_substrate_connection()
+        await finder.initialize_substrate_connection()
     
         start_time = time.time()
 

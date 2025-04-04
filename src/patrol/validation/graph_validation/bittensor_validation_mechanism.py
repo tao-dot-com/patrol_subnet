@@ -224,7 +224,7 @@ class BittensorValidationMechanism:
         if missing_edges:
             raise PayloadValidationError(f"{len(missing_edges)} edges not found in on-chain events.")
 
-        bt.logging.info("All edges matched with on-chain events.")
+        bt.logging.debug("All edges matched with on-chain events.")
 
     def return_validated_payload(self):
         return self.graph_payload
@@ -246,7 +246,7 @@ if __name__ == "__main__":
     async def main():
 
         fetcher = EventFetcher()
-        await fetcher.initialise_substrate_connections()
+        await fetcher.initialize_substrate_connections()
 
         async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
             coldkey_finder = ColdkeyFinder(substrate)

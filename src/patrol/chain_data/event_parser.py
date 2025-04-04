@@ -186,10 +186,10 @@ async def process_event_data(event_data: dict, coldkey_finder: ColdkeyFinder) ->
         bt.logging.error(f"Expected event_data to be a dict, got: {type(event_data)}")
         return []
     if not event_data:
-        bt.logging.info("No event data provided.")
+        bt.logging.error("No event data provided.")
         return []
 
-    bt.logging.info(f"Parsing event data from {len(event_data)} blocks.")
+    bt.logging.debug(f"Parsing event data from {len(event_data)} blocks.")
     start_time = time.time()
 
     semaphore = asyncio.Semaphore(25)
@@ -217,7 +217,7 @@ async def process_event_data(event_data: dict, coldkey_finder: ColdkeyFinder) ->
         else:
             all_parsed_events.extend(result)
 
-    bt.logging.info(f"Returning {len(all_parsed_events)} parsed events in {round(time.time() - start_time, 4)} seconds.")
+    bt.logging.debug(f"Returning {len(all_parsed_events)} parsed events in {round(time.time() - start_time, 4)} seconds.")
     return all_parsed_events
 
 if __name__ == "__main__":
@@ -234,7 +234,7 @@ if __name__ == "__main__":
             data = json.load(f)
 
         coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialise_substrate_connection()
+        await coldkey_finder.initialize_substrate_connection()
         
         parsed_events = await process_event_data(data, coldkey_finder)
         bt.logging.info(parsed_events)
