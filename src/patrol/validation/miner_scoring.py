@@ -4,6 +4,7 @@ import math
 import uuid
 from datetime import datetime, UTC
 
+
 from patrol.protocol import GraphPayload
 from patrol.validation.graph_validation.errors import ErrorPayload
 from patrol.validation.scoring import MinerScore
