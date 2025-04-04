@@ -11,7 +11,7 @@ import time
 
 from patrol.protocol import PatrolSynapse
 from patrol.constants import Constants
-from patrol.validation.target_generation import TargetGenerator, generate_targets
+from patrol.validation.target_generation import TargetGenerator
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
@@ -127,7 +127,7 @@ async def test_miner():
     await coldkey_finder.initialize_substrate_connection()
 
     validator_mechanism = BittensorValidationMechanism(fetcher, coldkey_finder)
-    target_generator = TargetGenerator(event_fetcher, coldkey_finder)
+    target_generator = TargetGenerator(fetcher, coldkey_finder)
 
     targets = await target_generator.generate_targets(10)
 

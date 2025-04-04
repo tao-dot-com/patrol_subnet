@@ -2,7 +2,8 @@ from typing import Dict, Any, List
 import bittensor as bt
 import math
 
-from patrol.validation.graph_validation.validation_models import GraphPayload
+
+from patrol.protocol import GraphPayload
 from patrol.validation.graph_validation.errors import ErrorPayload
 from patrol.validation.scoring import MinerScore
 from patrol.constants import Constants
@@ -51,7 +52,7 @@ class MinerScoring:
                 response_time_seconds=response_time,
                 novelty_score=None,
                 validation_passed=False,
-                error_msg=payload.message
+                error_message=payload.message
             )
 
         volume = len(payload.nodes) + len(payload.edges)
