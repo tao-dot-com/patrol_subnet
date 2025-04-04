@@ -1,55 +1,57 @@
-import asyncio
 import random
-from typing import List, Tuple
 import time
+from typing import List, Tuple
 
 import bittensor as bt
 from async_substrate_interface import AsyncSubstrateInterface
 
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
-from patrol.constants import Constants
-from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.get_current_block import get_current_block
 from patrol.chain_data.event_parser import process_event_data
+from patrol.chain_data.event_fetcher import EventFetcher
+from patrol.chain_data.coldkey_finder import ColdkeyFinder
 
-async def generate_random_block_tuples(substrate:AsyncSubstrateInterface, num_targets: int = 1) -> List[int]:
+class TargetGenerator:
+    def __init__(self, substrate: AsyncSubstrateInterface, event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder):
+        self.substrate = substrate
+        self.event_fetcher = event_fetcher
+        self.coldkey_finder = coldkey_finder
 
-    current_block = await get_current_block(substrate)
-    start_block = random.randint(3_014_342, current_block - num_targets*4*600)   # giving ourselves a buffer and a good selection of blocks
-    return [start_block + i*500 for i in range(num_targets*4)]
+    async def generate_random_block_tuples(self, num_targets: int = 1) -> List[int]:
+        current_block = await get_current_block(self.substrate)
+        start_block = random.randint(3_014_342, current_block - num_targets * 4 * 600)
+        return [start_block + i * 500 for i in range(num_targets * 4)]
 
-async def find_targets(events, number_targets: int) -> List[Tuple[str, int]]:
-    target_set = set()
+    async def find_targets(self, events, number_targets: int) -> List[Tuple[str, int]]:
+        target_set = set()
+        for event in events:
+            block = event.get("evidence", {}).get("block_number")
+            for key in ("coldkey_source", "coldkey_destination", "coldkey_owner"):
+                addr = event.get(key)
+                if addr and block:
+                    target_set.add((addr, block))
+        return random.sample(list(target_set), min(number_targets, len(target_set)))
 
-    for event in events:
-        block = event.get("evidence", {}).get("block_number")
-        for key in ("coldkey_source", "coldkey_destination", "coldkey_owner"):
-            addr = event.get(key)
-            if addr and block:
-                target_set.add((addr, block))
+    async def generate_targets(self, num_targets: int = 1) -> List[Tuple[str, int]]:
+        bt.logging.info(f"Fetching {num_targets} target addresses.")
+        start_time = time.time()
 
-    return random.sample(list(target_set), min(number_targets, len(target_set)))
+        block_numbers = await self.generate_random_block_tuples(num_targets)
+        events = await self.event_fetcher.fetch_all_events(block_numbers)
+        processed_events = await process_event_data(events, self.coldkey_finder)
+        target_tuples = await self.find_targets(processed_events, num_targets)
 
-async def generate_targets(substrate: AsyncSubstrateInterface, event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder, num_targets: int = 1):
-    bt.logging.info(f"Fetching {num_targets} target addresses.")
-    start_time = time.time() 
+        while len(target_tuples) < num_targets:
+            if not target_tuples:
+                break
+            target_tuples.append(random.choice(target_tuples))
 
-    block_numbers = await generate_random_block_tuples(substrate, num_targets)
-    events = await event_fetcher.fetch_all_events(block_numbers)
-    processed_events = await process_event_data(events, coldkey_finder)
-    target_tuples = await find_targets(processed_events, num_targets)
-
-    while len(target_tuples) < num_targets:
-        if not target_tuples:
-            break  # prevent infinite loop
-        target_tuples.append(random.choice(target_tuples))
-
-    bt.logging.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
-    return target_tuples
+        bt.logging.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
+        return target_tuples
 
 if __name__ == "__main__":
 
     from patrol.constants import Constants
+    import asyncio
 
     async def example():
 
@@ -62,7 +64,9 @@ if __name__ == "__main__":
 
             coldkey_finder = ColdkeyFinder(substrate)
 
-            target_tuples = await generate_targets(substrate, fetcher, coldkey_finder, 247)
+            target_generator = TargetGenerator(substrate, fetcher, coldkey_finder)
+
+            target_tuples = await target_generator.generate_targets(247)
 
             bt.logging.info(f"Returned: {len(target_tuples)} targets.")
 
