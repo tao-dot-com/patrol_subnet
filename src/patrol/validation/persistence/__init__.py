@@ -17,6 +17,7 @@ def migrate_db(url: str):
 
     alembic_config = Config(Path(__file__).with_name("alembic.ini"))
     alembic_config.set_main_option('sqlalchemy.url', url)
-    command.upgrade(alembic_config, 'head')
+    alembic_config.set_main_option('script_location', str(Path(__file__).with_name("migrations")))
 
+    command.upgrade(alembic_config, 'head')
     logging.info("Completed DB migration")

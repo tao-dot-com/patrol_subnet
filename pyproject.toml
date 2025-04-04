@@ -35,6 +35,6 @@ log_cli = false
 #log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 #log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
-pythonpath = ['src']
+pythonpath = ['src/']
 testpaths = ['test']
 #addopts = ['--strict-config', '-ra']
