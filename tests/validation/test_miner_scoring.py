@@ -71,7 +71,7 @@ def test_calculate_score_success(scoring):
     assert result.overall_score > 0
 
 def test_normalize_scores_empty():
-    assert normalize_scores({}) == []
+    assert normalize_scores({}) == {}
 
 def test_normalize_scores_same_values():
     scores = {1: 0.5, 2: 0.5}

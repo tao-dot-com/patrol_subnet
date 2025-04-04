@@ -89,13 +89,13 @@ class MinerScoring:
             error_message=None
         )
 
-def normalize_scores(scores: Dict[int, float]) -> list[float]:
+def normalize_scores(scores: Dict[int, float]) -> dict[float]:
     """
         Normalize a dictionary of miner Coverage scores to ensure fair comparison.
         Returns list of Coverage scores normalized between 0-1.
     """
     if not scores:
-        return []
+        return {}
     
     min_score = min(scores.values())
     max_score = max(scores.values())
