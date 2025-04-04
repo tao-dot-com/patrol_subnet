@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, UTC
 
 from patrol.protocol import GraphPayload
+from patrol.protocol import GraphPayload
 
 from patrol.protocol import GraphPayload
 from patrol.validation.graph_validation.errors import ErrorPayload
