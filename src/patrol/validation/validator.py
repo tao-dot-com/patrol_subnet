@@ -1,10 +1,16 @@
 """Functionality for asynchronously sending requests to a miner"""
+import uuid
+from typing import Callable
 
 import bittensor as bt
+import patrol
+from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
+from patrol.validation.scoring import MinerScoreRepository
 import asyncio
 import aiohttp
 import time
-import uuid
+import logging
+from uuid import UUID
 
 from patrol.protocol import PatrolSynapse
 from patrol.constants import Constants
@@ -15,31 +21,59 @@ from patrol.validation.graph_validation.bittensor_validation_mechanism import Bi
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScore
 
-async def query_miner(uid: int, 
-                      dendrite: bt.dendrite, 
-                      axon: bt.axon, 
-                      target_tuple: str,
-                      batch_id: str,
-                      validation_mechanism: BittensorValidationMechanism,
-                      scoring_mechanism: MinerScoring,
-                      semaphore: asyncio.Semaphore) -> MinerScore:
-    
-    synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
+from bittensor.core.metagraph import AsyncMetagraph
 
-    axon_info = axon.info()
+logger = logging.getLogger(__name__)
 
-    processed_synapse = dendrite.preprocess_synapse_for_request(axon_info, synapse)
+class Validator:
 
-    url = dendrite._get_endpoint_url(axon, "PatrolSynapse")
+    def __init__(self,
+        validation_mechanism: BittensorValidationMechanism,
+        target_generator: TargetGenerator,
+        scoring_mechanism: MinerScoring,
+        miner_score_repository: MinerScoreRepository,
+        dendrite: bt.Dendrite,
+        metagraph: AsyncMetagraph,
+        my_uid: int,
+        uuid_generator: Callable[[], UUID]
+    ):
+        self.validation_mechanism = validation_mechanism
+        self.scoring_mechanism = scoring_mechanism
+        self.target_generator = target_generator
+        self.miner_score_repository = miner_score_repository
+        self.dendrite = dendrite
+        self.metagraph = metagraph
+        self.my_uid = my_uid
+        self.uuid_generator = uuid_generator
 
-    async with semaphore:
+    async def query_miner(self,
+        batch_id: UUID,
+        uid: int,
+        axon_info: bt.AxonInfo,
+        target_tuple,
+    ) -> MinerScore:
 
-        async with aiohttp.ClientSession() as session:
+        synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
+        #axon_info = axon.info()
+        processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
 
-            bt.logging.info(f"Requesting url: {url}")
-            start_time = time.time() 
+        url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
+
+        trace_config = aiohttp.TraceConfig()
+        timings = {}
+
+        @trace_config.on_request_start.append
+        async def on_request_start(sess, ctx, params):
+            timings['request_start'] = time.perf_counter()
+
+        @trace_config.on_response_chunk_received.append
+        async def on_response_end(sess, ctx, params):
+            timings['response_received'] = time.perf_counter()
+
+        async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
+
+            logger.info(f"Requesting url: {url}")
             try:
-                    
                 async with session.post(
                         url,
                         headers=processed_synapse.to_headers(),
@@ -48,77 +82,85 @@ async def query_miner(uid: int,
                     ) as response:
                         # Extract the JSON response from the server
                         json_response = await response.json()
-
-                        response_time = time.time() - start_time
+                        response_time = timings['response_received'] - timings["request_start"]
 
             except aiohttp.ClientConnectorError as e:
-                bt.logging.error(f"Failed to connect to miner {uid}.  Skipping.")
-                return
+                logger.exception(f"Failed to connect to miner {uid}.  Skipping.")
             except TimeoutError as e:
-                bt.logging.error(f"Timeout error for miner {uid}.  Skipping.")
-                return
+                logger.error(f"Timeout error for miner {uid}.  Skipping.")
             except Exception as e:
-                bt.logging.error(f"Error for miner {uid}.  Skipping.  Error: {e}")
-                return
+                logger.error(f"Error for miner {uid}.  Skipping.  Error: {e}")
 
-    # Handling the post-processing
-    try:
-        payload_subgraph = json_response['subgraph_output']
-    except KeyError:
-        bt.logging.warning(f"Miner {uid} returned a non-standard response.  returned: {json_response}")
-        payload_subgraph = None
+        # Handling the post-processing
+        try:
+            payload_subgraph = json_response['subgraph_output']
+        except KeyError:
+            logger.warning(f"Miner {uid} returned a non-standard response.  returned: {json_response}")
+            payload_subgraph = None
 
-    filename = 'miner_response.json'
-    import json
+        logger.debug(f"Payload received for UID {uid}.")
 
-    # Open the file in write mode and dump the dictionary to it
-    with open(filename, 'w') as json_file:
-        json.dump(payload_subgraph, json_file, indent=4)
-        
-    bt.logging.debug(f"Payload received for UID {uid}.")
+        validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
 
-    validation_results = await validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
+        logger.debug(f"calculating coverage score for miner {uid}")
+        miner_score = self.scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id)
 
-    bt.logging.debug(f"calculating coverage score for miner {uid}")
-    miner_score = scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id)
+        await self.miner_score_repository.add(miner_score)
 
-    bt.logging.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
+        logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
+        return miner_score
 
-# FIXME: Why does the dendrite/validator need a forward? Surely it should just run on a acheduled basis?
-async def query_miners(metagraph: bt.metagraph,
-                        dendrite: bt.dendrite,
-                        my_uid: int,
-                        target_generator: TargetGenerator,
-                        validator_mechanism: BittensorValidationMechanism,
-                        scoring_mechanism: MinerScoring,
-                  ):
 
-    start_time = time.time()
-    axons = metagraph.axons
+    async def query_miner_batch(self, my_uid: int):
+        targets = await self.target_generator.generate_targets(10)
+        batch_id = self.uuid_generator()
 
-    targets = await target_generator.generate_targets(10)
+        await self.metagraph.sync()
+        axons = self.metagraph.axons
+        uids = self.metagraph.uids.tolist()
 
-    batch_id = str(uuid.uuid4())
+        logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
 
-    bt.logging.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
-
-    semaphore = asyncio.Semaphore(1)
-
-    tasks = []
-
-    for i, axon in enumerate(axons):
+        tasks = []
+        for i, axon in enumerate(axons):
             if axon.port != 0:
                 target = targets.pop()
-                tasks.append(query_miner(1, dendrite, axon, target, batch_id, validator_mechanism, scoring_mechanism, semaphore), return_exceptions=True)
+                tasks.append(self.query_miner(batch_id, uids[i], axon, target))
 
-    responses = await asyncio.gather(*tasks)
-    
-    # We want to run this every 10 minutes, so calculate the sleep time. 
-    # Get the difference between the current time and 10 minutes since the start time.
-    sleep_time = 10 * 60 - (time.time() - start_time)
+        await asyncio.gather(*tasks, return_exceptions=True)
 
-    if sleep_time > 0:
-        time.sleep(sleep_time)
+        await self._set_weights(batch_id)
+
+
+    async def _set_weights(self, batch_id: UUID):
+        pass
+
+
+async def start():
+
+    from patrol.validation.config import DB_URL, NETWORK, NET_UID
+    engine = patrol.validation.config.create_async_engine(DB_URL)
+    subtensor = bt.async_subtensor(NETWORK)
+
+    metagraph = await subtensor.metagraph(NET_UID)
+    coldkey_finder = ColdkeyFinder(subtensor.substrate)
+
+    event_fetcher = EventFetcher()
+
+    miner_validator = Validator(
+        validation_mechanism=BittensorValidationMechanism(event_fetcher, coldkey_finder),
+        target_generator=TargetGenerator(event_fetcher, coldkey_finder),
+        scoring_mechanism=MinerScoring(),
+        miner_score_repository=DatabaseMinerScoreRepository(engine),
+        dendrite=None, # FIXME
+        metagraph=metagraph,
+        my_uid=1,
+        uuid_generator=lambda: uuid.uuid4()
+    )
+
+    while True:
+        await miner_validator.query_miner_batch(1)
+        await asyncio.sleep(10 * 60)
 
 
 async def test_miner():
@@ -149,11 +191,3 @@ async def test_miner():
     semaphore = asyncio.Semaphore(1)
 
     await query_miner(1, dendrite, axon, target, "placehold_id", validator_mechanism, scoring_mechanism, semaphore)
-
-if __name__ == "__main__":
-    
-    asyncio.run(test_miner())
-        
-
-        
-
