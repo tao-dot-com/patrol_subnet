@@ -174,9 +174,11 @@ async def start():
         except Exception as ex:
             logger.exception("Error!")
 
+def boot():
+    asyncio.run(start())
 
 if __name__ == "__main__":
-    asyncio.run(start())
+   boot()
 
 # async def test_miner():
 #
