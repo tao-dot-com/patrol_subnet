@@ -4,7 +4,7 @@ import asyncio
 import time
 import json
 
-from patrol.validation.graph_validation.validation_models import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
+from patrol.protocol import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
 from patrol.validation.graph_validation.errors import PayloadValidationError, ErrorPayload
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.event_parser import process_event_data
