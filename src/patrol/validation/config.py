@@ -9,3 +9,6 @@ DB_URL = os.getenv("DB_URL", f"sqlite+aiosqlite:///{DB_DIR}/patrol.db")
 
 db_engine = create_async_engine(DB_URL)
 
+WALLET_NAME = os.environ['WALLET_NAME']
+HOTKEY_NAME = os.environ['HOTKEY_NAME']
+BITTENSOR_PATH = os.getenv('BITTENSOR_PATH')

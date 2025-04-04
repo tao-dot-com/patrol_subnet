@@ -1,6 +1,7 @@
 import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
+from email.headerregistry import UniqueUnstructuredHeader
 from typing import Optional
 from datetime import datetime
 
@@ -21,7 +22,7 @@ class MinerScore:
     validation_passed: bool
     error_message: Optional[str]
 
-class MinerScoreRepository():
+class MinerScoreRepository:
 
     @abstractmethod
     async def add(self, score: MinerScore):
@@ -29,4 +30,8 @@ class MinerScoreRepository():
 
     @abstractmethod
     async def find_by_batch_id(self, batch_id: uuid.UUID) -> list[MinerScore]:
+        pass
+
+    @abstractmethod
+    async def find_overall_scores_by_batch_id(self, batch_id: uuid.UUID):
         pass

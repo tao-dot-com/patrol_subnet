@@ -31,10 +31,8 @@ class WeightWatcher: #lol
 
     def should_set_weights(self):
         last_update = self.subtensor.blocks_since_last_update(self.config.netuid, self.my_uid)
-        if last_update > self.get_tempo():
-            return True
-        return False
-    
+        return last_update > self.get_tempo()
+
     def update_moving_avg_scores(self):
 
         scores = self.scoring.load_all_cached_scores()

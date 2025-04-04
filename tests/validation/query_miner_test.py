@@ -16,6 +16,7 @@ from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet.mock import MockWallet
 
 from aiohttp import web
+from patrol.validation.weight_setter import WeightSetter
 
 SAMPLE_RESPONSE = {
     'subgraph_output': {
@@ -72,7 +73,8 @@ async def test_persist_miner_score(mock_axon):
     axon = bt.axon(MockWallet(), port=port, ip=ip)
 
     validator = Validator(
-        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, dendrite, metagraph, 1, lambda: batch_id
+        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, dendrite,
+        metagraph, lambda: batch_id, AsyncMock(WeightSetter)
     )
     await validator.query_miner(batch_id, uid, axon.info(), ("bar", 123))
 
@@ -80,8 +82,6 @@ async def test_persist_miner_score(mock_axon):
 
 
 async def test_query_miner_batch(mock_axon):
-    # subtensor = bt.async_subtensor("finney")
-    # metagraph = await subtensor.metagraph(81)
 
     ip, port = mock_axon
 
@@ -104,8 +104,8 @@ async def test_query_miner_batch(mock_axon):
                                 novelty_score=1.0, validation_passed=True, error_message=None,
                                 coldkey="foo", hotkey="bar")
 
-    miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=3,
-                                overall_score=10.0, created_at=datetime.now(UTC),
+    miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=4,
+                                overall_score=30.0, created_at=datetime.now(UTC),
                                 volume_score=1.0, volume=2,
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
@@ -126,17 +126,25 @@ async def test_query_miner_batch(mock_axon):
         return [("A", 1), ("B", 2)]
 
     mock_generate_targets = AsyncMock(TargetGenerator, side_effect=on_generate_targets)
-
     target_generator.generate_targets=mock_generate_targets
+
+    weight_setter = AsyncMock(WeightSetter)
+
+    weights = [
+        {'uid': miner_scores_1.uid, 'weight': 0.2},
+        {'uid': miner_scores_2.uid, 'overall_score': 0.8},
+    ]
+
+    weight_setter.calculate_weights.return_value = weights
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository,
-        dendrite, metagraph, 1, lambda: batch_id
+        dendrite, metagraph, lambda: batch_id, weight_setter
     )
 
-    await validator.query_miner_batch(1)
-    # miner_score_repository.add.assert_awaited_with(miner_scores_2)
-    # miner_score_repository.add.assert_awaited_with(miner_scores_1)
-    #     call(miner_scores_1),
-    #     call(miner_scores_2),
-    # ])
+    await validator.query_miner_batch()
+    miner_score_repository.add.assert_has_awaits([
+        call(miner_scores_1),
+        call(miner_scores_2),
+    ])
+    weight_setter.set_weights.assert_awaited_once_with(weights)

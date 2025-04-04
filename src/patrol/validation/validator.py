@@ -22,6 +22,8 @@ from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScore
 
 from bittensor.core.metagraph import AsyncMetagraph
+import bittensor_wallet as btw
+from patrol.validation.weight_setter import WeightSetter
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +36,8 @@ class Validator:
         miner_score_repository: MinerScoreRepository,
         dendrite: bt.Dendrite,
         metagraph: AsyncMetagraph,
-        my_uid: int,
-        uuid_generator: Callable[[], UUID]
+        uuid_generator: Callable[[], UUID],
+        weight_setter: WeightSetter,
     ):
         self.validation_mechanism = validation_mechanism
         self.scoring_mechanism = scoring_mechanism
@@ -43,8 +45,8 @@ class Validator:
         self.miner_score_repository = miner_score_repository
         self.dendrite = dendrite
         self.metagraph = metagraph
-        self.my_uid = my_uid
         self.uuid_generator = uuid_generator
+        self.weight_setter = weight_setter
 
     async def query_miner(self,
         batch_id: UUID,
@@ -111,13 +113,13 @@ class Validator:
         return miner_score
 
 
-    async def query_miner_batch(self, my_uid: int):
+    async def query_miner_batch(self):
         batch_id = self.uuid_generator()
 
         await self.metagraph.sync()
         axons = self.metagraph.axons
         uids = self.metagraph.uids.tolist()
-        
+
         targets = await self.target_generator.generate_targets(len(uids))
 
         logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
@@ -134,61 +136,68 @@ class Validator:
 
 
     async def _set_weights(self, batch_id: UUID):
-        pass
+        weights = await self.weight_setter.calculate_weights(batch_id)
+        await self.weight_setter.set_weights(weights)
 
 
 async def start():
 
-    from patrol.validation.config import DB_URL, NETWORK, NET_UID
-    engine = patrol.validation.config.create_async_engine(DB_URL)
+    from patrol.validation.config import DB_URL, NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH
+
+    wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
+    engine = patrol.validation.config.db_engine
     subtensor = bt.async_subtensor(NETWORK)
+    miner_score_repository = DatabaseMinerScoreRepository(engine)
 
     metagraph = await subtensor.metagraph(NET_UID)
     coldkey_finder = ColdkeyFinder(subtensor.substrate)
+    mock_weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
 
     event_fetcher = EventFetcher()
+
+    dendrite = bt.Dendrite(wallet)
 
     miner_validator = Validator(
         validation_mechanism=BittensorValidationMechanism(event_fetcher, coldkey_finder),
         target_generator=TargetGenerator(event_fetcher, coldkey_finder),
         scoring_mechanism=MinerScoring(),
-        miner_score_repository=DatabaseMinerScoreRepository(engine),
-        dendrite=None, # FIXME
+        miner_score_repository=miner_score_repository,
+        dendrite=dendrite,
         metagraph=metagraph,
-        my_uid=1,
-        uuid_generator=lambda: uuid.uuid4()
+        uuid_generator=lambda: uuid.uuid4(),
+        weight_setter=mock_weight_setter
     )
 
     while True:
-        await miner_validator.query_miner_batch(1)
+        await miner_validator.query_miner_batch()
         await asyncio.sleep(10 * 60)
 
 
-async def test_miner():
-
-    bt.debug()
-
-    fetcher = EventFetcher()
-    await fetcher.initialize_substrate_connections()
-    
-    scoring_mechanism = MinerScoring()
-
-    coldkey_finder = ColdkeyFinder()
-    await coldkey_finder.initialize_substrate_connection()
-
-    validator_mechanism = BittensorValidationMechanism(fetcher, coldkey_finder)
-    target_generator = TargetGenerator(fetcher, coldkey_finder)
-
-    targets = await target_generator.generate_targets(10)
-
-    target = ("5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD", 5163655)
-
-    wallet_2 = bt.wallet(name="miners", hotkey="miner_1")
-    dendrite = bt.dendrite(wallet=wallet_2)
-
-    wallet = bt.wallet(name="miners", hotkey="miner_1")
-    axon = bt.axon(wallet=wallet, ip="0.0.0.0", port=8000)
-
-    semaphore = asyncio.Semaphore(1)
-
-    await query_miner(1, dendrite, axon, target, "placehold_id", validator_mechanism, scoring_mechanism, semaphore)
+# async def test_miner():
+#
+#     bt.debug()
+#
+#     fetcher = EventFetcher()
+#     await fetcher.initialize_substrate_connections()
+#
+#     scoring_mechanism = MinerScoring()
+#
+#     coldkey_finder = ColdkeyFinder()
+#     await coldkey_finder.initialize_substrate_connection()
+#
+#     validator_mechanism = BittensorValidationMechanism(fetcher, coldkey_finder)
+#     target_generator = TargetGenerator(fetcher, coldkey_finder)
+#
+#     targets = await target_generator.generate_targets(10)
+#
+#     target = ("5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD", 5163655)
+#
+#     wallet_2 = bt.wallet(name="miners", hotkey="miner_1")
+#     dendrite = bt.dendrite(wallet=wallet_2)
+#
+#     wallet = bt.wallet(name="miners", hotkey="miner_1")
+#     axon = bt.axon(wallet=wallet, ip="0.0.0.0", port=8000)
+#
+#     semaphore = asyncio.Semaphore(1)
+#
+#     await query_miner(1, dendrite, axon, target, "placehold_id", validator_mechanism, scoring_mechanism, semaphore)
