@@ -1,10 +1,11 @@
 import uuid
 from datetime import datetime, UTC
+from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock, MagicMock, call
 
+import bittensor_wallet
 import numpy
 import pytest
-from bt_decode.bt_decode import AxonInfo
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
@@ -13,7 +14,6 @@ from patrol.validation.validator import Validator
 
 import bittensor as bt
 from bittensor.core.metagraph import AsyncMetagraph
-from bittensor_wallet.mock import MockWallet
 
 from aiohttp import web
 from patrol.validation.weight_setter import WeightSetter
@@ -30,6 +30,12 @@ SAMPLE_RESPONSE = {
     }
 }
 
+@pytest.fixture
+def test_wallet():
+    with TemporaryDirectory() as tmp:
+        wallet = bittensor_wallet.Wallet(path=tmp)
+        wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
+        yield wallet
 
 @pytest.fixture
 async def mock_axon():
@@ -47,7 +53,7 @@ async def mock_axon():
     await site.stop()
 
 
-async def test_persist_miner_score(mock_axon):
+async def test_persist_miner_score(mock_axon, test_wallet):
     ip, port = mock_axon
 
     uid = 12
@@ -69,8 +75,8 @@ async def test_persist_miner_score(mock_axon):
 
     scoring_mechanism.calculate_score.return_value = miner_score
 
-    dendrite = bt.dendrite(MockWallet())
-    axon = bt.axon(MockWallet(), port=port, ip=ip)
+    dendrite = bt.dendrite(test_wallet)
+    axon = bt.axon(test_wallet, port=port, ip=ip)
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, dendrite,
@@ -81,11 +87,11 @@ async def test_persist_miner_score(mock_axon):
     miner_score_repository_mock.add.assert_awaited_once_with(miner_score)
 
 
-async def test_query_miner_batch(mock_axon):
+async def test_query_miner_batch(mock_axon, test_wallet):
 
     ip, port = mock_axon
 
-    dendrite = bt.dendrite(MockWallet())
+    dendrite = bt.dendrite(test_wallet)
     target_generator = AsyncMock(TargetGenerator)
     validation_mechanism = AsyncMock(BittensorValidationMechanism)
     scoring_mechanism = AsyncMock(MinerScoring)
@@ -117,8 +123,8 @@ async def test_query_miner_batch(mock_axon):
 
     metagraph = AsyncMock(AsyncMetagraph)
     metagraph.axons = [
-        bt.axon(MockWallet(), port=port, ip=ip).info(),
-        bt.axon(MockWallet(), port=port, ip=ip).info(),
+        bt.axon(test_wallet, port=port, ip=ip).info(),
+        bt.axon(test_wallet, port=port, ip=ip).info(),
     ]
     metagraph.uids = numpy.array((3, 5),)
 

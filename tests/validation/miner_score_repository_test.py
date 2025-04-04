@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, UTC
 from tempfile import TemporaryDirectory
@@ -22,7 +23,7 @@ def sqlite_engine(temp_dir):
 
 @pytest.fixture
 def pgsql_engine():
-    url = f"postgresql+asyncpg://patrol:password@localhost:5432/patrol"
+    url = os.getenv("TEST_POSTGRESQL_URL", "postgresql+asyncpg://patrol:password@localhost:5432/patrol")
     migrate_db(url)
     engine = create_async_engine(url)
     return engine
