@@ -21,6 +21,8 @@ class TargetGenerator:
     async def find_targets(self, events, number_targets: int) -> List[Tuple[str, int]]:
         target_set = set()
         for event in events:
+            if not isinstance(event, dict):
+                continue
             block = event.get("evidence", {}).get("block_number")
             for key in ("coldkey_source", "coldkey_destination", "coldkey_owner"):
                 addr = event.get(key)

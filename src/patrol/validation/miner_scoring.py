@@ -1,8 +1,10 @@
 from typing import Dict, Any, List
 import bittensor as bt
 import math
+import uuid
+from datetime import datetime, UTC
 
-from patrol.validation.graph_validation.validation_models import GraphPayload
+from patrol.protocol import GraphPayload
 from patrol.validation.graph_validation.errors import ErrorPayload
 from patrol.validation.scoring import MinerScore
 from patrol.constants import Constants
@@ -35,12 +37,16 @@ class MinerScoring:
         coldkey: str,
         hotkey: str,
         payload: GraphPayload | ErrorPayload,
-        response_time: float
+        response_time: float,
+        batch_id: str
     ) -> MinerScore:
 
         if isinstance(payload, ErrorPayload):
             bt.logging.warning(f"Error recieved as output from validation process, adding details to miner {uid} records.")
             return MinerScore(
+                id=str(uuid.uuid4()),
+                batch_id=batch_id,
+                created_at=datetime.now(UTC),
                 uid=uid,
                 coldkey=coldkey,
                 hotkey=hotkey,
@@ -51,7 +57,7 @@ class MinerScoring:
                 response_time_seconds=response_time,
                 novelty_score=None,
                 validation_passed=False,
-                error_msg=payload.message
+                error_message=payload.message
             )
 
         volume = len(payload.nodes) + len(payload.edges)
@@ -66,6 +72,9 @@ class MinerScoring:
         bt.logging.info(f"Scoring completed for miner {uid}, with overall score: {overall_score}")
 
         return MinerScore(
+            id=str(uuid.uuid4()),
+            batch_id=batch_id,
+            created_at=datetime.now(UTC),
             uid=uid,
             coldkey=coldkey,
             hotkey=hotkey,
@@ -76,7 +85,7 @@ class MinerScoring:
             response_time_seconds=response_time,
             novelty_score=None,
             validation_passed=True,
-            error_msg=None
+            error_message=None
         )
 
 def normalize_scores(scores: Dict[int, float]) -> List[float]:

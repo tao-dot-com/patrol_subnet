@@ -1,17 +1,14 @@
 """Functionality for asynchronously sending requests to a miner"""
 
 import bittensor as bt
-from patrol.chain_data import event_fetcher
-from patrol.validation.scoring import MinerScoreRepository
-from substrateinterface import SubstrateInterface
-from async_substrate_interface import AsyncSubstrateInterface
 import asyncio
 import aiohttp
 import time
+import uuid
 
 from patrol.protocol import PatrolSynapse
 from patrol.constants import Constants
-from patrol.validation.target_generation import TargetGenerator, generate_targets
+from patrol.validation.target_generation import TargetGenerator
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
@@ -22,6 +19,7 @@ async def query_miner(uid: int,
                       dendrite: bt.dendrite, 
                       axon: bt.axon, 
                       target_tuple: str,
+                      batch_id: str,
                       validation_mechanism: BittensorValidationMechanism,
                       scoring_mechanism: MinerScoring,
                       semaphore: asyncio.Semaphore) -> MinerScore:
@@ -69,13 +67,20 @@ async def query_miner(uid: int,
     except KeyError:
         bt.logging.warning(f"Miner {uid} returned a non-standard response.  returned: {json_response}")
         payload_subgraph = None
+
+    filename = 'miner_response.json'
+    import json
+
+    # Open the file in write mode and dump the dictionary to it
+    with open(filename, 'w') as json_file:
+        json.dump(payload_subgraph, json_file, indent=4)
         
     bt.logging.debug(f"Payload received for UID {uid}.")
 
     validation_results = await validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
 
     bt.logging.debug(f"calculating coverage score for miner {uid}")
-    miner_score = scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time)
+    miner_score = scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id)
 
     bt.logging.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
 
@@ -93,7 +98,9 @@ async def query_miners(metagraph: bt.metagraph,
 
     targets = await target_generator.generate_targets(10)
 
-    bt.logging.info(f"Selected {len(targets)} targets.")
+    batch_id = str(uuid.uuid4())
+
+    bt.logging.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
 
     semaphore = asyncio.Semaphore(1)
 
@@ -102,7 +109,7 @@ async def query_miners(metagraph: bt.metagraph,
     for i, axon in enumerate(axons):
             if axon.port != 0:
                 target = targets.pop()
-                tasks.append(query_miner(1, dendrite, axon, target, validator_mechanism, scoring_mechanism, semaphore), return_exceptions=True)
+                tasks.append(query_miner(1, dendrite, axon, target, batch_id, validator_mechanism, scoring_mechanism, semaphore), return_exceptions=True)
 
     responses = await asyncio.gather(*tasks)
     
@@ -127,7 +134,7 @@ async def test_miner():
     await coldkey_finder.initialize_substrate_connection()
 
     validator_mechanism = BittensorValidationMechanism(fetcher, coldkey_finder)
-    target_generator = TargetGenerator(event_fetcher, coldkey_finder)
+    target_generator = TargetGenerator(fetcher, coldkey_finder)
 
     targets = await target_generator.generate_targets(10)
 
@@ -141,7 +148,7 @@ async def test_miner():
 
     semaphore = asyncio.Semaphore(1)
 
-    await query_miner(1, dendrite, axon, target, validator_mechanism, scoring_mechanism, semaphore)
+    await query_miner(1, dendrite, axon, target, "placehold_id", validator_mechanism, scoring_mechanism, semaphore)
 
 if __name__ == "__main__":
     

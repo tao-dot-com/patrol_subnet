@@ -239,7 +239,7 @@ if __name__ == "__main__":
 
     from patrol.constants import Constants
 
-    file_path = "example_subgraph_output.json"
+    file_path = "miner_response.json"
     with open(file_path, "r") as f:
         payload = json.load(f)
 
@@ -248,13 +248,13 @@ if __name__ == "__main__":
         fetcher = EventFetcher()
         await fetcher.initialize_substrate_connections()
 
-        async with AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS) as substrate:
-            coldkey_finder = ColdkeyFinder(substrate)
+        coldkey_finder = ColdkeyFinder()
+        await coldkey_finder.initialize_substrate_connection()
 
-            validator = BittensorValidationMechanism(fetcher, coldkey_finder)
-            
-            # Run the validation
-            result = await validator.validate_payload(uid=1, payload=payload, target="5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD")
+        validator = BittensorValidationMechanism(fetcher, coldkey_finder)
+        
+        # Run the validation
+        result = await validator.validate_payload(uid=1, payload=payload, target="5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD")
             # bt.logging.info("Validated Payload:", result)
 
     asyncio.run(main())
