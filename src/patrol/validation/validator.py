@@ -1,88 +1,90 @@
 """Functionality for asynchronously sending requests to a miner"""
 
 import bittensor as bt
+from patrol.chain_data import event_fetcher
+from patrol.validation.scoring import MinerScoreRepository
+from substrateinterface import SubstrateInterface
+from async_substrate_interface import AsyncSubstrateInterface
 import asyncio
 import aiohttp
 import time
-import uuid
 
 from patrol.protocol import PatrolSynapse
 from patrol.constants import Constants
-from patrol.validation.target_generation import TargetGenerator
+from patrol.validation.target_generation import TargetGenerator, generate_targets
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScore
 
-async def query_miner(uid: int, 
+logger = logging.getLogger(__name__)
+
+async def query_miner(batch_id: UUID,
+                      uid: int,
                       dendrite: bt.dendrite, 
                       axon: bt.axon, 
-                      target_tuple: str,
-                      batch_id: str,
+                      target_tuple,
                       validation_mechanism: BittensorValidationMechanism,
                       scoring_mechanism: MinerScoring,
-                      semaphore: asyncio.Semaphore) -> MinerScore:
+                      miner_score_repository: MinerScoreRepository
+                      ):
     
     synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
-
     axon_info = axon.info()
-
     processed_synapse = dendrite.preprocess_synapse_for_request(axon_info, synapse)
 
     url = dendrite._get_endpoint_url(axon, "PatrolSynapse")
 
-    async with semaphore:
+    trace_config = aiohttp.TraceConfig()
+    timings = {}
 
-        async with aiohttp.ClientSession() as session:
+    @trace_config.on_request_start.append
+    async def on_request_start(session, ctx, params):
+        timings['request_start'] = time.perf_counter()
 
-            bt.logging.info(f"Requesting url: {url}")
-            start_time = time.time() 
-            try:
-                    
-                async with session.post(
-                        url,
-                        headers=processed_synapse.to_headers(),
-                        json=processed_synapse.model_dump(),
-                        timeout=Constants.MAX_RESPONSE_TIME
-                    ) as response:
-                        # Extract the JSON response from the server
-                        json_response = await response.json()
+    @trace_config.on_response_chunk_received.append
+    async def on_response_end(session, ctx, params):
+        timings['response_received'] = time.perf_counter()
 
-                        response_time = time.time() - start_time
+    async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
 
-            except aiohttp.ClientConnectorError as e:
-                bt.logging.error(f"Failed to connect to miner {uid}.  Skipping.")
-                return
-            except TimeoutError as e:
-                bt.logging.error(f"Timeout error for miner {uid}.  Skipping.")
-                return
-            except Exception as e:
-                bt.logging.error(f"Error for miner {uid}.  Skipping.  Error: {e}")
-                return
+        logger.info(f"Requesting url: {url}")
+        try:
+            async with session.post(
+                    url,
+                    headers=processed_synapse.to_headers(),
+                    json=processed_synapse.model_dump(),
+                    timeout=Constants.MAX_RESPONSE_TIME
+                ) as response:
+                    # Extract the JSON response from the server
+                    json_response = await response.json()
+                    response_time = timings['response_received'] - timings["request_start"]
+
+        except aiohttp.ClientConnectorError as e:
+            logger.exception(f"Failed to connect to miner {uid}.  Skipping.")
+        except TimeoutError as e:
+            logger.error(f"Timeout error for miner {uid}.  Skipping.")
+        except Exception as e:
+            logger.error(f"Error for miner {uid}.  Skipping.  Error: {e}")
 
     # Handling the post-processing
     try:
         payload_subgraph = json_response['subgraph_output']
     except KeyError:
-        bt.logging.warning(f"Miner {uid} returned a non-standard response.  returned: {json_response}")
+        logger.warning(f"Miner {uid} returned a non-standard response.  returned: {json_response}")
         payload_subgraph = None
 
-    filename = 'miner_response.json'
-    import json
-
-    # Open the file in write mode and dump the dictionary to it
-    with open(filename, 'w') as json_file:
-        json.dump(payload_subgraph, json_file, indent=4)
-        
-    bt.logging.debug(f"Payload received for UID {uid}.")
+    logger.debug(f"Payload received for UID {uid}.")
 
     validation_results = await validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
 
-    bt.logging.debug(f"calculating coverage score for miner {uid}")
-    miner_score = scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id)
+    logger.debug(f"calculating coverage score for miner {uid}")
+    miner_score = scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time)
 
-    bt.logging.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
+    await miner_score_repository.add(miner_score)
+
+    logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
 
 # FIXME: Why does the dendrite/validator need a forward? Surely it should just run on a acheduled basis?
 async def query_miners(metagraph: bt.metagraph,

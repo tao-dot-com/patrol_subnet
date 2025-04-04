@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx"]
+test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "aioresponses"]
 
 [build-system]
 requires = ["setuptools>=57", "wheel", "setuptools-git-versioning>=2.0,<3"]
