@@ -45,7 +45,7 @@ class TargetGenerator:
             target_tuples.append(random.choice(target_tuples))
 
         bt.logging.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
-        return target_tuples
+        return target_tuples[:num_targets]
 
 if __name__ == "__main__":
 

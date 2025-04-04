@@ -112,12 +112,13 @@ class Validator:
 
 
     async def query_miner_batch(self, my_uid: int):
-        targets = await self.target_generator.generate_targets(10)
         batch_id = self.uuid_generator()
 
         await self.metagraph.sync()
         axons = self.metagraph.axons
         uids = self.metagraph.uids.tolist()
+        
+        targets = await self.target_generator.generate_targets(len(uids))
 
         logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
 
