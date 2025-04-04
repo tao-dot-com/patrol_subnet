@@ -8,10 +8,12 @@ from async_substrate_interface import AsyncSubstrateInterface
 import asyncio
 import aiohttp
 import time
+import logging
+from uuid import UUID
 
 from patrol.protocol import PatrolSynapse
 from patrol.constants import Constants
-from patrol.validation.target_generation import TargetGenerator, generate_targets
+from patrol.validation.target_generation import TargetGenerator
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
