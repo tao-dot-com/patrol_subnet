@@ -20,16 +20,16 @@ from patrol.validation.scoring import MinerScore
 
 logger = logging.getLogger(__name__)
 
-async def query_miner(batch_id: UUID,
-                      uid: int,
-                      dendrite: bt.dendrite, 
-                      axon: bt.axon, 
-                      target_tuple,
-                      validation_mechanism: BittensorValidationMechanism,
-                      scoring_mechanism: MinerScoring,
-                      miner_score_repository: MinerScoreRepository
-                      ):
-    
+async def query_miner(
+    batch_id: UUID,
+    uid: int,
+    dendrite: bt.dendrite,
+    axon: bt.axon,
+    target_tuple,
+    validation_mechanism: BittensorValidationMechanism,
+    scoring_mechanism: MinerScoring,
+    miner_score_repository: MinerScoreRepository
+):
     synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
     axon_info = axon.info()
     processed_synapse = dendrite.preprocess_synapse_for_request(axon_info, synapse)
