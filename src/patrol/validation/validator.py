@@ -170,12 +170,15 @@ async def start():
     while True:
         try:
             await miner_validator.query_miner_batch()
-            await asyncio.sleep(10 * 60)
         except Exception as ex:
             logger.exception("Error!")
+        await asyncio.sleep(10 * 60)
 
 def boot():
-    asyncio.run(start())
+    try:
+        asyncio.run(start())
+    except KeyboardInterrupt as ex:
+        logger.info("Exiting")
 
 if __name__ == "__main__":
    boot()

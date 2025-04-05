@@ -11,7 +11,8 @@ dependencies = [
     "aiosqlite",
     "psycopg2-binary",
     "asyncpg",
-    "alembic"
+    "alembic",
+    "python-json-logger"
 ]
 
 [project.optional-dependencies]
