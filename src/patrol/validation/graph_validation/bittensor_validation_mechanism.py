@@ -109,6 +109,10 @@ class BittensorValidationMechanism:
     def verify_target_in_graph(self, target: str) -> None:
 
         def find_target(target):
+            if len(self.graph_payload.nodes) == 1:
+                if self.graph_payload.nodes[0].id == target:
+                    return True
+
             for edge in self.graph_payload.edges:
                 if edge.coldkey_destination == target:
                     return True
