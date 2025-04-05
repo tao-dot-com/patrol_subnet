@@ -157,7 +157,7 @@ class EventFetcher:
             A dictionary mapping block numbers to their event responses.
         """
         start_time = time.time()
-        bt.logging.debug(f"\nAttempting to fetching event data, for {len(block_numbers)} blocks...")
+        bt.logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
 
         # Validate input: check if block_numbers is empty.
         if not block_numbers:
@@ -197,11 +197,11 @@ class EventFetcher:
                         break
                     except Exception as e:
                         if attempt < attempts - 1:
-                            bt.logging.error(
-                                f"Error fetching events for group {group} batch on attempt {attempt+1}: {e}. Retrying..."
+                            bt.logging.warning(
+                                f"Issue fetching events for group {group} batch on attempt {attempt+1}: {e}. Retrying..."
                             )
                         else:
-                            bt.logging.error(
+                            bt.logging.warning(
                                 f"Error fetching events for group {group} batch on final attempt: {e}. Continuing..."
                             )
             # Continue to next group even if the current one fails.
