@@ -14,14 +14,14 @@ class SubgraphGenerator:
     
     # These parameters control the subgraph generation:
     # - _max_future_events: The number of events into the past you will collect
-    # - _max_historic_events: The number of events into the future you will collect
+    # - _max_past_events: The number of events into the future you will collect
     # Adjust these based on your needs - higher values give higher chance of being able to find and deliver larger subgraphs, 
     # but will require more time and resources to generate
-    def __init__(self,  event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder, max_future_events=900, max_historic_events=900, timeout=Constants.MAX_RESPONSE_TIME):
+    def __init__(self,  event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder, max_future_events=900, max_past_events=900, timeout=Constants.MAX_RESPONSE_TIME):
         self.event_fetcher = event_fetcher
         self.coldkey_finder = coldkey_finder
         self._max_future_events = max_future_events
-        self._max_historic_events = max_historic_events
+        self._max_past_events = max_past_events
         self.timeout = timeout
     
     async def generate_block_numbers(self, target_block: int, lower_block_limit: int = Constants.LOWER_BLOCK_LIMIT) -> List[int]:
@@ -30,7 +30,7 @@ class SubgraphGenerator:
 
         upper_block_limit = await self.event_fetcher.get_current_block()
 
-        start_block = max(target_block - self._max_historic_events, lower_block_limit)
+        start_block = max(target_block - self._max_past_events, lower_block_limit)
         end_block = min(target_block + self._max_future_events, upper_block_limit)
 
         return list(range(start_block, end_block + 1))
@@ -165,7 +165,7 @@ if __name__ == "__main__":
         coldkey_finder = ColdkeyFinder()
         await coldkey_finder.initialize_substrate_connection()
 
-        subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_historic_events=500)
+        subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_past_events=500)
         subgraph = await subgraph_generator.run(target, target_block)
 
         volume = len(subgraph.nodes) + len(subgraph.edges)
