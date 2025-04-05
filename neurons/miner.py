@@ -10,11 +10,13 @@ import logging
 import argparse
 
 from patrol.protocol import PatrolSynapse, MinerPingSynapse
-from patrol.mining.subgraph_generator import SubgraphProcessor
+from patrol.chain_data.event_fetcher import EventFetcher
+from patrol.chain_data.coldkey_finder import ColdkeyFinder
+from patrol.mining.subgraph_generator import SubgraphGenerator
 from patrol.constants import Constants
 
 class Miner:
-    def __init__(self, dev_flag, wallet_path, coldkey, hotkey, port, external_ip, netuid, subtensor_network):
+    def __init__(self, dev_flag: bool, wallet_path: str, coldkey: str, hotkey: str, port: int, external_ip: str, netuid: int, subtensor_network: str, subgraph_generator: SubgraphGenerator):
         self.dev_flag = dev_flag
         self.wallet_path = wallet_path
         self.coldkey = coldkey
@@ -23,6 +25,7 @@ class Miner:
         self.external_ip = external_ip
         self.netuid = netuid
         self.network = subtensor_network
+        self.subgraph_generator = subgraph_generator
         self.setup_logging()
         self.setup_bittensor_objects()
 
@@ -119,8 +122,17 @@ class Miner:
     def blacklist_fn(self, synapse: PatrolSynapse) -> Tuple[bool, str]:
         # Ignore requests from unrecognized entities.
         if not self.dev_flag and synapse.dendrite.hotkey not in self.metagraph.hotkeys:
-            bt.logging.trace(f'Blacklisting unrecognized hotkey {synapse.dendrite.hotkey}')
-            return True, None
+            bt.logging.warning(f'Blacklisting unrecognized hotkey {synapse.dendrite.hotkey}')
+            return True, "Unrecognized hotkey"
+
+        uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
+
+        if not self.metagraph.validator_permit[uid] or self.metagraph.S[uid] < 30000:
+            bt.logging.warning(
+                f"Blacklisting a request from non-validator hotkey {synapse.dendrite.hotkey}"
+            )
+            return True, "Non-validator hotkey"
+        
         bt.logging.trace(f'Not blacklisting recognized hotkey {synapse.dendrite.hotkey}')
         return False, None
 
@@ -130,9 +142,12 @@ class Miner:
         It generates a subgraph for the given target and returns it.
         """
         bt.logging.info(f"Received request: {synapse.target}")
-        processor = SubgraphProcessor(depth=2, max_nodes=10, max_edges=30)
-        synapse.subgraph_output = await processor.generate_subgraph(synapse.target)
-        bt.logging.info("Payload returned.")
+        start_time = time.time()
+        synapse.subgraph_output = await self.subgraph_generator.run(synapse.target, synapse.target_block_number)
+
+        volume = len(synapse.subgraph_output.nodes) + len(synapse.subgraph_output.edges)
+
+        bt.logging.info(f"Finished: {time.time() - start_time} with volume: {volume}")
         return synapse
 
     def forward_ping(self, synapse: MinerPingSynapse) -> MinerPingSynapse:
@@ -198,6 +213,16 @@ class Miner:
                 bt.logging.error(traceback.format_exc())
                 continue
 
+async def setup_subgraph_generator(max_future_events: int = 500, max_past_events: int = 500) -> SubgraphGenerator:
+
+    event_fetcher = EventFetcher()
+    await event_fetcher.initialize_substrate_connections()
+
+    coldkey_finder = ColdkeyFinder()
+    await coldkey_finder.initialize_substrate_connection()
+
+    return SubgraphGenerator(event_fetcher=event_fetcher, coldkey_finder=coldkey_finder, max_future_events=max_future_events, max_past_events=max_past_events)
+
 # Run the miner
 
 if __name__ == "__main__":
@@ -210,12 +235,15 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, default=8000, help="Port number for the miner.")
     parser.add_argument('--external_ip', type=str, default=None, help="External IP for miner to serve on the metagraph.")
     parser.add_argument('--dev_flag', type=bool, default=False, help="Enable developer mode. This will run the miner without needing a blockchain endpoint.")
-    parser.add_argument('--network',type=str, default="finney", help="Subtensor Endpoint.")
     parser.add_argument('--archive_node_address', type=str, default="ws://5.9.118.137:9944", help="Address of bittensor archive node.")
+    parser.add_argument('--max_future_events', type=int, default=500, help="Number of blocks to querying into the future from the target block recieved.")
+    parser.add_argument('--max_past_events', type=int, default=500, help="Number of blocks to querying into the past from the target block recieved.")
     
     args = parser.parse_args()
 
     Constants.ARCHIVE_NODE_ADDRESS = args.archive_node_address
+
+    subgraph_generator = asyncio.run(setup_subgraph_generator())
     
     miner = Miner(
         dev_flag=args.dev_flag,
@@ -225,6 +253,7 @@ if __name__ == "__main__":
         port=args.port,
         external_ip=args.external_ip,
         netuid=args.netuid,
-        subtensor_network=args.network
+        subtensor_network=args.archive_node_address,
+        subgraph_generator=subgraph_generator
     )
     miner.run()
