@@ -15,6 +15,11 @@ from patrol.protocol import PatrolSynapse, MinerPingSynapse
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.mining.subgraph_generator import SubgraphGenerator
+from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+
+import json
+import uuid
+import dataclasses
 
 def get_event_loop():
     loop = asyncio.new_event_loop()
@@ -23,7 +28,7 @@ def get_event_loop():
     return loop
 
 class Miner:
-    def __init__(self, dev_flag: bool, wallet_path: str, coldkey: str, hotkey: str, port: int, external_ip: str, netuid: int, subtensor: AsyncSubtensor, max_new_events: int= 500, max_past_events: int = 500):
+    def __init__(self, dev_flag: bool, wallet_path: str, coldkey: str, hotkey: str, port: int, external_ip: str, netuid: int, subtensor: AsyncSubtensor, network_url: str, max_future_events: int= 500, max_past_events: int = 500):
         self.dev_flag = dev_flag
         self.wallet_path = wallet_path
         self.coldkey = coldkey
@@ -32,7 +37,8 @@ class Miner:
         self.external_ip = external_ip
         self.netuid = netuid
         self.subtensor = subtensor
-        self.max_new_events = max_new_events
+        self.network_url = network_url
+        self.max_future_events = max_future_events
         self.max_past_events = max_past_events
         self.subgraph_loop = get_event_loop()
         self.subgraph_generator = None
@@ -67,16 +73,18 @@ class Miner:
         return False, None
 
     async def forward(self, synapse: PatrolSynapse) -> PatrolSynapse:
-        bt.logging.info(f"Received request: {synapse.target}")
+        bt.logging.info(f"Received request: {synapse.target}, with block number: {synapse.target_block_number}")
         start_time = time.time()
         future = run_coroutine_threadsafe(
             self.subgraph_generator.run(synapse.target, synapse.target_block_number),
             self.subgraph_loop
         )
         synapse.subgraph_output = future.result()
+
         volume = len(synapse.subgraph_output.nodes) + len(synapse.subgraph_output.edges)
-        bt.logging.info(f"Finished: {time.time() - start_time} with volume: {volume}")
+        bt.logging.info(f"Returning a graph of {volume} in {round(time.time() - start_time, 2)} seconds.")
         return synapse
+        # If this errors then we should reload the substrate? 
 
     def forward_ping(self, synapse: MinerPingSynapse) -> MinerPingSynapse:
         return MinerPingSynapse(is_available=True)
@@ -89,17 +97,20 @@ class Miner:
         self.axon.start()
 
     async def setup_miner(self):
+            
+        # Create an instance of SubstrateClient.
+        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=self.network_url, keepalive_interval=30, max_retries=3)
+        
+        await client.initialize_connections()
 
-        event_fetcher = EventFetcher()
-        await event_fetcher.initialize_substrate_connections()
-        coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialize_substrate_connection()
+        event_fetcher = EventFetcher(substrate_client=client)
+        coldkey_finder = ColdkeyFinder(substrate_client=client)
 
         self.subgraph_generator = SubgraphGenerator(
             event_fetcher=event_fetcher,
             coldkey_finder=coldkey_finder,
-            max_future_events=500,
-            max_past_events=500
+            max_future_events=self.max_future_events,
+            max_past_events=self.max_past_events
         )
 
         bt.logging.info("Successfully initialised, waiting for requests...")
@@ -151,7 +162,10 @@ async def boot():
             port=args.port,
             external_ip=args.external_ip,
             netuid=args.netuid,
-            subtensor=subtensor
+            subtensor=subtensor,
+            network_url=args.archive_node_address,
+            max_future_events=args.max_future_events,
+            max_past_events=args.max_past_events
         )
         await miner.run()
 

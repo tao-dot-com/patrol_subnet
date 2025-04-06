@@ -1,19 +1,7 @@
 import asyncio
 import time
 from typing import Dict, List, Tuple, Any
-from async_substrate_interface import AsyncSubstrateInterface
 import bittensor as bt
-
-from patrol.constants import Constants
-
-GROUP_INIT_BLOCK = {
-    1: 3784340,
-    2: 4264340,
-    3: 4920350,
-    4: 5163656,
-    5: 5228683,
-    6: 5228685,
-}
 
 def group_block(block: int, current_block: int) -> int:
     if block <= 3014340:
@@ -67,40 +55,22 @@ def group_blocks(
     return batched
 
 class EventFetcher:
-    def __init__(self):
-        self.substrates = {}  # group_id -> AsyncSubstrateInterface
-
-    async def initialize_substrate_connections(self):
-        bt.logging.info("Initializing Event Fetcher")
-        for group, init_block in GROUP_INIT_BLOCK.items():
-            bt.logging.info(f"Initializing substrate for group {group} @ block {init_block}")
-            substrate = AsyncSubstrateInterface(url=Constants.ARCHIVE_NODE_ADDRESS)
-            init_hash = await substrate.get_block_hash(init_block)
-            await substrate.init_runtime(block_hash=init_hash)
-            self.substrates[group] = substrate
-
+    def __init__(self, substrate_client):
+        self.substrate_client = substrate_client
+        self.semaphore = asyncio.Semaphore(1)
+  
     async def get_current_block(self) -> int:
-
-        current_block = await self.substrates[6].get_block()
-
-        return current_block['header']['number']
+        current_block = await self.substrate_client.query(6, "get_block")
+        return current_block["header"]["number"]
 
     async def get_block_events(
-        self, 
-        substrate: AsyncSubstrateInterface, 
-        block_info: List[Tuple[int, str]], 
+        self,
+        group: int,
+        block_info: List[Tuple[int, str]],
         max_concurrent: int = 10
     ) -> Dict[int, Any]:
         """
-        Fetch events for a list of blocks.
-        
-        Parameters:
-            substrate: The substrate interface for RPC calls.
-            block_info: List of tuples (block_number, block_hash).
-            max_concurrent: Maximum number of concurrent RPC calls.
-            
-        Returns:
-            A dictionary mapping block number to event response.
+        Fetch events for a batch of blocks for a specific group using the substrate client's query method.
         """
         # Extract block hashes for processing.
         block_hashes = [block_hash for (_, block_hash) in block_info]
@@ -108,7 +78,10 @@ class EventFetcher:
 
         async def preprocess_with_semaphore(block_hash):
             async with semaphore:
-                return await substrate._preprocess(
+                # Use the query method to call the substrate's _preprocess method.
+                return await self.substrate_client.query(
+                    group,
+                    "_preprocess",
                     None,
                     block_hash,
                     module="System",
@@ -121,17 +94,12 @@ class EventFetcher:
         if errors:
             raise Exception(f"Preprocessing failed: {errors}")
 
-        payloads = [
-            substrate.make_payload(
-                f"{block_hash}",
-                preprocessed.method,
-                [preprocessed.params[0], block_hash]
-            )
-            for block_hash, preprocessed in zip(block_hashes, preprocessed_lst)
-        ]
+        payloads = self.substrate_client.build_payloads(group, block_hashes, preprocessed_lst)
 
         responses = await asyncio.wait_for(
-            substrate._make_rpc_request(
+            self.substrate_client.query(
+                group,
+                "_make_rpc_request",
                 payloads,
                 preprocessed_lst[0].value_scale_type,
                 preprocessed_lst[0].storage_item
@@ -145,19 +113,11 @@ class EventFetcher:
             for (block_number, block_hash) in block_info
         }
     
-
     async def fetch_all_events(self, block_numbers: List[int]) -> Dict[int, Any]:
         """
         Retrieve events for all given block numbers.
-        
-        Parameters:
-            block_numbers: A list of block numbers.
-            
-        Returns:
-            A dictionary mapping block numbers to their event responses.
         """
         start_time = time.time()
-        bt.logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
 
         # Validate input: check if block_numbers is empty.
         if not block_numbers:
@@ -172,38 +132,33 @@ class EventFetcher:
         # Get rid of duplicates
         block_numbers = set(block_numbers)
 
-        # Get block hashes from substrate 1 (assuming all substrates return consistent hashes).
-        block_hashes = await asyncio.gather(
-            *[self.substrates[1].get_block_hash(n) for n in block_numbers]
-        )
+        async with self.semaphore:
+            bt.logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
 
-        # Need to make sure we always use the latest substrate to get the current block otherwise it can throw off older substrate
-        current_block = await self.get_current_block()
+            block_hash_tasks = [
+                self.substrate_client.query(6, "get_block_hash", n)
+                for n in block_numbers
+            ]
+            block_hashes = await asyncio.gather(*block_hash_tasks)
 
-        # Group blocks by group while maintaining the block number alongside its hash.
-        grouped = group_blocks(block_numbers, block_hashes, current_block)
+            # Need to make sure we always use the latest substrate to get the current block otherwise it can throw off older substrate
+            current_block = await self.get_current_block()
 
-        all_events: Dict[int, Any] = {}
-        for group, batches in grouped.items():
-            substrate = self.substrates[group]
-            for batch in batches:
-                bt.logging.debug(f"\nFetching events for group {group} (batch of {len(batch)} blocks)...")
-                attempts = 3
-                for attempt in range(attempts):
+            # Group blocks by group while maintaining the block number alongside its hash.
+            grouped = group_blocks(block_numbers, block_hashes, current_block)
+
+            all_events: Dict[int, Any] = {}
+            for group, batches in grouped.items():
+                for batch in batches:
+                    bt.logging.debug(f"\nFetching events for group {group} (batch of {len(batch)} blocks)...")
                     try:
-                        events = await self.get_block_events(substrate, batch)
+                        events = await self.get_block_events(group, batch)
                         all_events.update(events)
-                        bt.logging.debug(f"Successfully fetched events for group {group} batch on attempt {attempt+1}.")
-                        break
+                        bt.logging.debug(f"Successfully fetched events for group {group} batch.")
                     except Exception as e:
-                        if attempt < attempts - 1:
-                            bt.logging.warning(
-                                f"Issue fetching events for group {group} batch on attempt {attempt+1}: {e}. Retrying..."
-                            )
-                        else:
-                            bt.logging.warning(
-                                f"Error fetching events for group {group} batch on final attempt: {e}. Continuing..."
-                            )
+                        bt.logging.warning(
+                            f"Error fetching events for group {group} batch on final attempt: {e}. Continuing..."
+                        )
             # Continue to next group even if the current one fails.
         bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
@@ -212,8 +167,17 @@ async def example():
 
     bt.debug()
 
-    fetcher = EventFetcher()
-    await fetcher.initialize_substrate_connections()
+    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+
+    network_url = "wss://archive.chain.opentensor.ai:443/"
+        
+    # Create an instance of SubstrateClient.
+    client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+    
+    # Initialize substrate connections for all groups.
+    await client.initialize_connections()
+
+    fetcher = EventFetcher(substrate_client=client)
 
     test_cases = [
         [5163655 + i for i in range(1000)]

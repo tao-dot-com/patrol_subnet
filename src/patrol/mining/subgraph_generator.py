@@ -98,29 +98,34 @@ class SubgraphGenerator:
                     evidence.get('block_number')
                 )
 
-                if edge_key not in seen_edges:
-                    seen_edges.add(edge_key)
-                    if event.get('category') == "balance":                
-                        edges.append(
-                            Edge(
-                                coldkey_source=event['coldkey_source'],
-                                coldkey_destination=event['coldkey_destination'],
-                                category=event['category'],
-                                type=event['type'],
-                                evidence=TransferEvidence(**event['evidence'])
+                try:
+
+                    if edge_key not in seen_edges:
+                        seen_edges.add(edge_key)
+                        if event.get('category') == "balance":                
+                            edges.append(
+                                Edge(
+                                    coldkey_source=event['coldkey_source'],
+                                    coldkey_destination=event['coldkey_destination'],
+                                    category=event['category'],
+                                    type=event['type'],
+                                    evidence=TransferEvidence(**event['evidence'])
+                                )
                             )
-                        )
-                    elif event.get('category') == "staking":
-                        edges.append(
-                            Edge(
-                                coldkey_source=event['coldkey_source'],
-                                coldkey_destination=event['coldkey_destination'],
-                                coldkey_owner=event.get('coldkey_owner'),
-                                category=event['category'],
-                                type=event['type'],
-                                evidence=StakeEvidence(**event['evidence'])
+                        elif event.get('category') == "staking":
+                            edges.append(
+                                Edge(
+                                    coldkey_source=event['coldkey_source'],
+                                    coldkey_destination=event['coldkey_destination'],
+                                    coldkey_owner=event.get('coldkey_owner'),
+                                    category=event['category'],
+                                    type=event['type'],
+                                    evidence=StakeEvidence(**event['evidence'])
+                                )
                             )
-                        )
+                except Exception as e:
+                    print(event)
+
 
                 if neighbor not in seen_nodes and neighbor not in queue:
                     queue.append(neighbor)
@@ -154,16 +159,23 @@ if __name__ == "__main__":
 
         bt.debug()
 
-        fetcher = EventFetcher()
-        await fetcher.initialize_substrate_connections()
+        from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+
+        network_url = "wss://archive.chain.opentensor.ai:443/"
+            
+        # Create an instance of SubstrateClient.
+        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+        
+        # Initialize substrate connections for all groups.
+        await client.initialize_connections()
 
         start_time = time.time()
 
-        target = "5HBtpwxuGNL1gwzwomwR7sjwUt8WXYSuWcLYN6f9KpTZkP4k"
-        target_block = 5163655
+        target = "5FyCncAf9EBU8Nkcm5gL1DQu3hVmY7aphiqRn3CxwoTmB1cZ"
+        target_block = 4179349
 
-        coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialize_substrate_connection()
+        fetcher = EventFetcher(substrate_client=client)
+        coldkey_finder = ColdkeyFinder(substrate_client=client)
 
         subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_past_events=500)
         subgraph = await subgraph_generator.run(target, target_block)

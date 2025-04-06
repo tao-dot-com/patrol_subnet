@@ -24,6 +24,7 @@ class BittensorValidationMechanism:
         try:
             if not payload:
                 raise PayloadValidationError("Empty/Null Payload recieved.")
+            
             self.parse_graph_payload(payload)
             
             self.verify_target_in_graph(target)
@@ -34,12 +35,12 @@ class BittensorValidationMechanism:
 
         except Exception as e: 
             bt.logging.error(f"Validation error for uid {uid}: {e}")
-            self.graph_payload = ErrorPayload(message=f"Error: {str(e)}")
+            return ErrorPayload(message=f"Error: {str(e)}")
 
         validation_time = time.time() - start_time
         bt.logging.info(f"Validation finished for {uid}. Completed in {validation_time:.2f} seconds")
 
-        return self.return_validated_payload()
+        return self.graph_payload
 
     def parse_graph_payload(self, payload: dict) -> None:
         """
@@ -108,11 +109,10 @@ class BittensorValidationMechanism:
     
     def verify_target_in_graph(self, target: str) -> None:
 
-        def find_target(target):
-            if len(self.graph_payload.nodes) == 1:
-                if self.graph_payload.nodes[0].id == target:
-                    return True
+        if len(self.graph_payload.nodes) < 2:
+            raise PayloadValidationError("Only single node provided.")
 
+        def find_target(target):
             for edge in self.graph_payload.edges:
                 if edge.coldkey_destination == target:
                     return True
@@ -230,9 +230,6 @@ class BittensorValidationMechanism:
 
         bt.logging.debug("All edges matched with on-chain events.")
 
-    def return_validated_payload(self):
-        return self.graph_payload
-
 # Example usage:
 if __name__ == "__main__":
 
@@ -243,7 +240,7 @@ if __name__ == "__main__":
 
     from patrol.constants import Constants
 
-    file_path = "miner_response.json"
+    file_path = "example_subgraph_output.json"
     with open(file_path, "r") as f:
         payload = json.load(f)
 

@@ -222,8 +222,9 @@ async def process_event_data(event_data: dict, coldkey_finder: ColdkeyFinder) ->
 
 if __name__ == "__main__":
 
-    from async_substrate_interface import AsyncSubstrateInterface
-    from patrol.constants import Constants
+    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+
+    network_url = "wss://archive.chain.opentensor.ai:443/"
 
     async def example():
 
@@ -233,8 +234,13 @@ if __name__ == "__main__":
         with open(file_path, "r") as f:
             data = json.load(f)
 
-        coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialize_substrate_connection()
+            # Create an instance of SubstrateClient.
+        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+        
+        # Initialize substrate connections for all groups.
+        await client.initialize_connections()
+
+        coldkey_finder = ColdkeyFinder(substrate_client=client)
         
         parsed_events = await process_event_data(data, coldkey_finder)
         bt.logging.info(parsed_events)
