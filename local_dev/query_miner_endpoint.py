@@ -73,7 +73,8 @@ async def test_miner(requests):
         dendrite=dendrite,
         metagraph=None,
         uuid_generator=lambda: uuid.uuid4(),
-        weight_setter=None
+        weight_setter=None,
+        enable_weight_setting=False
     )
 
     start_time = time.time()
