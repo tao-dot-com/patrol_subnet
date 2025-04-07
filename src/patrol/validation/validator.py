@@ -5,6 +5,9 @@ from typing import Callable, Tuple
 import uuid
 import bittensor as bt
 import patrol
+from patrol.chain_data import substrate_client
+from patrol.chain_data.event_processor import EventProcessor
+from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 from patrol.validation.scoring import MinerScoreRepository
 import asyncio
@@ -39,6 +42,7 @@ class Validator:
         metagraph: AsyncMetagraph,
         uuid_generator: Callable[[], UUID],
         weight_setter: WeightSetter,
+        enable_weight_setting: bool
     ):
         self.validation_mechanism = validation_mechanism
         self.scoring_mechanism = scoring_mechanism
@@ -49,6 +53,7 @@ class Validator:
         self.uuid_generator = uuid_generator
         self.weight_setter = weight_setter
         self.miner_timing_semaphore = asyncio.Semaphore(1)
+        self.enable_weight_setting = enable_weight_setting
 
     async def query_miner(self,
         batch_id: UUID,
@@ -134,7 +139,7 @@ class Validator:
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        if await self.weight_setter.is_weight_setting_due():
+        if self.enable_weight_setting and await self.weight_setter.is_weight_setting_due():
             await self._set_weights()
 
 
@@ -145,7 +150,9 @@ class Validator:
 
 async def start():
 
-    from patrol.validation.config import DB_URL, NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH
+    from patrol.validation.config import DB_URL, NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH, ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR
+    if not ENABLE_WEIGHT_SETTING:
+        logger.warning("Weight setting is not enabled.")
 
     wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
     engine = patrol.validation.config.db_engine
@@ -156,19 +163,23 @@ async def start():
     coldkey_finder = ColdkeyFinder(subtensor.substrate)
     weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
 
-    event_fetcher = EventFetcher()
+    my_substrate_client = SubstrateClient(substrate_client.GROUP_INIT_BLOCK, ARCHIVE_SUBTENSOR)
+
+    event_fetcher = EventFetcher(my_substrate_client)
+    event_processor = EventProcessor(coldkey_finder)
 
     dendrite = bt.Dendrite(wallet)
 
     miner_validator = Validator(
-        validation_mechanism=BittensorValidationMechanism(event_fetcher, coldkey_finder),
-        target_generator=TargetGenerator(event_fetcher, coldkey_finder),
+        validation_mechanism=BittensorValidationMechanism(event_fetcher, event_processor),
+        target_generator=TargetGenerator(event_fetcher, event_processor),
         scoring_mechanism=MinerScoring(),
         miner_score_repository=miner_score_repository,
         dendrite=dendrite,
         metagraph=metagraph,
         uuid_generator=lambda: uuid.uuid4(),
-        weight_setter=weight_setter
+        weight_setter=weight_setter,
+        enable_weight_setting=ENABLE_WEIGHT_SETTING
     )
 
     while True:

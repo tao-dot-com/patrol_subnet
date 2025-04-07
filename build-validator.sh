@@ -2,7 +2,7 @@
 
 set -e
 
-docker compose up --wait
+docker compose up db --wait
 
 pytest ./tests
 

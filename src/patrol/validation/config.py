@@ -12,3 +12,6 @@ db_engine = create_async_engine(DB_URL)
 WALLET_NAME = os.getenv('WALLET_NAME', "default")
 HOTKEY_NAME = os.getenv('HOTKEY_NAME', "default")
 BITTENSOR_PATH = os.getenv('BITTENSOR_PATH')
+
+ENABLE_WEIGHT_SETTING = os.getenv('ENABLE_WEIGHT_SETTING', "1") == "1"
+ARCHIVE_SUBTENSOR = os.getenv('ARCHIVE_SUBTENSOR', "wss://archive.chain.opentensor.ai:443")
