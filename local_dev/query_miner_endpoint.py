@@ -2,6 +2,9 @@ import asyncio
 import bittensor as bt
 import uuid
 import time
+from dataclasses import asdict
+import json
+from datetime import datetime
 
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
@@ -22,6 +25,15 @@ class MockMinerScoreRepo:
 
     def return_scores(self):
         return self.scores
+    
+# Custom JSON encoder to handle UUID and datetime objects.
+class CustomEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, uuid.UUID):
+            return str(o)
+        if isinstance(o, datetime):
+            return o.isoformat()
+        return super().default(o)
 
 async def test_miner(requests):
 
@@ -54,7 +66,7 @@ async def test_miner(requests):
     miner_scoring = MockMinerScoreRepo()
 
     miner_validator = Validator(
-        validation_mechanism=BittensorValidationMechanism(event_fetcher, coldkey_finder),
+        validation_mechanism=BittensorValidationMechanism(event_fetcher, event_processor),
         target_generator=TargetGenerator(event_fetcher, coldkey_finder),
         scoring_mechanism=MinerScoring(),
         miner_score_repository=miner_scoring,
@@ -71,12 +83,20 @@ async def test_miner(requests):
     await asyncio.gather(*tasks)
 
     print(f"{requests} made in {time.time() - start_time}")
-    print(f"Final miner scores: {miner_scoring.return_scores()}")
+    scores = miner_scoring.return_scores()
+
+    scores_dict_list = [asdict(score) for score in scores]
+
+    # Save the list of dictionaries to a JSON file using the custom encoder.
+    with open("scores.json", "w") as f:
+        json.dump(scores_dict_list, f, indent=4, cls=CustomEncoder)
+
+    # print(f"Final miner scores: {miner_scoring.return_scores()}")
 
 if __name__ == "__main__":
 
     bt.debug()
 
-    REQUESTS = 1
+    REQUESTS = 10
 
     asyncio.run(test_miner(REQUESTS))
