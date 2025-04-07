@@ -13,4 +13,5 @@ tmp
 __pycache__
 .idea
 *.iml
+env.local
 

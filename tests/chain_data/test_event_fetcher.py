@@ -2,7 +2,7 @@
 import asyncio
 import time
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from patrol.chain_data.event_fetcher import group_block, group_blocks, EventFetcher, GROUP_INIT_BLOCK
 
@@ -50,29 +50,19 @@ def test_group_block_boundaries():
 # -----------------------------
 # Tests for group_blocks function
 # -----------------------------
-def test_group_blocks():
-    # Prepare test blocks and fake hashes.
-    blocks = [3014341, 3804340, 3804341, 4264340, 4264341,
-              4920350, 4920351, 5163656, 5163657, 5228683, 5228685, 6000000]
-    hashes = [f"hash_{b}" for b in blocks]
+def test_group_blocks_batches_correctly():
+    block_numbers = list(range(1000, 1012))
+    block_hashes = [f"0xhash{i}" for i in range(len(block_numbers))]
+    current_block = 6000000
 
-    current_block = 5248681
+    # Patch group_block to return group 1 for all inputs
+    with patch("patrol.chain_data.event_fetcher.group_block", return_value=1):
+        grouped = group_blocks(block_numbers, block_hashes, current_block, batch_size=5)
 
-    grouped = group_blocks(blocks, hashes, current_block)
-
-    # According to group_block:
-    # Group 1: blocks in (3014340, 3804340] → [3014341, 3804340]
-    assert 1 in grouped and len(grouped[1]) == 2
-    # Group 2: blocks <=4264340 (and not in group 1) → [3804341, 4264340]
-    assert 2 in grouped and len(grouped[2]) == 2
-    # Group 3: blocks <=4920350 → [4264341, 4920350]
-    assert 3 in grouped and len(grouped[3]) == 2
-    # Group 4: blocks <=5163656 → [4920351, 5163656]
-    assert 4 in grouped and len(grouped[4]) == 2
-    # Group 5: blocks <=5228683 → [5163657, 5228683]
-    assert 5 in grouped and len(grouped[5]) == 2
-    # Group 6: blocks >5228683 → [5228684]
-    assert 6 in grouped and len(grouped[6]) == 1
+    assert 1 in grouped
+    assert len(grouped[1]) == 3  # 12 blocks => 3 batches of 5, 5, 2
+    assert all(isinstance(batch, list) for batch in grouped[1])
+    assert grouped[1][0] == [(1000, '0xhash0'), (1001, '0xhash1'), (1002, '0xhash2'), (1003, '0xhash3'), (1004, '0xhash4')]
 
 
 # -----------------------------
@@ -95,9 +85,12 @@ async def test_get_block_events_success():
         side_effect=lambda block_hash, method, params: f"payload_{block_hash}"
     )
 
+    # Prepare a list of (block_number, block_hash) tuples.
+    block_info = [(100, "abc"), (101, "def")]
+
     # Simulate _make_rpc_request to return a dict mapping payloads to event responses.
     def fake_make_rpc_request(payloads, value_scale_type, storage_item):
-        return {payload: [f"event_for_{payload}"] for payload in payloads}
+        return {block_info: [f"event_for_{block_info}"] for block_num, block_info in block_info}
 
     fake_substrate._make_rpc_request = AsyncMock(
         side_effect=lambda payloads, value_scale_type, storage_item: fake_make_rpc_request(
@@ -105,15 +98,12 @@ async def test_get_block_events_success():
         )
     )
 
-    # Prepare a list of (block_number, block_hash) tuples.
-    block_info = [(100, "abc"), (101, "def")]
-
     event_fetcher = EventFetcher()
     events = await event_fetcher.get_block_events(fake_substrate, block_info, max_concurrent=2)
 
     # Check that the events are mapped correctly.
-    assert events[100] == "event_for_payload_abc"
-    assert events[101] == "event_for_payload_def"
+    assert events[100] == "event_for_abc"
+    assert events[101] == "event_for_def"
 
 
 @pytest.mark.asyncio

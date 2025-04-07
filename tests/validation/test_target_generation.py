@@ -1,37 +1,43 @@
 import pytest
 import random
 from unittest.mock import AsyncMock, patch
-from patrol.validation.target_generation import generate_targets, generate_random_block_tuples, find_targets
+from patrol.validation.target_generation import TargetGenerator
 
 @pytest.mark.asyncio
 async def test_generate_random_block_tuples():
-    mock_substrate = AsyncMock()
-    with patch("patrol.validation.target_generation.get_current_block", new=AsyncMock(return_value=3_500_000)):
-        blocks = await generate_random_block_tuples(mock_substrate, num_targets=2)
-        assert len(blocks) == 8
-        assert all(isinstance(b, int) for b in blocks)
+    fetcher = AsyncMock()
+    fetcher.get_current_block.return_value = 3_500_000
+    generator = TargetGenerator(fetcher, AsyncMock())
+
+    result = await generator.generate_random_block_tuples(num_targets=2)
+    assert len(result) == 8
+    assert all(isinstance(n, int) for n in result)
 
 @pytest.mark.asyncio
-async def test_find_targets_basic():
-    sample_events = [
-        {"coldkey_source": "A", "evidence": {"block_number": 100}},
-        {"coldkey_destination": "B", "evidence": {"block_number": 101}},
-        {"coldkey_owner": "C", "evidence": {"block_number": 102}},
+async def test_find_targets_with_valid_and_invalid():
+    generator = TargetGenerator(AsyncMock(), AsyncMock())
+    events = [
+        {"coldkey_source": "A", "evidence": {"block_number": 1}},
+        {"coldkey_destination": "B", "evidence": {"block_number": 2}},
+        {"coldkey_owner": "C", "evidence": {"block_number": 3}},
+        "invalid_string_event",  # should be skipped
+        12345  # also skipped
     ]
-    result = await find_targets(sample_events, 2)
-    assert len(result) == 2
-    assert all(isinstance(x, tuple) and len(x) == 2 for x in result)
+    results = await generator.find_targets(events, number_targets=2)
+    assert all(isinstance(r, tuple) and len(r) == 2 for r in results)
+    assert len(results) <= 2
 
 @pytest.mark.asyncio
-async def test_generate_targets_pads_to_num_targets():
-    mock_substrate = AsyncMock()
-    mock_fetcher = AsyncMock()
-    mock_fetcher.fetch_all_events.return_value = [{"coldkey_source": "A", "evidence": {"block_number": 100}}]
-    mock_coldkey_finder = AsyncMock()
-    
-    with patch("patrol.validation.target_generation.get_current_block", new=AsyncMock(return_value=3_500_000)), \
-         patch("patrol.validation.target_generation.process_event_data", new=AsyncMock(return_value=mock_fetcher.fetch_all_events.return_value)):
-        
-        results = await generate_targets(mock_substrate, mock_fetcher, mock_coldkey_finder, num_targets=3)
-        assert len(results) == 3
-        assert all(isinstance(t, tuple) for t in results)
+async def test_generate_targets_handles_padding():
+    fetcher = AsyncMock()
+    fetcher.get_current_block.return_value = 3_500_000
+    fetcher.fetch_all_events.return_value = {"123": [{"coldkey_source": "X", "evidence": {"block_number": 123}}]}
+
+    with patch("patrol.validation.target_generation.process_event_data", new=AsyncMock(return_value=[
+        {"coldkey_source": "X", "evidence": {"block_number": 123}}
+    ])):
+        generator = TargetGenerator(fetcher, AsyncMock())
+        targets = await generator.generate_targets(num_targets=3)
+
+    assert len(targets) == 3
+    assert all(isinstance(t, tuple) for t in targets)

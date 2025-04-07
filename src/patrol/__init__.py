@@ -1,5 +1,5 @@
-# Copyright (c) 2024 Watchtower
-# 
+# Copyright (c) 2025 Tensora
+
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -18,7 +18,23 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-
 __version__ = "0.0.1"
 
+import os
+from datetime import datetime, timezone
+from logging import config
+from pathlib import Path
+
+from pythonjsonlogger.json import JsonFormatter
+
+class PatrolJsonFormatter(JsonFormatter):
+    def formatTime(self, record, datefmt = None):
+        dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        return dt.isoformat(timespec="milliseconds")
+
+import bittensor as bt
+bt.logging.enable_third_party_loggers()
+
+if os.getenv("JSON_LOGGING", "1") == "1":
+    config.fileConfig(str(Path(__file__).parent.with_name("logging.ini")))
 

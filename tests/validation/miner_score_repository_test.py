@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, UTC
 from tempfile import TemporaryDirectory
@@ -22,7 +23,7 @@ def sqlite_engine(temp_dir):
 
 @pytest.fixture
 def pgsql_engine():
-    url = f"postgresql+asyncpg://patrol:password@localhost:5432/patrol"
+    url = os.getenv("TEST_POSTGRESQL_URL", "postgresql+asyncpg://patrol:password@localhost:5432/patrol")
     migrate_db(url)
     engine = create_async_engine(url)
     return engine
@@ -169,6 +170,27 @@ async def test_find_scores_by_batch_id_postgres(clean_pgsql_engine):
 
     assert scores[1].batch_id == batch_ids[1]
     assert scores[1].created_at == now
+
+
+async def test_find_overall_scores_by_batch_id_postgres(clean_pgsql_engine):
+
+    batch_ids = [uuid.uuid4(), uuid.uuid4()]
+    now = datetime.now(UTC)
+    # add 2 scores for each batch
+    repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+    for b in batch_ids:
+        miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_1)
+        miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_2)
+
+    scores = await repository.find_overall_scores_by_batch_id(batch_ids[1])
+    assert len(scores) == 2
+    assert scores[0]['hotkey'] == "ghijkl"
+    assert scores[0]['overall_score'] == 10.0
+
+    assert scores[1]['overall_score'] == 10.0
+    assert scores[1]['hotkey'] == "ghijkl"
 
 
 def make_miner_score(score_id: uuid.UUID, batch_id: uuid.UUID, created_at: datetime):

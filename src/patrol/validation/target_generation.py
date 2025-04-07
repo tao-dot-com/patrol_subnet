@@ -21,6 +21,8 @@ class TargetGenerator:
     async def find_targets(self, events, number_targets: int) -> List[Tuple[str, int]]:
         target_set = set()
         for event in events:
+            if not isinstance(event, dict):
+                continue
             block = event.get("evidence", {}).get("block_number")
             for key in ("coldkey_source", "coldkey_destination", "coldkey_owner"):
                 addr = event.get(key)
@@ -43,7 +45,7 @@ class TargetGenerator:
             target_tuples.append(random.choice(target_tuples))
 
         bt.logging.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
-        return target_tuples
+        return target_tuples[:num_targets]
 
 if __name__ == "__main__":
 
