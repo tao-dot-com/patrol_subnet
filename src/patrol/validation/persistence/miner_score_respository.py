@@ -86,18 +86,6 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             session.add(obj)
             await session.commit()
 
-    async def find_by_batch_id(self, batch_id: uuid.UUID) -> list[MinerScore]:
-        async with self.LocalAsyncSession() as session:
-            query = select(_MinerScore).where(_MinerScore.batch_id == str(batch_id))
-            results = await session.scalars(query)
-            return [s.as_score for s in results]
-
-    async def find_overall_scores_by_batch_id(self, batch_id: uuid.UUID):
-        async with self.LocalAsyncSession() as session:
-            query = select(_MinerScore.hotkey, _MinerScore.overall_score, _MinerScore.uid).where(_MinerScore.batch_id == str(batch_id))
-            results = await session.execute(query)
-            return results.mappings().all()
-
     async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Sequence[float]:
         async with self.LocalAsyncSession() as session:
             query = select(_MinerScore.overall_score).filter(

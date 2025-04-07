@@ -133,52 +133,25 @@ async def test_add_score_postgres(clean_pgsql_engine):
     assert score.validation_passed == False
     assert score.error_message == "Oh dear"
 
-async def test_find_scores_by_batch_id_sqlite(sqlite_engine):
-
-    batch_ids = [uuid.uuid4(), uuid.uuid4()]
-    now = datetime.now(UTC)
-    # add 2 scores for each batch
-    repository = DatabaseMinerScoreRepository(sqlite_engine)
-    for b in batch_ids:
-        miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
-        await repository.add(miner_score_1)
-        miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
-        await repository.add(miner_score_2)
-
-    scores = await repository.find_by_batch_id(batch_ids[1])
-    assert len(scores) == 2
-    assert scores[0].batch_id == batch_ids[1]
-    assert scores[0].created_at == now
-
-    assert scores[1].batch_id == batch_ids[1]
-    assert scores[1].created_at == now
-
-async def test_find_scores_by_batch_id_postgres(clean_pgsql_engine):
-
-    batch_ids = [uuid.uuid4(), uuid.uuid4()]
-    now = datetime.now(UTC)
-    # add 2 scores for each batch
-    repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
-    for b in batch_ids:
-        miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
-        await repository.add(miner_score_1)
-        miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
-        await repository.add(miner_score_2)
-
-    scores = await repository.find_by_batch_id(batch_ids[1])
-    assert len(scores) == 2
-    assert scores[0].batch_id == batch_ids[1]
-    assert scores[0].created_at == now
-
-    assert scores[1].batch_id == batch_ids[1]
-    assert scores[1].created_at == now
-
-
 async def test_find_sum_of_previous_overall_scores(clean_pgsql_engine):
     batch_ids = [uuid.uuid4(), uuid.uuid4()]
     now = datetime.now(UTC)
     # add 2 scores for each batch
     repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+    for b in batch_ids:
+        miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_1)
+        miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_2)
+
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 20)
+    assert overall_scores == [10.0, 10.0, 10.0, 10.0]
+
+async def test_find_sum_of_previous_overall_scores_sqlite(sqlite_engine):
+    batch_ids = [uuid.uuid4(), uuid.uuid4()]
+    now = datetime.now(UTC)
+    # add 2 scores for each batch
+    repository = DatabaseMinerScoreRepository(sqlite_engine)
     for b in batch_ids:
         miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
         await repository.add(miner_score_1)
@@ -202,31 +175,45 @@ async def test_find_sum_of_limited_previous_overall_scores(clean_pgsql_engine):
     overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
     assert overall_scores == [10.0, 10.0]
 
-async def test_find_overall_scores_by_batch_id_postgres(clean_pgsql_engine):
-
+async def test_find_sum_of_limited_previous_overall_scores_sqlite(sqlite_engine):
     batch_ids = [uuid.uuid4(), uuid.uuid4()]
     now = datetime.now(UTC)
     # add 2 scores for each batch
-    repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+    repository = DatabaseMinerScoreRepository(sqlite_engine)
     for b in batch_ids:
         miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
         await repository.add(miner_score_1)
         miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
         await repository.add(miner_score_2)
 
-    scores = await repository.find_overall_scores_by_batch_id(batch_ids[1])
-    assert len(scores) == 2
-    assert scores[0]['hotkey'] == "ghijkl"
-    assert scores[0]['overall_score'] == 10.0
-
-    assert scores[1]['overall_score'] == 10.0
-    assert scores[1]['hotkey'] == "ghijkl"
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
+    assert overall_scores == [10.0, 10.0]
 
 
 async def test_find_last_average_overall_scores(clean_pgsql_engine):
     batch_id = uuid.uuid4()
     now = datetime.now(UTC)
     repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+    await repository.add(make_miner_score(
+        uuid.uuid4(), batch_id, miner=("abc", 1),
+        created_at = now - timedelta(minutes=10), overall_score_moving_average=5.0))
+    await repository.add(make_miner_score(
+        uuid.uuid4(), batch_id, miner=("abc", 1),
+        created_at = now - timedelta(minutes=20), overall_score_moving_average=6.0))
+    await repository.add(make_miner_score(
+        uuid.uuid4(), batch_id, miner=("def", 1),
+        created_at = now - timedelta(minutes=30), overall_score_moving_average=7.0))
+
+    scores = await repository.find_last_average_overall_scores()
+    assert scores == {
+        ("abc", 1): 5.0,
+        ("def", 1): 7.0,
+    }
+
+async def test_find_last_average_overall_scores_sqlite(sqlite_engine):
+    batch_id = uuid.uuid4()
+    now = datetime.now(UTC)
+    repository = DatabaseMinerScoreRepository(sqlite_engine)
     await repository.add(make_miner_score(
         uuid.uuid4(), batch_id, miner=("abc", 1),
         created_at = now - timedelta(minutes=10), overall_score_moving_average=5.0))

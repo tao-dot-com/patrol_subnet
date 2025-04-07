@@ -33,14 +33,6 @@ class MinerScoreRepository(ABC):
         pass
 
     @abstractmethod
-    async def find_by_batch_id(self, batch_id: uuid.UUID) -> list[MinerScore]:
-        pass
-
-    @abstractmethod
-    async def find_overall_scores_by_batch_id(self, batch_id: uuid.UUID):
-        pass
-
-    @abstractmethod
     async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> float:
         pass
 
