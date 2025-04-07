@@ -13,10 +13,16 @@ from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
 
 class MockMinerScoreRepo:
 
-    async def add(self, miner_score):
-        pass
+    def __init__(self):
+        self.scores = []
 
-async def test_miner():
+    async def add(self, miner_score):
+        self.scores.append(miner_score)
+
+    def return_scores(self):
+        return self.scores
+
+async def test_miner(requests):
 
     bt.debug()
 
@@ -33,7 +39,6 @@ async def test_miner():
 
     target_generator = TargetGenerator(event_fetcher, coldkey_finder)
 
-    REQUESTS = 1
 
     targets = await target_generator.generate_targets(REQUESTS)
 
@@ -45,11 +50,13 @@ async def test_miner():
     wallet_miner.create_if_non_existent(False, False)
     axon = bt.axon(wallet=wallet_miner, ip="0.0.0.0", port=8000)
 
+    miner_scoring = MockMinerScoreRepo()
+
     miner_validator = Validator(
         validation_mechanism=BittensorValidationMechanism(event_fetcher, coldkey_finder),
         target_generator=TargetGenerator(event_fetcher, coldkey_finder),
         scoring_mechanism=MinerScoring(),
-        miner_score_repository=MockMinerScoreRepo(),
+        miner_score_repository=miner_scoring,
         dendrite=dendrite,
         metagraph=None,
         uuid_generator=lambda: uuid.uuid4(),
@@ -62,10 +69,13 @@ async def test_miner():
 
     await asyncio.gather(*tasks)
 
-    print(f"{REQUESTS} made in {time.time() - start_time}")
+    print(f"{requests} made in {time.time() - start_time}")
+    print(f"Final miner scores: {miner_scoring.return_scores()}")
 
 if __name__ == "__main__":
 
     bt.debug()
 
-    asyncio.run(test_miner())
+    REQUESTS = 1
+
+    asyncio.run(test_miner(REQUESTS))
