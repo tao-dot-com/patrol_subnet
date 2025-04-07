@@ -5,6 +5,7 @@ import time
 
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
+from patrol.chain_data.event_processor import EventProcessor
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.target_generation import TargetGenerator
 from patrol.validation.miner_scoring import MinerScoring
@@ -36,9 +37,9 @@ async def test_miner(requests):
 
     event_fetcher = EventFetcher(substrate_client=client)
     coldkey_finder = ColdkeyFinder(substrate_client=client)
+    event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
-    target_generator = TargetGenerator(event_fetcher, coldkey_finder)
-
+    target_generator = TargetGenerator(event_fetcher, event_processor)
 
     targets = await target_generator.generate_targets(REQUESTS)
 
