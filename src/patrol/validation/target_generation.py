@@ -33,14 +33,17 @@ class TargetGenerator:
         bt.logging.debug(f"Fetching {num_targets} target addresses.")
         start_time = time.time()
 
+        target_tuples = None
+
         block_numbers = await self.generate_random_block_tuples(num_targets)
         events = await self.event_fetcher.fetch_all_events(block_numbers)
         processed_events = await self.event_processor.process_event_data(events)
         target_tuples = await self.find_targets(processed_events, num_targets)
 
+        if not target_tuples:
+            await self.generate_targets(num_targets)
+
         while len(target_tuples) < num_targets:
-            if not target_tuples:
-                break
             target_tuples.append(random.choice(target_tuples))
 
         bt.logging.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
