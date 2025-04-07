@@ -1,7 +1,7 @@
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
-from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
-from sqlalchemy import DateTime, select
+from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass, aliased
+from sqlalchemy import DateTime, select, Sequence, extract, func
 from datetime import datetime, UTC
 from patrol.validation.persistence import Base
 import uuid
@@ -18,6 +18,7 @@ class _MinerScore(Base, MappedAsDataclass):
     coldkey: Mapped[str]
     hotkey: Mapped[str]
     overall_score: Mapped[float]
+    overall_score_moving_average: Mapped[float]
     volume: Mapped[int]
     volume_score: Mapped[float]
     responsiveness_score: Mapped[float]
@@ -35,6 +36,7 @@ class _MinerScore(Base, MappedAsDataclass):
             uid=miner_score.uid,
             coldkey=miner_score.coldkey,
             hotkey=miner_score.hotkey,
+            overall_score_moving_average=miner_score.overall_score_moving_average,
             overall_score=miner_score.overall_score,
             volume=miner_score.volume,
             volume_score=miner_score.volume_score,
@@ -45,9 +47,10 @@ class _MinerScore(Base, MappedAsDataclass):
             error_message=miner_score.error_message
         )
 
-    def _to_utc(self, instant):
+    @staticmethod
+    def _to_utc(instant):
         """
-        SQLite does not persiste timezone info, so just set the timezone to UTC if the DB did not give us one.
+        SQLite does not persist timezone info, so just set the timezone to UTC if the DB did not give us one.
         """
         return instant if instant.tzinfo is not None else instant.replace(tzinfo=UTC)
 
@@ -60,6 +63,7 @@ class _MinerScore(Base, MappedAsDataclass):
             uid=self.uid,
             coldkey=self.coldkey,
             hotkey=self.hotkey,
+            overall_score_moving_average=self.overall_score_moving_average,
             overall_score=self.overall_score,
             volume=self.volume,
             volume_score=self.volume_score,
@@ -93,3 +97,27 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             query = select(_MinerScore.hotkey, _MinerScore.overall_score, _MinerScore.uid).where(_MinerScore.batch_id == str(batch_id))
             results = await session.execute(query)
             return results.mappings().all()
+
+    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Sequence[float]:
+        async with self.LocalAsyncSession() as session:
+            query = select(_MinerScore.overall_score).filter(
+                _MinerScore.hotkey == miner[0],
+                _MinerScore.uid == miner[1],
+            ).order_by(_MinerScore.created_at.desc()).limit(batch_count)
+            result = await session.scalars(query)
+            return result.all()
+
+    async def find_last_average_overall_scores(self) -> dict[tuple[str, int], float]:
+
+        async with self.LocalAsyncSession() as session:
+
+            ranked = select(
+                _MinerScore.overall_score_moving_average,
+                _MinerScore.hotkey,
+                _MinerScore.uid,
+                func.row_number().over(partition_by=[_MinerScore.hotkey, _MinerScore.uid], order_by=_MinerScore.created_at.desc()).label("rnk")
+            ).subquery()
+
+            results = await session.execute(select(ranked).filter(ranked.c.rnk == 1))
+            foo = results.mappings().all()
+            return {(r['hotkey'], r['uid']): r['overall_score_moving_average']for r in foo}
