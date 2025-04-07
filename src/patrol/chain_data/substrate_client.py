@@ -2,6 +2,7 @@ import asyncio
 import bittensor as bt
 
 from async_substrate_interface import AsyncSubstrateInterface
+from bittensor import Config
 
 # Define the initial block numbers for each group.
 GROUP_INIT_BLOCK = {
@@ -32,8 +33,19 @@ class SubstrateClient:
         """
         Creates and initializes a substrate connection for a given group.
         """
-        substrate = AsyncSubstrateInterface(url=self.network_url)
         init_block = self.groups[group]
+
+        # from bittensor.core.async_subtensor import AsyncSubtensor
+        # subtensor = AsyncSubtensor(self.network_url)
+        # await subtensor.initialize()
+        #
+        # init_block_hash = await subtensor.get_block_hash(block=init_block)
+        # substrate = subtensor.substrate
+        # await substrate.init_runtime(block_hash=init_block_hash)
+        # return substrate
+
+
+        substrate = AsyncSubstrateInterface(url=self.network_url)
         init_hash = await substrate.get_block_hash(init_block)
         await substrate.init_runtime(block_hash=init_hash)
         return substrate

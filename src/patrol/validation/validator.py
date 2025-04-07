@@ -164,6 +164,7 @@ async def start():
     weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
 
     my_substrate_client = SubstrateClient(substrate_client.GROUP_INIT_BLOCK, ARCHIVE_SUBTENSOR)
+    await my_substrate_client.initialize_connections()
 
     event_fetcher = EventFetcher(my_substrate_client)
     event_processor = EventProcessor(coldkey_finder)
