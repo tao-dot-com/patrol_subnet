@@ -69,6 +69,7 @@ async def test_persist_miner_score(mock_axon, test_wallet):
                              overall_score=10.0, created_at=datetime.now(UTC),
                              volume_score=1.0, volume=2,
                              responsiveness_score=1.0,
+                             overall_score_moving_average=5.0,
                              response_time_seconds=2.5,
                              novelty_score=1.0, validation_passed=True, error_message=None,
                              coldkey="foo", hotkey="bar")
@@ -103,6 +104,7 @@ async def test_query_miner_batch(mock_axon, test_wallet):
     score_2_uid = uuid.uuid4()
 
     miner_scores_1 = MinerScore(id=score_1_uid, batch_id=batch_id, uid=3,
+                                overall_score_moving_average=5.0,
                                 overall_score=10.0, created_at=datetime.now(UTC),
                                 volume_score=1.0, volume=2,
                                 responsiveness_score=1.0,
@@ -111,6 +113,7 @@ async def test_query_miner_batch(mock_axon, test_wallet):
                                 coldkey="foo", hotkey="bar")
 
     miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=4,
+                                overall_score_moving_average=15.0,
                                 overall_score=30.0, created_at=datetime.now(UTC),
                                 volume_score=1.0, volume=2,
                                 responsiveness_score=1.0,

@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from patrol.validation.miner_scoring import MinerScoring, normalize_scores
 from patrol.validation.graph_validation.errors import ErrorPayload
@@ -41,7 +43,9 @@ def test_calculate_score_error(scoring):
         hotkey="hk",
         payload=error,
         response_time=2.0,
-        batch_id="batch-1"
+        batch_id=uuid.uuid4(),
+        previous_overall_scores=[],
+        moving_average_denominator=20
     )
     assert result.validation_passed is False
     assert result.error_message == "Missing field"
@@ -64,7 +68,9 @@ def test_calculate_score_success(scoring):
         hotkey="hk1",
         payload=payload,
         response_time=0.2,
-        batch_id="batch-abc"
+        batch_id=uuid.uuid4(),
+        previous_overall_scores=[],
+        moving_average_denominator=20,
     )
     assert result.validation_passed is True
     assert result.volume_score > 0

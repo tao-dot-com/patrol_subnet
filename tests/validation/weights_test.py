@@ -1,50 +1,62 @@
-import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet.bittensor_wallet import Wallet
+
 from patrol.validation.scoring import MinerScoreRepository
 from patrol.validation.weight_setter import WeightSetter
 from bittensor.core.async_subtensor import AsyncSubtensor
-from bittensor_wallet.mock import MockWallet
+import numpy as np
 
 async def test_skip_weights():
     pass
 
 async def test_calculate_weights():
 
-    batch_id = uuid.uuid4()
     mock_score_repository = AsyncMock(MinerScoreRepository)
 
-    scores = [
-        {'hotkey': "alice", 'overall_score': 10, 'uid': 1},
-        {'hotkey': "bob", 'overall_score': 3, 'uid': 2},
-        {'hotkey': "carol", 'overall_score': 2, 'uid': 3},
-        {'hotkey': "dave", 'overall_score': 12, 'uid': 4},
-        {'hotkey': "emily", 'overall_score': 7, 'uid': 6},
-    ]
-    mock_score_repository.find_overall_scores_by_batch_id.return_value = scores
+    scores = {
+        ("alice", 1): 10.0,
+        ("bob", 2): 3.0,
+        ("carol", 2): 2.0,
+        ("dave", 4): 12.0,
+        ("emily", 6): 7.0
+    }
+    mock_score_repository.find_last_average_overall_scores.return_value = scores
 
-    sum_of_scores = sum([s['overall_score'] for s in scores])
+    mock_subtensor = AsyncMock(AsyncSubtensor)
+    mock_metagraph = AsyncMock(AsyncMetagraph)
+    mock_subtensor.metagraph.return_value = mock_metagraph
 
-    weights = WeightSetter(mock_score_repository, AsyncMock(AsyncSubtensor), MagicMock(Wallet), 81)
+    mock_metagraph.uids = np.array([1, 2, 4, 6])
+    # async with AsyncSubtensor("finney") as st:
+    #     mg = await st.metagraph(81)
 
-    weights = await weights.calculate_weights(batch_id)
-    # assert sum(map(lambda s: weights['weight']) == 1.0
-    assert weights[0] == {'uid': 1, 'weight': 10/sum_of_scores}
-    assert weights[1] == {'uid': 2, 'weight': 3/sum_of_scores}
-    assert weights[2] == {'uid': 3, 'weight': 2/sum_of_scores}
-    assert weights[3] == {'uid': 4, 'weight': 12/sum_of_scores}
-    assert weights[4] == {'uid': 6, 'weight': 7/sum_of_scores}
+    mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
+
+    sum_of_scores = sum(scores.values()) - 3.0 # No Bob!
+
+    weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81)
+
+    weights = await weights.calculate_weights()
+
+    assert sum(weights.values()) == 1
+    assert weights == {
+        ("alice", 1): 10.0/sum_of_scores,
+        ("carol", 2): 2.0/sum_of_scores,
+        ("dave", 4): 12.0/sum_of_scores,
+        ("emily", 6): 7.0/sum_of_scores
+    }
 
 
 async def test_set_weights():
 
-    weights = [
-        {'uid': 2, 'weight': 0.3},
-        {'uid': 3, 'weight': 0.1},
-        {'uid': 5, 'weight': 0.4},
-        {'uid': 23, 'weight': 0.2},
-    ]
+    weights = {
+        ("alice", 2): 0.3,
+        ('bob', 3): 0.1,
+        ('carol', 5): 0.4,
+        ('dave', 23): 0.2,
+    }
     mock_score_repository = AsyncMock(MinerScoreRepository)
 
     wallet = MagicMock(Wallet)
