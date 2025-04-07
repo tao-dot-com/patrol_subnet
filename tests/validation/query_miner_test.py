@@ -88,7 +88,7 @@ async def test_persist_miner_score(mock_axon, test_wallet):
     miner_score_repository_mock.add.assert_awaited_once_with(miner_score)
 
 
-async def test_query_miner_batch(mock_axon, test_wallet):
+async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
 
     ip, port = mock_axon
 
@@ -138,6 +138,7 @@ async def test_query_miner_batch(mock_axon, test_wallet):
     target_generator.generate_targets=mock_generate_targets
 
     weight_setter = AsyncMock(WeightSetter)
+    weight_setter.is_weight_setting_due.return_value = True
 
     weights = [
         {'uid': miner_scores_1.uid, 'weight': 0.2},
@@ -157,3 +158,64 @@ async def test_query_miner_batch(mock_axon, test_wallet):
         call(miner_scores_2),
     ])
     weight_setter.set_weights.assert_awaited_once_with(weights)
+
+async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet):
+
+    ip, port = mock_axon
+
+    dendrite = bt.dendrite(test_wallet)
+    target_generator = AsyncMock(TargetGenerator)
+    validation_mechanism = AsyncMock(BittensorValidationMechanism)
+    scoring_mechanism = AsyncMock(MinerScoring)
+    miner_score_repository = AsyncMock(MinerScoreRepository)
+
+    batch_id = uuid.uuid4()
+
+    score_1_uid = uuid.uuid4()
+    score_2_uid = uuid.uuid4()
+
+    miner_scores_1 = MinerScore(id=score_1_uid, batch_id=batch_id, uid=3,
+                                overall_score_moving_average=5.0,
+                                overall_score=10.0, created_at=datetime.now(UTC),
+                                volume_score=1.0, volume=2,
+                                responsiveness_score=1.0,
+                                response_time_seconds=2.5,
+                                novelty_score=1.0, validation_passed=True, error_message=None,
+                                coldkey="foo", hotkey="bar")
+
+    miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=4,
+                                overall_score_moving_average=15.0,
+                                overall_score=30.0, created_at=datetime.now(UTC),
+                                volume_score=1.0, volume=2,
+                                responsiveness_score=1.0,
+                                response_time_seconds=2.5,
+                                novelty_score=1.0, validation_passed=True, error_message=None,
+                                coldkey="foo2", hotkey="bar2")
+
+    mock_calc_score = MagicMock(side_effect=[miner_scores_1, miner_scores_2])
+    scoring_mechanism.calculate_score = mock_calc_score
+
+    metagraph = AsyncMock(AsyncMetagraph)
+    metagraph.axons = [
+        bt.axon(test_wallet, port=port, ip=ip).info(),
+        bt.axon(test_wallet, port=port, ip=ip).info(),
+    ]
+    metagraph.uids = numpy.array((3, 5),)
+
+    def on_generate_targets(count: int):
+        return [("A", 1), ("B", 2)]
+
+    mock_generate_targets = AsyncMock(TargetGenerator, side_effect=on_generate_targets)
+    target_generator.generate_targets=mock_generate_targets
+
+    weight_setter = AsyncMock(WeightSetter)
+    weight_setter.is_weight_setting_due.return_value = False
+
+    validator = Validator(
+        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository,
+        dendrite, metagraph, lambda: batch_id, weight_setter
+    )
+
+    await validator.query_miner_batch()
+    weight_setter.calculate_weights.assert_not_awaited()
+    weight_setter.set_weights.assert_not_awaited()
