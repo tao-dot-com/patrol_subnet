@@ -1,7 +1,6 @@
 import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
-from email.headerregistry import UniqueUnstructuredHeader
 from typing import Optional
 from datetime import datetime
 
@@ -13,6 +12,7 @@ class MinerScore:
     uid: int
     coldkey: str
     hotkey: str
+    overall_score_moving_average: float
     overall_score: float
     volume_score: float
     volume: int
@@ -22,7 +22,11 @@ class MinerScore:
     validation_passed: bool
     error_message: Optional[str]
 
-class MinerScoreRepository:
+    @property
+    def miner(self) -> tuple[str, int]:
+        return self.hotkey, self.uid
+
+class MinerScoreRepository(ABC):
 
     @abstractmethod
     async def add(self, score: MinerScore):
@@ -34,4 +38,12 @@ class MinerScoreRepository:
 
     @abstractmethod
     async def find_overall_scores_by_batch_id(self, batch_id: uuid.UUID):
+        pass
+
+    @abstractmethod
+    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> float:
+        pass
+
+    @abstractmethod
+    async def find_last_average_overall_scores(self) -> dict[tuple[str, int], float]:
         pass

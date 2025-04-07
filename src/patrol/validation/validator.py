@@ -134,7 +134,8 @@ class Validator:
 
         await asyncio.gather(*tasks, return_exceptions=True)
 
-        await self._set_weights(batch_id)
+        if await self.weight_setter.is_weight_setting_due():
+            await self._set_weights(batch_id)
 
 
     async def _set_weights(self, batch_id: UUID):
@@ -153,7 +154,7 @@ async def start():
 
     metagraph = await subtensor.metagraph(NET_UID)
     coldkey_finder = ColdkeyFinder(subtensor.substrate)
-    mock_weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
+    weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
 
     event_fetcher = EventFetcher()
 
@@ -167,7 +168,7 @@ async def start():
         dendrite=dendrite,
         metagraph=metagraph,
         uuid_generator=lambda: uuid.uuid4(),
-        weight_setter=mock_weight_setter
+        weight_setter=weight_setter
     )
 
     while True:

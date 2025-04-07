@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Sequence
 import bittensor as bt
 import math
 import uuid
@@ -39,8 +39,12 @@ class MinerScoring:
         hotkey: str,
         payload: GraphPayload | ErrorPayload,
         response_time: float,
-        batch_id: UUID
+        batch_id: UUID,
+        previous_overall_scores: Sequence[float],
+        moving_average_denominator: int = 20
     ) -> MinerScore:
+
+        assert len(previous_overall_scores) < moving_average_denominator
 
         if isinstance(payload, ErrorPayload):
             bt.logging.warning(f"Error received as output from validation process, adding details to miner {uid} records.")
@@ -51,6 +55,7 @@ class MinerScoring:
                 uid=uid,
                 coldkey=coldkey,
                 hotkey=hotkey,
+                overall_score_moving_average=(sum(previous_overall_scores) + 0.0) / moving_average_denominator,
                 overall_score=0.0,
                 volume_score=0.0,
                 volume=0,
@@ -79,6 +84,7 @@ class MinerScoring:
             uid=uid,
             coldkey=coldkey,
             hotkey=hotkey,
+            overall_score_moving_average=(sum(previous_overall_scores) + overall_score) / moving_average_denominator,
             overall_score=overall_score,
             volume_score=volume_score,
             volume=volume,
