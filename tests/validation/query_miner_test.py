@@ -217,5 +217,9 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
     )
 
     await validator.query_miner_batch()
+    miner_score_repository.add.assert_has_awaits([
+        call(miner_scores_1),
+        call(miner_scores_2),
+    ])
     weight_setter.calculate_weights.assert_not_awaited()
     weight_setter.set_weights.assert_not_awaited()
