@@ -135,11 +135,11 @@ class Validator:
         await asyncio.gather(*tasks, return_exceptions=True)
 
         if await self.weight_setter.is_weight_setting_due():
-            await self._set_weights(batch_id)
+            await self._set_weights()
 
 
-    async def _set_weights(self, batch_id: UUID):
-        weights = await self.weight_setter.calculate_weights(batch_id)
+    async def _set_weights(self):
+        weights = await self.weight_setter.calculate_weights()
         await self.weight_setter.set_weights(weights)
 
 
