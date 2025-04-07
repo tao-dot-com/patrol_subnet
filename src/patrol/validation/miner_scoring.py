@@ -42,7 +42,7 @@ class MinerScoring:
     ) -> MinerScore:
 
         if isinstance(payload, ErrorPayload):
-            bt.logging.warning(f"Error recieved as output from validation process, adding details to miner {uid} records.")
+            bt.logging.warning(f"Error received as output from validation process, adding details to miner {uid} records.")
             return MinerScore(
                 id=str(uuid.uuid4()),
                 batch_id=batch_id,

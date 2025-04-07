@@ -1,5 +1,6 @@
 """Functionality for asynchronously sending requests to a miner"""
 
+import uuid
 import bittensor as bt
 from patrol.chain_data import event_fetcher
 from patrol.validation.scoring import MinerScoreRepository
@@ -81,9 +82,14 @@ async def query_miner(
 
     validation_results = await validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
 
-    logger.debug(f"calculating coverage score for miner {uid}")
-    miner_score = scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time)
-
+    logger.debug(f"Calculating coverage score for miner {uid}")
+    miner_score = scoring_mechanism.calculate_score(uid, 
+                                                    axon_info.coldkey, 
+                                                    axon_info.hotkey, 
+                                                    validation_results, 
+                                                    response_time,
+                                                    batch_id)
+    
     await miner_score_repository.add(miner_score)
 
     logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
@@ -142,6 +148,8 @@ async def test_miner():
 
     targets = await target_generator.generate_targets(10)
 
+    score_repo = MinerScoreRepository()
+
     target = ("5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD", 5163655)
 
     wallet_2 = bt.wallet(name="miners", hotkey="miner_1")
@@ -152,7 +160,16 @@ async def test_miner():
 
     semaphore = asyncio.Semaphore(1)
 
-    await query_miner(1, dendrite, axon, target, "placehold_id", validator_mechanism, scoring_mechanism, semaphore)
+    await query_miner(
+        batch_id="placehold_id",
+        uid=1,
+        dendrite=dendrite,
+        axon=axon,
+        target_tuple=target,
+        validation_mechanism=validator_mechanism,
+        scoring_mechanism=scoring_mechanism,
+        miner_score_repository=score_repo
+    )
 
 if __name__ == "__main__":
     
