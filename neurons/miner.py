@@ -2,7 +2,6 @@ import time
 import asyncio
 import argparse
 import traceback
-import logging
 from threading import Thread
 from asyncio import run_coroutine_threadsafe
 from typing import Tuple
@@ -14,12 +13,9 @@ from bittensor.utils.networking import get_external_ip
 from patrol.protocol import PatrolSynapse, MinerPingSynapse
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
+from patrol.chain_data.event_processor import EventProcessor
 from patrol.mining.subgraph_generator import SubgraphGenerator
 from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
-
-import json
-import uuid
-import dataclasses
 
 def get_event_loop():
     loop = asyncio.new_event_loop()
@@ -84,7 +80,6 @@ class Miner:
         volume = len(synapse.subgraph_output.nodes) + len(synapse.subgraph_output.edges)
         bt.logging.info(f"Returning a graph of {volume} in {round(time.time() - start_time, 2)} seconds.")
         return synapse
-        # If this errors then we should reload the substrate? 
 
     def forward_ping(self, synapse: MinerPingSynapse) -> MinerPingSynapse:
         return MinerPingSynapse(is_available=True)
@@ -105,10 +100,11 @@ class Miner:
 
         event_fetcher = EventFetcher(substrate_client=client)
         coldkey_finder = ColdkeyFinder(substrate_client=client)
+        event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
         self.subgraph_generator = SubgraphGenerator(
             event_fetcher=event_fetcher,
-            coldkey_finder=coldkey_finder,
+            event_processor=event_processor,
             max_future_events=self.max_future_events,
             max_past_events=self.max_past_events
         )

@@ -1,3 +1,4 @@
+from re import S
 from typing import Dict, Any
 import bittensor as bt
 import asyncio
@@ -7,15 +8,14 @@ import json
 from patrol.protocol import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
 from patrol.validation.graph_validation.errors import PayloadValidationError, ErrorPayload
 from patrol.chain_data.event_fetcher import EventFetcher
-from patrol.chain_data.event_parser import process_event_data
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
+from patrol.chain_data.event_processor import EventProcessor
 
 class BittensorValidationMechanism:
 
-    def __init__(self,  event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder):
+    def __init__(self,  event_fetcher: EventFetcher, event_processer: EventProcessor):
         self.graph_payload = None
         self.event_fetcher = event_fetcher
-        self.coldkey_finder = coldkey_finder
+        self.event_processer = event_processer
 
     async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None) -> Dict[str, Any]:
         start_time = time.time()
@@ -179,7 +179,7 @@ class BittensorValidationMechanism:
 
         events = await self.event_fetcher.fetch_all_events(block_numbers)
 
-        processed_events = await process_event_data(events, self.coldkey_finder)
+        processed_events = await self.event_processer.process_event_data(events)
 
         # Create a normalized event key set from on-chain events
         event_keys = {}
@@ -233,12 +233,11 @@ class BittensorValidationMechanism:
 # Example usage:
 if __name__ == "__main__":
 
-    from async_substrate_interface import AsyncSubstrateInterface
     import json
 
+    from patrol.chain_data.coldkey_finder import ColdkeyFinder
+    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
     bt.debug()
-
-    from patrol.constants import Constants
 
     file_path = "example_subgraph_output.json"
     with open(file_path, "r") as f:
@@ -246,13 +245,17 @@ if __name__ == "__main__":
 
     async def main():
 
-        fetcher = EventFetcher()
-        await fetcher.initialize_substrate_connections()
+        network_url = "wss://archive.chain.opentensor.ai:443/"
+        
+        # Create an instance of SubstrateClient.
+        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+        await client.initialize_connections()
 
-        coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialize_substrate_connection()
+        fetcher = EventFetcher(client)
+        coldkey_finder = ColdkeyFinder(client)
+        event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
-        validator = BittensorValidationMechanism(fetcher, coldkey_finder)
+        validator = BittensorValidationMechanism(fetcher, event_processor)
         
         # Run the validation
         result = await validator.validate_payload(uid=1, payload=payload, target="5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD")

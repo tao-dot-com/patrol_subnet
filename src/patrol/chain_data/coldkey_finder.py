@@ -1,5 +1,3 @@
-import logging
-
 class ColdkeyFinder:
     _cache = {}
 
@@ -20,7 +18,7 @@ class ColdkeyFinder:
         
         result = await self.substrate_client.query(
             6,
-            "query", 
+            "query",
             "SubtensorModule",
             "Owner",
             [hotkey]
@@ -36,8 +34,6 @@ if __name__ == "__main__":
     hotkey = "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3"
 
     async def example():
-        # Configure logging to see INFO-level messages.
-        logging.basicConfig(level=logging.INFO)
         
         # Replace with your actual substrate node WebSocket URL.
         network_url = "wss://archive.chain.opentensor.ai:443/"
@@ -64,7 +60,5 @@ if __name__ == "__main__":
         response_time = time.time() - start_time
 
         print(f"Fetched {coldkey} for the second time in {response_time} seconds.")
-
-
 
     asyncio.run(example())

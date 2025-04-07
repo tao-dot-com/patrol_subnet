@@ -6,8 +6,7 @@ import bittensor as bt
 
 from patrol.constants import Constants
 from patrol.chain_data.event_fetcher import EventFetcher
-from patrol.chain_data.event_parser import process_event_data
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
+from patrol.chain_data.event_processor import EventProcessor
 from patrol.protocol import GraphPayload, Node, Edge, TransferEvidence, StakeEvidence
 
 class SubgraphGenerator:
@@ -17,9 +16,9 @@ class SubgraphGenerator:
     # - _max_past_events: The number of events into the future you will collect
     # Adjust these based on your needs - higher values give higher chance of being able to find and deliver larger subgraphs, 
     # but will require more time and resources to generate
-    def __init__(self,  event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder, max_future_events=900, max_past_events=900, timeout=Constants.MAX_RESPONSE_TIME):
+    def __init__(self,  event_fetcher: EventFetcher, event_processor: EventProcessor, max_future_events=900, max_past_events=900, timeout=Constants.MAX_RESPONSE_TIME):
         self.event_fetcher = event_fetcher
-        self.coldkey_finder = coldkey_finder
+        self.event_processor = event_processor
         self._max_future_events = max_future_events
         self._max_past_events = max_past_events
         self.timeout = timeout
@@ -142,7 +141,7 @@ class SubgraphGenerator:
 
         events = await self.event_fetcher.fetch_all_events(block_numbers)
 
-        processed_events = await process_event_data(events, self.coldkey_finder)
+        processed_events = await self.event_processor.process_event_data(events)
 
         adjacency_graph = self.generate_adjacency_graph_from_events(processed_events)
 
@@ -152,8 +151,7 @@ class SubgraphGenerator:
 
 if __name__ == "__main__":
 
-    from async_substrate_interface import AsyncSubstrateInterface
-    from patrol.constants import Constants
+    from patrol.chain_data.coldkey_finder import ColdkeyFinder
 
     async def example():
 
@@ -176,8 +174,9 @@ if __name__ == "__main__":
 
         fetcher = EventFetcher(substrate_client=client)
         coldkey_finder = ColdkeyFinder(substrate_client=client)
+        event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
-        subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_past_events=500)
+        subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, event_processor=event_processor, max_future_events=500, max_past_events=500)
         subgraph = await subgraph_generator.run(target, target_block)
 
         volume = len(subgraph.nodes) + len(subgraph.edges)

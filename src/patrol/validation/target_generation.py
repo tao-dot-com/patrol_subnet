@@ -4,14 +4,13 @@ from typing import List, Tuple
 
 import bittensor as bt
 
-from patrol.chain_data.event_parser import process_event_data
+from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.event_fetcher import EventFetcher
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
 
 class TargetGenerator:
-    def __init__(self, event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder):
+    def __init__(self, event_fetcher: EventFetcher, event_processor: EventProcessor):
         self.event_fetcher = event_fetcher
-        self.coldkey_finder = coldkey_finder
+        self.event_processor = event_processor
 
     async def generate_random_block_tuples(self, num_targets: int = 1) -> List[int]:
         current_block = await self.event_fetcher.get_current_block()
@@ -36,7 +35,7 @@ class TargetGenerator:
 
         block_numbers = await self.generate_random_block_tuples(num_targets)
         events = await self.event_fetcher.fetch_all_events(block_numbers)
-        processed_events = await process_event_data(events, self.coldkey_finder)
+        processed_events = await self.event_processor.process_event_data(events)
         target_tuples = await self.find_targets(processed_events, num_targets)
 
         while len(target_tuples) < num_targets:
@@ -51,17 +50,26 @@ if __name__ == "__main__":
 
     import asyncio
 
+    from patrol.chain_data.coldkey_finder import ColdkeyFinder
+    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+
     async def example():
 
         bt.debug()
 
-        fetcher = EventFetcher()
-        await fetcher.initialize_substrate_connections()
+        network_url = "wss://archive.chain.opentensor.ai:443/"
+            
+        # Create an instance of SubstrateClient.
+        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+        
+        # Initialize substrate connections for all groups.
+        await client.initialize_connections()
 
-        coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialize_substrate_connection()
+        fetcher = EventFetcher(substrate_client=client)
+        coldkey_finder = ColdkeyFinder(substrate_client=client)
+        event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
-        target_generator = TargetGenerator(fetcher, coldkey_finder)
+        target_generator = TargetGenerator(fetcher, event_processor)
 
         target_tuples = await target_generator.generate_targets(247)
 

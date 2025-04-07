@@ -8,14 +8,14 @@ async def test_generate_block_numbers():
     mock_fetcher = AsyncMock()
     mock_fetcher.get_current_block.return_value = 6000000
 
-    gen = SubgraphGenerator(event_fetcher=mock_fetcher, coldkey_finder=AsyncMock(), max_future_events=10, max_historic_events=10)
+    gen = SubgraphGenerator(event_fetcher=mock_fetcher, event_processor=AsyncMock(), max_future_events=10, max_past_events=10)
     result = await gen.generate_block_numbers(5000000, lower_block_limit=4990000)
 
     assert result[0] == 4999990
     assert result[-1] == 5000010
 
 def test_generate_adjacency_graph():
-    gen = SubgraphGenerator(event_fetcher=None, coldkey_finder=None)
+    gen = SubgraphGenerator(event_fetcher=None, event_processor=None)
     sample_events = [
         {"coldkey_source": "A", "coldkey_destination": "B", "evidence": {"rao_amount": 100, "block_number": 1}},
         {"coldkey_source": "B", "coldkey_owner": "C", "evidence": {"rao_amount": 200, "block_number": 2}},
@@ -25,7 +25,7 @@ def test_generate_adjacency_graph():
     assert any(conn["neighbor"] == "B" for conn in graph["A"])
 
 def test_generate_subgraph_from_adjacency_graph():
-    gen = SubgraphGenerator(event_fetcher=None, coldkey_finder=None)
+    gen = SubgraphGenerator(event_fetcher=None, event_processor=None)
     adjacency_graph = {
         "X": [{"neighbor": "Y", "event": {
             "coldkey_source": "X",

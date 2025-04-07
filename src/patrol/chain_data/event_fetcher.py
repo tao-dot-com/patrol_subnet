@@ -1,7 +1,9 @@
 import asyncio
 import time
 from typing import Dict, List, Tuple, Any
+
 import bittensor as bt
+from async_substrate_interface import AsyncSubstrateInterface
 
 def group_block(block: int, current_block: int) -> int:
     if block <= 3014340:
@@ -94,7 +96,14 @@ class EventFetcher:
         if errors:
             raise Exception(f"Preprocessing failed: {errors}")
 
-        payloads = self.substrate_client.build_payloads(group, block_hashes, preprocessed_lst)
+        payloads = [
+            AsyncSubstrateInterface.make_payload(
+                str(block_hash),
+                preprocessed.method,
+                [preprocessed.params[0], block_hash]
+            )
+            for block_hash, preprocessed in zip(block_hashes, preprocessed_lst)
+        ]
 
         responses = await asyncio.wait_for(
             self.substrate_client.query(
@@ -165,7 +174,7 @@ class EventFetcher:
 
 async def example():
 
-    bt.debug()
+    import json
 
     from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
 
@@ -180,23 +189,9 @@ async def example():
     fetcher = EventFetcher(substrate_client=client)
 
     test_cases = [
-        [5163655 + i for i in range(1000)]
-        # [3804341, 3804339, 3804340, 3804341, 4264339, 4264340, 4264341, 4920349, 4920350, 4920351, 5163655, 5163656, 5163657, 5228683, 5228684, 5228685]
-        # [3804341, 3804341],   # duplicates
-        # [3014322],  # block number is too early
-        # [6000000],  # block number is too later
-        # [],   # empty input
-        # ["str_input", 3804339],   # invalid types in input
+        [5163655 + i for i in range(1000)],
         # [3804341 + i for i in range(1000)]    # high volume
     ]
-
-    failing_test_cases = [[4264340 + i] for i in range(500)]
-    #     # [4264440 + i for i in range(100)],
-    #     # [4264540 + i for i in range(100)],
-    #     # [4264640 + i for i in range(100)],
-    #     # [4264740 + i for i in range(100)]
-    #     [4264632]
-    # ]
 
     for test_case in test_cases:
 
@@ -206,12 +201,9 @@ async def example():
         all_events = await fetcher.fetch_all_events(test_case)
         bt.logging.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
-        filename = 'new_event_data.json'
-        import json
+        with open('raw_event_data.json', 'w') as file:
+            json.dump(all_events, file, indent=4)
 
-        # Open the file in write mode and dump the dictionary to it
-        with open(filename, 'w') as json_file:
-            json.dump(all_events, json_file, indent=4)
         # bt.logging.debug(all_events)
 
 if __name__ == "__main__":
