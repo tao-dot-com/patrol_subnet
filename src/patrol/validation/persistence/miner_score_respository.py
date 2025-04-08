@@ -1,11 +1,11 @@
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
-from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass, aliased
-from sqlalchemy import DateTime, select, Sequence, extract, func
+from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
+from sqlalchemy import DateTime, select, func
 from datetime import datetime, UTC
 from patrol.validation.persistence import Base
 import uuid
-from typing import Optional
+from typing import Optional, Iterable
 
 
 class _MinerScore(Base, MappedAsDataclass):
@@ -86,7 +86,7 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             session.add(obj)
             await session.commit()
 
-    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Sequence[float]:
+    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Iterable[float]:
         async with self.LocalAsyncSession() as session:
             query = select(_MinerScore.overall_score).filter(
                 _MinerScore.hotkey == miner[0],

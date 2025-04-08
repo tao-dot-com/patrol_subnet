@@ -81,7 +81,7 @@ async def test_persist_miner_score(mock_axon, test_wallet):
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, dendrite,
-        metagraph, lambda: batch_id, AsyncMock(WeightSetter)
+        metagraph, lambda: batch_id, AsyncMock(WeightSetter), enable_weight_setting=True
     )
     await validator.query_miner(batch_id, uid, axon.info(), ("bar", 123))
 
@@ -121,7 +121,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
                                 novelty_score=1.0, validation_passed=True, error_message=None,
                                 coldkey="foo2", hotkey="bar2")
 
-    mock_calc_score = MagicMock(side_effect=[miner_scores_1, miner_scores_2])
+    mock_calc_score = AsyncMock(side_effect=[miner_scores_1, miner_scores_2])
     scoring_mechanism.calculate_score = mock_calc_score
 
     metagraph = AsyncMock(AsyncMetagraph)
@@ -149,7 +149,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository,
-        dendrite, metagraph, lambda: batch_id, weight_setter
+        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True
     )
 
     await validator.query_miner_batch()
@@ -192,7 +192,7 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
                                 novelty_score=1.0, validation_passed=True, error_message=None,
                                 coldkey="foo2", hotkey="bar2")
 
-    mock_calc_score = MagicMock(side_effect=[miner_scores_1, miner_scores_2])
+    mock_calc_score = AsyncMock(side_effect=[miner_scores_1, miner_scores_2])
     scoring_mechanism.calculate_score = mock_calc_score
 
     metagraph = AsyncMock(AsyncMetagraph)
@@ -213,7 +213,7 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository,
-        dendrite, metagraph, lambda: batch_id, weight_setter
+        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True
     )
 
     await validator.query_miner_batch()

@@ -7,15 +7,16 @@ from uuid import UUID
 
 from patrol.protocol import GraphPayload
 from patrol.validation.graph_validation.errors import ErrorPayload
-from patrol.validation.scoring import MinerScore
+from patrol.validation.scoring import MinerScore, MinerScoreRepository
 from patrol.constants import Constants
 
 class MinerScoring:
-    def __init__(self):
+    def __init__(self, miner_score_repository: MinerScoreRepository):
         self.importance = {
             'volume': 0.5,
             'responsiveness': 0.5,
         }
+        self.miner_score_repository = miner_score_repository
 
     def calculate_novelty_score(self, payload: Dict[str, Any]) -> float:
         # Placeholder for future implementation
@@ -32,7 +33,7 @@ class MinerScoring:
         response_time = min(response_time, Constants.MAX_RESPONSE_TIME)
         return 1.0 - (response_time / Constants.MAX_RESPONSE_TIME)
 
-    def calculate_score(
+    async def calculate_score(
         self,
         uid: int,
         coldkey: str,
@@ -45,6 +46,7 @@ class MinerScoring:
     ) -> MinerScore:
 
         assert len(previous_overall_scores) < moving_average_denominator
+        previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), moving_average_denominator - 1)
 
         if isinstance(payload, ErrorPayload):
             bt.logging.warning(f"Error received as output from validation process, adding details to miner {uid} records.")

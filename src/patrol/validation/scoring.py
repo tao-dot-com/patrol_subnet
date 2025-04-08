@@ -1,7 +1,7 @@
 import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Iterable
 from datetime import datetime
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class MinerScoreRepository(ABC):
         pass
 
     @abstractmethod
-    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> float:
+    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Iterable[float]:
         pass
 
     @abstractmethod
