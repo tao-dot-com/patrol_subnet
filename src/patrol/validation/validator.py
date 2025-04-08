@@ -1,15 +1,12 @@
-"""Functionality for asynchronously sending requests to a miner"""
-from ast import Sub
-import uuid
 from typing import Callable, Tuple
 
 import uuid
 import bittensor as bt
 import patrol
-from patrol.chain_data import substrate_client
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
+from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 from patrol.validation.scoring import MinerScoreRepository
 import asyncio
@@ -44,7 +41,7 @@ class Validator:
         metagraph: AsyncMetagraph,
         uuid_generator: Callable[[], UUID],
         weight_setter: WeightSetter,
-        enable_weight_setting: bool
+        enable_weight_setting: bool,
     ):
         self.validation_mechanism = validation_mechanism
         self.scoring_mechanism = scoring_mechanism
@@ -152,7 +149,7 @@ class Validator:
 
 async def start():
 
-    from patrol.validation.config import DB_URL, NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH, ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR
+    from patrol.validation.config import DB_URL, NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH, ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS
     if not ENABLE_WEIGHT_SETTING:
         logger.warning("Weight setting is not enabled.")
 
@@ -192,10 +189,12 @@ async def start():
             await miner_validator.query_miner_batch()
         except Exception as ex:
             logger.exception("Error!")
-        await asyncio.sleep(10 * 60)
+        await asyncio.sleep(SCORING_INTERVAL_SECONDS)
 
 def boot():
     try:
+        from config import DB_URL
+        migrate_db(DB_URL)
         asyncio.run(start())
     except KeyboardInterrupt as ex:
         logger.info("Exiting")
