@@ -3,7 +3,19 @@
 ## Prerequsites
 
 - docker
+- bittensor cli (for wallet management)
 
+### Create a wallet
+
+Be sure to create a wallet in advance following instructions from http://docs.bittensor.com
+
+1. Register your validator with the Patrol subnet using the following command
+   `btcli subnet register --netuid <UID> --wallet.name <YOUR_COLDKEY> --wallet.hotkey <YOUR_HOTKEY> --network <your_network>`
+   where `<your network>` is either 81 (Mainet) or 275 (Testnet)
+
+2. Install docker (https://docs.docker.com/engine/install/)
+
+The validator requires a SQL database. This can be either an embedded SQLite database or a Postgresql database.
 The database is configured using a URL e.g.
 `sqlite+aiosqlite:///<some_path>/validator.db` (SQLite)
 `postgres+asyncpg://<user>:<password>@<host>:<port>/<db name>` (PostgreSQL)
@@ -24,6 +36,9 @@ The following environment variables can be used to configure the validator:
 | ARCHIVE_SUBTENSOR      | wss://archive.chain.opentensor.ai:443   | An archive subtensor node                                        |
 
 #### Embedded SQLite database
+volumes:
+sqlite
+
 services:
 # This is optional - any Postgres database, or an embedded SQLite database can be used
 validator:
@@ -55,6 +70,4 @@ POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
 ## Options
 
 ### Postgresql database
-
-
 
