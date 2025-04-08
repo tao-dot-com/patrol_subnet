@@ -100,12 +100,10 @@ class SubstrateClient:
             bt.logging.debug("No runtime version provided, setting default.")
             runtime_version = max(self.substrate_cache.keys())
 
-        # Check that the provided group is initialized.
         if runtime_version not in self.substrate_cache:
             raise Exception(f"Runtime version {runtime_version} is not initialized. Available versions: {list(self.substrate_cache.keys())}")
 
         errors = []
-        # First set of retry attempts using the current connection.
         for attempt in range(self.max_retries):
             try:
                 substrate = self.substrate_cache[runtime_version]

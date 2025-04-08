@@ -83,12 +83,9 @@ class Miner:
         bt.logging.info(f"Returning a graph of {volume} in {round(time.time() - start_time, 2)} seconds.")
         return synapse
 
-    def forward_ping(self, synapse: MinerPingSynapse) -> MinerPingSynapse:
-        return MinerPingSynapse(is_available=True)
-
     async def setup_axon(self):
         self.axon = bt.axon(wallet=self.wallet, port=self.port, external_ip=self.external_ip)
-        self.axon.attach(forward_fn=self.forward, blacklist_fn=self.blacklist_fn).attach(forward_fn=self.forward_ping)
+        self.axon.attach(forward_fn=self.forward, blacklist_fn=self.blacklist_fn)
         if not self.dev_flag:
             await self.subtensor.serve_axon(
                 netuid=self.netuid,
