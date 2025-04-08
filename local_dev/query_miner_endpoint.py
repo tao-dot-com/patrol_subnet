@@ -13,7 +13,8 @@ from patrol.validation.graph_validation.bittensor_validation_mechanism import Bi
 from patrol.validation.target_generation import TargetGenerator
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.validator import Validator
-from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+from patrol.chain_data.substrate_client import SubstrateClient
+from patrol.chain_data.runtime_groupings import load_versions
 
 class MockMinerScoreRepo:
 
@@ -42,10 +43,10 @@ async def test_miner(requests):
     network_url = "wss://archive.chain.opentensor.ai:443/"
         
     # Create an instance of SubstrateClient.
-    client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
-    
-    # Initialize substrate connections for all groups.
-    await client.initialize_connections()
+    versions = load_versions()
+        
+    client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+    await client.initialize()
 
     event_fetcher = EventFetcher(substrate_client=client)
     coldkey_finder = ColdkeyFinder(substrate_client=client)

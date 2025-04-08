@@ -18,7 +18,7 @@ async def test_find_calls_query_when_not_cached():
     # Assert: The result should be what the fake substrate client returns.
     assert result == fake_query_result
     fake_substrate_client.query.assert_awaited_once_with(
-        6, "query", "SubtensorModule", "Owner", [hotkey]
+        "query", None, "SubtensorModule", "Owner", [hotkey]
     )
 
 @pytest.mark.asyncio

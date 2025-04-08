@@ -4,154 +4,158 @@ import logging
 import bittensor as bt
 
 from async_substrate_interface import AsyncSubstrateInterface
+from async_substrate_interface.async_substrate import Websocket
 
-logger = logging.getLogger(__name__)
-
-# Define the initial block numbers for each group.
-GROUP_INIT_BLOCK = {
-    1: 3784340,
-    2: 4264340,
-    3: 4920350,
-    4: 5163656,
-    5: 5228683,
-    6: 5228685,
-}
+class CustomAsyncSubstrateInterface(AsyncSubstrateInterface):
+    def __init__(self, url=None, ws=None, **kwargs):
+        """
+        Extends AsyncSubstrateInterface to allow injecting a custom websocket connection.
+        
+        Args:
+            url: the URI of the chain to connect to.
+            ws: Optional websocket connection to use. If provided, it overrides the default one.
+            **kwargs: any additional keyword arguments for the parent class.
+        """
+        # Initialize the parent class with all normal parameters.
+        super().__init__(url, **kwargs)
+        # Override the websocket connection if one is provided.
+        self.ws = ws
 
 class SubstrateClient:
-    def __init__(self, groups: dict, network_url: str, keepalive_interval: int = 20, max_retries: int = 3):
+    def __init__(self, runtime_mappings: dict, network_url: str, websocket: Websocket = None, keepalive_interval: int = 20, max_retries: int = 3):
         """
         Args:
-            groups: A dict mapping group_id to initial block numbers.
+            runtime_mappings: A dict mapping group_id to runtime versions.
             network_url: The URL for the archive node.
             keepalive_interval: Interval for keepalive pings in seconds.
             max_retries: Number of times to retry a query before reinitializing the connection.
         """
-        self.groups = groups
+        self.runtime_mappings = runtime_mappings
         self.keepalive_interval = keepalive_interval
         self.max_retries = max_retries
-        self.connections: dict[int, AsyncSubstrateInterface] = {}  # group_id -> AsyncSubstrateInterface
+        self.websocket = websocket
+        self.substrate_cache = {}  # group_id -> AsyncSubstrateInterface
         self.network_url = network_url
 
-    async def _create_connection(self, group: int) -> AsyncSubstrateInterface:
+    async def initialize(self):
         """
-        Creates and initializes a substrate connection for a given group.
+        Initializes the websocket connection and loads metadata instances fol all runtime versions.
         """
-        init_block = self.groups[group]
-        substrate = AsyncSubstrateInterface(url=self.network_url)
-        init_hash = await substrate.get_block_hash(init_block)
-        await substrate.init_runtime(block_hash=init_hash)
-        return substrate
+        bt.logging.info("Initializing websocket connection.")
+        if self.websocket is None:
+            self.websocket = Websocket(
+                    self.network_url,
+                    options={
+                        "max_size": 2**32,
+                        "write_limit": 2**16,
+                    },
+                )
+        
+        await self.websocket.connect(force=True)
 
-    async def initialize_connections(self):
-        """
-        Initializes substrate connections for all groups and starts the keepalive tasks.
-        """
-        for group in self.groups:
-            logger.info(f"Initializing substrate connection for group {group} at block {self.groups[group]}")
-            substrate = await self._create_connection(group)
-            self.connections[group] = substrate
-            # Start a background task for keepalive pings.
-            asyncio.create_task(self._keepalive_task(group, substrate))
+        for version, mapping in self.runtime_mappings.items():
+            bt.logging.info(f"Initializing substrate instance for version: {version}.")
 
-    async def _reinitialize_connection(self, group: int) -> AsyncSubstrateInterface:
+            substrate = CustomAsyncSubstrateInterface(ws=self.websocket)
+
+            await substrate.init_runtime(block_hash=mapping["block_hash_min"])
+
+            self.substrate_cache[int(version)] = substrate
+
+        bt.logging.info("Substrate client successfully initialized.")
+
+    async def _reinitialize_connection(self):
         """
-        Reinitializes the substrate connection for a specific group.
+        Reinitializes the websocket connection.
         """
-        existing_substrate = self.connections[group]
-        await existing_substrate.close()
+        if self.websocket:
+            await self.websocket.shutdown()
+        
+        self.websocket = Websocket(
+                self.network_url,
+                options={
+                    "max_size": 2**32,
+                    "write_limit": 2**16,
+                },
+            )
+        
+        await self.websocket.connect(force=True)
+        bt.logging.info("Reinitialized websocket connection.")
 
-        existing_substrate.runtime_cache.blocks.clear()
-        existing_substrate.runtime_cache.block_hashes.clear()
-        existing_substrate.runtime_cache.versions.clear()
-
-        substrate = await self._create_connection(group)
-        logger.info(f"Reinitialized connection for group {group}")
-        return substrate
-
-    async def _keepalive_task(self, group, substrate):
-        """Periodically sends a lightweight ping to keep the connection alive."""
-        while True:
-            try:
-                logger.debug(f"Performing keep alive ping for group {group}")
-                await substrate.get_block(block_number=self.groups[group])
-                logger.debug(f"Keep alive ping successful for group {group}")
-            except Exception as e:
-                logger.warning(f"Keepalive failed for group {group}: {e}. Reinitializing connection.")
-                substrate = await self._reinitialize_connection(group)
-                self.connections[group] = substrate
-            finally:
-                await asyncio.sleep(self.keepalive_interval)
-
-    async def query(self, group: int, method_name: str, *args, **kwargs):
+    async def query(self, method_name: str, runtime_version: int = None, *args, **kwargs):
         """
-        Executes a query using the substrate connection for the given group.
-        Checks if the group is valid, and if the connection is missing, reinitializes it.
+        Executes a query using the substrate instance for the given runtime version.
+        Checks if the version is valid, and if the connection is missing, reinitializes it.
         Uses a retry mechanism both before and after reinitializing the connection.
 
         Args:
-            group: The group id for the substrate connection.
+            runtime_version: The runtime version for the substrate instance.
             method_name: The name of the substrate method to call (e.g., "get_block_hash").
             *args, **kwargs: Arguments for the query method.
 
         Returns:
             The result of the query method.
         """
+        if runtime_version is None:
+            bt.logging.debug("No runtime version provided, setting default.")
+            runtime_version = max(self.substrate_cache.keys())
+
         # Check that the provided group is initialized.
-        if group not in self.groups:
-            raise Exception(f"Group {group} is not initialized. Available groups: {list(self.groups.keys())}")
-        
+        if runtime_version not in self.substrate_cache:
+            raise Exception(f"Runtime version {runtime_version} is not initialized. Available versions: {list(self.substrate_cache.keys())}")
 
         errors = []
         # First set of retry attempts using the current connection.
         for attempt in range(self.max_retries):
             try:
-                substrate = await self.get_connection(group)
+                substrate = self.substrate_cache[runtime_version]
 
                 query_func = getattr(substrate, method_name)
                 return await query_func(*args, **kwargs)
             except Exception as e:
                 errors.append(e)
-                logger.warning(f"Query error on group {group} attempt {attempt + 1}: {e}")
+                bt.logging.warning(f"Query error on version {runtime_version} attempt {attempt + 1}: {e}")
                 if "429" in str(e):
                     await asyncio.sleep(2 * (attempt + 1))
                 else:
                     await asyncio.sleep(0.25)
-                
-                if attempt == self.max_retries - 2:
-                    logger.info(f"Initial query attempts failed for group {group}. Attempting to reinitialize connection.")
-                    substrate = await self._reinitialize_connection(group)
-                    self.connections[group] = substrate
+
+                    if attempt == self.max_retries - 2:
+                        await self._reinitialize_connection()
             
-        raise Exception(f"Query failed for group {group} after reinitialization attempts. Errors: {errors}")
-
-    async def get_connection(self, group: int) -> AsyncSubstrateInterface:
-        """Return the substrate connection for a given group."""
-        substrate = self.connections.get(group)
-        if substrate is None:
-            logger.info(f"No active connection for group {group}. Reinitializing connection.")
-            substrate = await self._reinitialize_connection(group)
-            self.connections[group] = substrate
-
-        return substrate
+        raise Exception(f"Query failed for version {runtime_version} after reinitialization attempts. Errors: {errors}")
+    
+    def return_runtime_versions(self):
+        return self.runtime_mappings
 
 if __name__ == "__main__":
+
+    from patrol.chain_data.runtime_groupings import load_versions, get_version_for_block
 
     async def example():
     
         # Replace with your actual substrate node WebSocket URL.
         network_url = "wss://archive.chain.opentensor.ai:443/"
+        versions = load_versions()
+
+        # shortening the version dict for dev
+
+        keys_to_keep = {"149", "150", "151"}
+        versions = {k: versions[k] for k in keys_to_keep if k in versions}
         
         # Create an instance of SubstrateClient with a shorter keepalive interval.
-        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=5, max_retries=3)
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
         
         # Initialize substrate connections for all groups.
-        await client.initialize_connections()
+        await client.initialize()
 
-        block_hash = await client.query(1, "get_block_hash", 3784340)
+        version = get_version_for_block(3157275, 5400000, versions)
+        version = None
+        block_hash = await client.query("get_block_hash", version, 3157275)
 
-        logger.info(block_hash)
-        
-        # Keep the main loop running to observe repeated keepalive pings.
-        await asyncio.sleep(30)
+        await client.websocket.shutdown()
+
+        block_hash = await client.query("get_block_hash", version, 3157275)
+        bt.logging.info(block_hash)
     
     asyncio.run(example())

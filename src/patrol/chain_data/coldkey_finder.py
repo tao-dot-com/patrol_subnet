@@ -21,8 +21,8 @@ class ColdkeyFinder:
             return self._cache[hotkey]
         
         result = await self.substrate_client.query(
-            6,
             "query",
+            None,
             "SubtensorModule",
             "Owner",
             [hotkey]
@@ -33,20 +33,18 @@ class ColdkeyFinder:
 if __name__ == "__main__":
     import asyncio
     import time
-    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+    from patrol.chain_data.substrate_client import SubstrateClient
+    from patrol.chain_data.runtime_groupings import load_versions
     
     hotkey = "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3"
 
     async def example():
         
-        # Replace with your actual substrate node WebSocket URL.
         network_url = "wss://archive.chain.opentensor.ai:443/"
+        versions = load_versions()
         
-        # Create an instance of SubstrateClient.
-        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
-        
-        # Initialize substrate connections for all groups.
-        await client.initialize_connections()
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+        await client.initialize()
 
         finder = ColdkeyFinder(substrate_client=client)
 

@@ -250,10 +250,12 @@ class EventProcessor:
     
 if __name__ == "__main__":
 
-    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
     import json
+    from patrol.chain_data.substrate_client import SubstrateClient
+    from patrol.chain_data.runtime_groupings import load_versions
 
     network_url = "wss://archive.chain.opentensor.ai:443/"
+    versions = load_versions()
 
     async def example():
 
@@ -263,8 +265,8 @@ if __name__ == "__main__":
         with open(file_path, "r") as f:
             data = json.load(f)
 
-        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
-        await client.initialize_connections()
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+        await client.initialize()
 
         coldkey_finder = ColdkeyFinder(substrate_client=client)
 

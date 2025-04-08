@@ -236,7 +236,8 @@ if __name__ == "__main__":
     import json
 
     from patrol.chain_data.coldkey_finder import ColdkeyFinder
-    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+    from patrol.chain_data.substrate_client import SubstrateClient
+    from patrol.chain_data.runtime_groupings import load_versions
     bt.debug()
 
     file_path = "example_subgraph_output.json"
@@ -246,10 +247,10 @@ if __name__ == "__main__":
     async def main():
 
         network_url = "wss://archive.chain.opentensor.ai:443/"
+        versions = load_versions()
         
-        # Create an instance of SubstrateClient.
-        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
-        await client.initialize_connections()
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+        await client.initialize()
 
         fetcher = EventFetcher(client)
         coldkey_finder = ColdkeyFinder(client)

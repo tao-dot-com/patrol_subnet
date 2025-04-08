@@ -4,45 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 import bittensor as bt
 
-from patrol.chain_data.event_fetcher import (
-    group_block,
-    group_blocks,
-    EventFetcher,
-)
-
-# ----------------------------
-# Tests for grouping functions
-# ----------------------------
-
-def test_group_block():
-    # Test boundary conditions.
-    assert group_block(3014341, 6000000) == 1
-    assert group_block(3804340, 6000000) == 1
-    assert group_block(3804341, 6000000) == 2
-    assert group_block(4264340, 6000000) == 2
-    assert group_block(4264341, 6000000) == 3
-    assert group_block(4920350, 6000000) == 3
-    assert group_block(4920351, 6000000) == 4
-    assert group_block(5163656, 6000000) == 4
-    assert group_block(5163657, 6000000) == 5
-    assert group_block(5228684, 6000000) == 5
-    assert group_block(5228685, 6000000) == 6
-    # Test a block that is too early.
-    assert group_block(3010000, 6000000) is None
-    # Test a block beyond the current block.
-    assert group_block(6000001, 6000000) is None
-
-def test_group_blocks():
-    block_numbers = [3784341, 3804340, 3804341, 4264340, 4264341, 4920350, 4920351, 5163656, 5163657, 5228684, 5228685]
-    block_hashes = [f"hash{i}" for i in block_numbers]
-    current_block = 6000000
-    grouped = group_blocks(block_numbers, block_hashes, current_block, batch_size=3)
-    # Ensure that grouped is a dict with keys for groups 1..6 (where applicable)
-    for group, batches in grouped.items():
-        for batch in batches:
-            for (bn, h) in batch:
-                assert isinstance(bn, int)
-                assert isinstance(h, str)
+from patrol.chain_data.event_fetcher import EventFetcher
 
 # ----------------------------
 # Tests for EventFetcher methods
@@ -62,7 +24,7 @@ async def test_get_current_block():
     
     # Assert
     assert block_num == 5000000
-    fake_substrate_client.query.assert_awaited_once_with(6, "get_block")
+    fake_substrate_client.query.assert_awaited_once_with("get_block", None)
 
 class FakePreprocessed:
     def __init__(self):
@@ -79,7 +41,7 @@ async def test_get_block_events_success():
     # Fake preprocessed response.
     fake_preprocessed = FakePreprocessed()
     
-    async def fake_query(group, method_name, *args, **kwargs):
+    async def fake_query(method_name, version, *args, **kwargs):
         if method_name == "_preprocess":
             return fake_preprocessed
         elif method_name == "_make_rpc_request":
@@ -98,7 +60,7 @@ async def test_get_block_events_success():
     ef = EventFetcher(fake_substrate_client)
     
     # Act
-    events = await ef.get_block_events(1, block_info, max_concurrent=2)
+    events = await ef.get_block_events(None, block_info, max_concurrent=2)
     
     # Assert: Expect a mapping from block number to the corresponding fake event.
     expected: Dict[int, Any] = {100: "event_for_hash100", 101: "event_for_hash101"}
@@ -109,7 +71,7 @@ async def test_get_block_events_preprocess_failure():
     # Arrange: simulate failure in _preprocess.
     block_info: List[Tuple[int, str]] = [(100, "hash100")]
     
-    async def fake_query(group, method_name, *args, **kwargs):
+    async def fake_query(method_name, version, *args, **kwargs):
         if method_name == "_preprocess":
             raise Exception("Preprocess failure")
         elif method_name == "_make_rpc_request":
@@ -146,7 +108,7 @@ async def test_fetch_all_events_success(monkeypatch):
 
     fake_preprocessed = FakePreprocessed()
 
-    async def fake_query(group, method_name, *args, **kwargs):
+    async def fake_query(method_name, version, *args, **kwargs):
         if method_name == "get_block":
             return {"header": {"number": 6000000}}
         if method_name == "_preprocess":

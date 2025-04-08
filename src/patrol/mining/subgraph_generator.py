@@ -157,16 +157,15 @@ if __name__ == "__main__":
 
         bt.debug()
 
-        from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+        from patrol.chain_data.substrate_client import SubstrateClient
+        from patrol.chain_data.runtime_groupings import load_versions
 
         network_url = "wss://archive.chain.opentensor.ai:443/"
-            
-        # Create an instance of SubstrateClient.
-        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+        versions = load_versions()
         
-        # Initialize substrate connections for all groups.
-        await client.initialize_connections()
-
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+        await client.initialize()
+            
         start_time = time.time()
 
         target = "5FyCncAf9EBU8Nkcm5gL1DQu3hVmY7aphiqRn3CxwoTmB1cZ"

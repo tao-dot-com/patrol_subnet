@@ -5,59 +5,7 @@ from typing import Dict, List, Tuple, Any
 
 import bittensor as bt
 from async_substrate_interface import AsyncSubstrateInterface
-
-logger = logging.getLogger(__name__)
-
-def group_block(block: int, current_block: int) -> int:
-    if block <= 3014340:
-        return None
-    elif block <= 3804340:
-        return 1
-    elif block <= 4264340:
-        return 2
-    elif block <= 4920350:
-        return 3
-    elif block <= 5163656:
-        return 4
-    elif block <= 5228684:
-        return 5
-    elif block > 5228684 and block <= current_block:
-        return 6
-    return None
-
-def group_blocks(
-    block_numbers: List[int],
-    block_hashes: List[str],
-    current_block: int,
-    batch_size: int = 500
-) -> Dict[int, List[List[Tuple[int, str]]]]:
-    """
-    Groups blocks by group ID and splits each group into batches.
-
-    Args:
-        block_numbers: List of block numbers.
-        block_hashes: Corresponding block hashes.
-        current_block: Current latest block.
-        batch_size: Maximum number of blocks per batch (default 500).
-
-    Returns:
-        Dictionary mapping group ID to list of block batches (each a list of tuples).
-    """
-    grouped: Dict[int, List[Tuple[int, str]]] = {}
-    for block_number, block_hash in zip(block_numbers, block_hashes):
-        group = group_block(block_number, current_block)
-        if group:
-            grouped.setdefault(group, []).append((block_number, block_hash))
-        else:
-            logger.warning(f"Block {block_number} is outside current groupings.")
-
-    batched: Dict[int, List[List[Tuple[int, str]]]] = {}
-    for group_id, block_list in grouped.items():
-        batched[group_id] = [
-            block_list[i:i + batch_size] for i in range(0, len(block_list), batch_size)
-        ]
-
-    return batched
+from patrol.chain_data.runtime_groupings import group_blocks
 
 class EventFetcher:
     def __init__(self, substrate_client):
@@ -65,17 +13,17 @@ class EventFetcher:
         self.semaphore = asyncio.Semaphore(1)
   
     async def get_current_block(self) -> int:
-        current_block = await self.substrate_client.query(6, "get_block")
+        current_block = await self.substrate_client.query("get_block", None)
         return current_block["header"]["number"]
 
     async def get_block_events(
         self,
-        group: int,
+        runtime_version: int,
         block_info: List[Tuple[int, str]],
         max_concurrent: int = 10
     ) -> Dict[int, Any]:
         """
-        Fetch events for a batch of blocks for a specific group using the substrate client's query method.
+        Fetch events for a batch of blocks for a specific runtime_version using the substrate client's query method.
         """
         # Extract block hashes for processing.
         block_hashes = [block_hash for (_, block_hash) in block_info]
@@ -85,8 +33,8 @@ class EventFetcher:
             async with semaphore:
                 # Use the query method to call the substrate's _preprocess method.
                 return await self.substrate_client.query(
-                    group,
                     "_preprocess",
+                    runtime_version,
                     None,
                     block_hash,
                     module="System",
@@ -110,8 +58,8 @@ class EventFetcher:
 
         responses = await asyncio.wait_for(
             self.substrate_client.query(
-                group,
                 "_make_rpc_request",
+                runtime_version,
                 payloads,
                 preprocessed_lst[0].value_scale_type,
                 preprocessed_lst[0].storage_item
@@ -133,22 +81,22 @@ class EventFetcher:
 
         # Validate input: check if block_numbers is empty.
         if not block_numbers:
-            logger.warning("No block numbers provided. Returning empty event dictionary.")
+            bt.logging.warning("No block numbers provided. Returning empty event dictionary.")
             return {}
 
         # Validate that all items in block_numbers are integers.
         if any(not isinstance(b, int) for b in block_numbers):
-            logger.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
+            bt.logging.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
             return {}
 
         # Get rid of duplicates
         block_numbers = set(block_numbers)
 
         async with self.semaphore:
-            logger.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
+            bt.logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
 
             block_hash_tasks = [
-                self.substrate_client.query(6, "get_block_hash", n)
+                self.substrate_client.query("get_block_hash", None, n)
                 for n in block_numbers
             ]
             block_hashes = await asyncio.gather(*block_hash_tasks)
@@ -157,37 +105,37 @@ class EventFetcher:
             current_block = await self.get_current_block()
 
             # Group blocks by group while maintaining the block number alongside its hash.
-            grouped = group_blocks(block_numbers, block_hashes, current_block)
+            versions = self.substrate_client.return_runtime_versions()
+            grouped = group_blocks(block_numbers, block_hashes, current_block, versions)
 
             all_events: Dict[int, Any] = {}
-            for group, batches in grouped.items():
+            for runtime_version, batches in grouped.items():
                 for batch in batches:
-                    logger.debug(f"\nFetching events for group {group} (batch of {len(batch)} blocks)...")
+                    bt.logging.debug(f"\nFetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
                     try:
-                        events = await self.get_block_events(group, batch)
+                        events = await self.get_block_events(runtime_version, batch)
                         all_events.update(events)
-                        logger.debug(f"Successfully fetched events for group {group} batch.")
+                        bt.logging.debug(f"Successfully fetched events for runtime version {runtime_version} batch.")
                     except Exception as e:
-                        logger.warning(
-                            f"Error fetching events for group {group} batch on final attempt: {e}. Continuing..."
+                        bt.logging.warning(
+                            f"Error fetching events for runtime version {runtime_version} batch on final attempt: {e}. Continuing..."
                         )
-            # Continue to next group even if the current one fails.
-        logger.debug(f"All events collected in {time.time() - start_time} seconds.")
+            # Continue to next version even if the current one fails.
+        bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
 
 async def example():
 
     import json
 
-    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+    from patrol.chain_data.substrate_client import SubstrateClient
+    from patrol.chain_data.runtime_groupings import load_versions
 
     network_url = "wss://archive.chain.opentensor.ai:443/"
-        
-    # Create an instance of SubstrateClient.
-    client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+    versions = load_versions()
     
-    # Initialize substrate connections for all groups.
-    await client.initialize_connections()
+    client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+    await client.initialize()
 
     fetcher = EventFetcher(substrate_client=client)
 
@@ -198,11 +146,11 @@ async def example():
 
     for test_case in test_cases:
 
-        logger.info("Starting next test case.")
+        bt.logging.info("Starting next test case.")
 
         start_time = time.time()
         all_events = await fetcher.fetch_all_events(test_case)
-        logger.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
+        bt.logging.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
         with open('raw_event_data.json', 'w') as file:
             json.dump(all_events, file, indent=4)

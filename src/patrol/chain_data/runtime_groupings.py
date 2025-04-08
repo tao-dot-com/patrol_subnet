@@ -1,5 +1,6 @@
 import json
 from typing import List, Dict, Optional
+from pathlib import Path
 import bittensor as bt
 
 # Define type aliases for clarity
@@ -7,7 +8,11 @@ VersionRange = Dict[str, int]
 VersionData = Dict[str, VersionRange]
 
 # Load JSON from file
-def load_versions(filepath: str) -> VersionData:
+def load_versions(filename: str = "runtime_versions.json") -> VersionData:
+    # Get the path to the current file and ensure relative to it
+    here = Path(__file__).parent.resolve()
+    filepath = here / filename
+
     with open(filepath, 'r') as f:
         return json.load(f)
 
@@ -52,7 +57,7 @@ def group_blocks(
     block_hashes: List[str],
     current_block: int,
     versions: VersionData,
-    batch_size: int = 500
+    batch_size: int = 25
 ) -> Dict[int, List[List[int]]]:
     """
     Groups blocks by version and splits each group into batches.
@@ -61,7 +66,7 @@ def group_blocks(
         block_numbers: List of block numbers.
         current_block: Current latest block.
         versions: Version boundaries for blocks.
-        batch_size: Maximum number of blocks per batch (default 500).
+        batch_size: Maximum number of blocks per batch (default 25).
 
     Returns:
         Dictionary mapping version number to list of block batches (each a list of ints).
@@ -84,7 +89,7 @@ def group_blocks(
 
 # Example usage
 if __name__ == "__main__":
-    versions = load_versions("runtime_versions.json")  # Replace with your actual file name
+    versions = load_versions()  # Replace with your actual file name
     print(versions)
     block_numbers = [5400000]
     block_hashes = ["test"]

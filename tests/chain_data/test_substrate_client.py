@@ -1,134 +1,140 @@
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from unittest.mock import AsyncMock, patch
 
-from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+from patrol.chain_data.substrate_client import SubstrateClient, CustomAsyncSubstrateInterface
 
+# ----------------------------
+# Fixtures
+# ----------------------------
 
-# ---------------------------
-# Test: initialize_connections
-# ---------------------------
+@pytest.fixture
+def runtime_mappings():
+    return {
+        "1": {"block_hash_min": "0xabc"},
+        "2": {"block_hash_min": "0xdef"},
+    }
+
+@pytest.fixture
+def mock_websocket():
+    ws = AsyncMock()
+    ws.connect = AsyncMock()
+    ws.shutdown = AsyncMock()
+    return ws
+
+# ----------------------------
+# Test: initialize
+# ----------------------------
+
 @pytest.mark.asyncio
-async def test_initialize_connections():
-    # Create a fake substrate object.
-    fake_substrate = MagicMock()
-    fake_substrate.get_block_hash = AsyncMock(return_value="fake_hash")
-    fake_substrate.init_runtime = AsyncMock(return_value=None)
-    
-    client = SubstrateClient(GROUP_INIT_BLOCK, "dummy_url", keepalive_interval=0.1, max_retries=3)
-    # Patch _create_connection to always return our fake substrate.
-    client._create_connection = AsyncMock(return_value=fake_substrate)
-    
-    await client.initialize_connections()
-    
-    # Check that each group in GROUP_INIT_BLOCK now has a connection.
-    for group in GROUP_INIT_BLOCK:
-        assert group in client.connections
-        assert client.connections[group] == fake_substrate
+@patch("patrol.chain_data.substrate_client.Websocket", autospec=True)
+@patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
+async def test_initialize_creates_websocket(mock_substrate_cls, mock_ws_cls, runtime_mappings):
+    mock_ws = AsyncMock()
+    mock_ws_cls.return_value = mock_ws
+    mock_substrate = AsyncMock()
+    mock_substrate_cls.return_value = mock_substrate
 
+    client = SubstrateClient(runtime_mappings, network_url="wss://mock", websocket=None)
+    await client.initialize()
 
-# ---------------------------
-# Test: get_connection (when already present)
-# ---------------------------
+    mock_ws_cls.assert_called_once_with("wss://mock", options={"max_size": 2**32, "write_limit": 2**16})
+    mock_ws.connect.assert_called_once()
+
+    assert len(client.substrate_cache) == len(runtime_mappings)
+    for version in runtime_mappings:
+        mock_substrate.init_runtime.assert_any_call(block_hash=runtime_mappings[version]["block_hash_min"])
+        assert int(version) in client.substrate_cache
+
 @pytest.mark.asyncio
-async def test_get_connection_when_present():
-    fake_substrate = MagicMock()
-    client = SubstrateClient(GROUP_INIT_BLOCK, "dummy_url")
-    client.connections[1] = fake_substrate
-    
-    substrate = await client.get_connection(1)
-    assert substrate == fake_substrate
+@patch("patrol.chain_data.substrate_client.Websocket", autospec=True)
+@patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
+async def test_initialize_reuses_existing_websocket(mock_substrate_cls, mock_ws_cls, runtime_mappings, mock_websocket):
+    mock_ws_cls.return_value = AsyncMock()  # Should NOT be used
+    mock_substrate = AsyncMock()
+    mock_substrate_cls.return_value = mock_substrate
 
+    client = SubstrateClient(runtime_mappings, network_url="wss://mock", websocket=mock_websocket)
+    await client.initialize()
 
-# ---------------------------
-# Test: get_connection (when missing)
-# ---------------------------
+    mock_ws_cls.assert_not_called()
+    mock_websocket.connect.assert_called_once()
+
+    for version in runtime_mappings:
+        mock_substrate.init_runtime.assert_any_call(block_hash=runtime_mappings[version]["block_hash_min"])
+        assert int(version) in client.substrate_cache
+
+# ----------------------------
+# Test: reinitialize
+# ----------------------------
+
 @pytest.mark.asyncio
-async def test_get_connection_when_missing():
-    fake_substrate = MagicMock()
-    client = SubstrateClient(GROUP_INIT_BLOCK, "dummy_url")
-    # Patch _reinitialize_connection to return our fake substrate.
-    client._reinitialize_connection = AsyncMock(return_value=fake_substrate)
-    
-    substrate = await client.get_connection(1)
-    assert substrate == fake_substrate
-    # Also, the connection should be stored.
-    assert client.connections[1] == fake_substrate
+@patch("patrol.chain_data.substrate_client.Websocket", autospec=True)
+async def test_reinitialize_connection(mock_ws_cls, mock_websocket):
+    mock_ws_cls.return_value = mock_websocket
 
+    client = SubstrateClient({}, "wss://mock", websocket=mock_websocket)
+    await client._reinitialize_connection()
 
-# ---------------------------
-# Test: query (successful query)
-# ---------------------------
+    mock_websocket.shutdown.assert_called_once()
+    mock_websocket.connect.assert_called_once()
+    mock_ws_cls.assert_called_once_with("wss://mock", options={"max_size": 2**32, "write_limit": 2**16})
+
+# ----------------------------
+# Test: query
+# ----------------------------
+
 @pytest.mark.asyncio
-async def test_query_success():
-    fake_substrate = MagicMock()
-    # Create a fake async method for get_block_hash.
-    fake_method = AsyncMock(return_value="fake_block_hash")
-    setattr(fake_substrate, "get_block_hash", fake_method)
-    
-    client = SubstrateClient(GROUP_INIT_BLOCK, "dummy_url")
-    client.connections[1] = fake_substrate
-    
-    result = await client.query(1, "get_block_hash", 3784340)
-    fake_method.assert_awaited_once_with(3784340)
-    assert result == "fake_block_hash"
+@patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
+async def test_query_success(mock_substrate_cls, runtime_mappings):
+    substrate = AsyncMock()
+    substrate.get_block_hash = AsyncMock(return_value="0x1234")
+    mock_substrate_cls.return_value = substrate
 
+    client = SubstrateClient(runtime_mappings, "wss://mock")
+    client.substrate_cache = {1: substrate}
 
-# ---------------------------
-# Test: query (invalid group)
-# ---------------------------
+    result = await client.query("get_block_hash", runtime_version=1)
+    assert result == "0x1234"
+    substrate.get_block_hash.assert_called_once()
+
 @pytest.mark.asyncio
-async def test_query_invalid_group():
-    client = SubstrateClient(GROUP_INIT_BLOCK, "dummy_url")
-    with pytest.raises(Exception) as excinfo:
-        await client.query(999, "get_block_hash", 3784340)
-    assert "not initialized" in str(excinfo.value)
+@patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
+async def test_query_uses_default_version(mock_substrate_cls, runtime_mappings):
+    substrate = AsyncMock()
+    substrate.get_block_hash = AsyncMock(return_value="0x9999")
+    mock_substrate_cls.return_value = substrate
 
+    client = SubstrateClient(runtime_mappings, "wss://mock")
+    client.substrate_cache = {1: substrate, 2: AsyncMock()}  # Max key is 2
+    client.substrate_cache[2].get_block_hash = AsyncMock(return_value="0x9999")
 
-# ---------------------------
-# Test: query (failure after retries)
-# ---------------------------
+    result = await client.query("get_block_hash")
+    assert result == "0x9999"
+    client.substrate_cache[2].get_block_hash.assert_called_once()
+
 @pytest.mark.asyncio
-async def test_query_failure_after_retries():
-    fake_substrate = MagicMock()
-    # Simulate a query method that always fails.
-    fake_method = AsyncMock(side_effect=Exception("Test failure"))
-    setattr(fake_substrate, "get_block_hash", fake_method)
-    
-    client = SubstrateClient(GROUP_INIT_BLOCK, "dummy_url", keepalive_interval=0.1, max_retries=2)
-    client.connections[1] = fake_substrate
-    # Patch _reinitialize_connection to return our fake substrate as well.
-    client._reinitialize_connection = AsyncMock(return_value=fake_substrate)
-    
-    with pytest.raises(Exception) as excinfo:
-        await client.query(1, "get_block_hash", 3784340)
-    assert "Query failed" in str(excinfo.value)
+@patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
+async def test_query_fails_and_retries(mock_substrate_cls, runtime_mappings):
+    failing_func = AsyncMock(side_effect=Exception("Mock error"))
+    substrate = AsyncMock()
+    setattr(substrate, "get_block_hash", failing_func)
+    mock_substrate_cls.return_value = substrate
 
+    client = SubstrateClient(runtime_mappings, "wss://mock", max_retries=2)
+    client.substrate_cache = {1: substrate}
 
-# ---------------------------
-# Test: _keepalive_task (reinitialization on failure)
-# ---------------------------
-@pytest.mark.asyncio
-async def test_keepalive_reinitialization():
-    fake_substrate = MagicMock()
-    # Simulate failure on the first call to get_block.
-    fake_get_block = AsyncMock(side_effect=[Exception("fail"), "success"])
-    fake_substrate.get_block = fake_get_block
+    with patch.object(client, "_reinitialize_connection", new_callable=AsyncMock) as mock_reinit:
+        with pytest.raises(Exception, match="Query failed for version 1"):
+            await client.query("get_block_hash", runtime_version=1)
 
-    client = SubstrateClient(GROUP_INIT_BLOCK, "dummy_url", keepalive_interval=0.1, max_retries=2)
-    # Patch _reinitialize_connection so we can detect its call.
-    client._reinitialize_connection = AsyncMock(return_value=fake_substrate)
-    
-    # Run the keepalive task for a short period.
-    task = asyncio.create_task(client._keepalive_task(1, fake_substrate))
-    # Let the task run for a short while (enough for a couple of iterations).
-    await asyncio.sleep(0.3)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+        assert failing_func.call_count == 2
+        assert mock_reinit.called
 
-    # Ensure that get_block was called and that _reinitialize_connection was invoked due to the failure.
-    fake_get_block.assert_called()
-    client._reinitialize_connection.assert_called()
+# ----------------------------
+# Test: return_runtime_versions
+# ----------------------------
+
+def test_return_runtime_versions(runtime_mappings):
+    client = SubstrateClient(runtime_mappings, "wss://mock")
+    assert client.return_runtime_versions() == runtime_mappings

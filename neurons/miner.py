@@ -15,7 +15,8 @@ from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.mining.subgraph_generator import SubgraphGenerator
-from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+from patrol.chain_data.substrate_client import SubstrateClient
+from patrol.chain_data.runtime_groupings import load_versions
 
 def get_event_loop():
     loop = asyncio.new_event_loop()
@@ -94,9 +95,10 @@ class Miner:
     async def setup_miner(self):
             
         # Create an instance of SubstrateClient.
-        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=self.network_url, keepalive_interval=30, max_retries=3)
+        versions = load_versions()
         
-        await client.initialize_connections()
+        client = SubstrateClient(runtime_mappings=versions, network_url=self.network_url, max_retries=3)
+        await client.initialize()
 
         event_fetcher = EventFetcher(substrate_client=client)
         coldkey_finder = ColdkeyFinder(substrate_client=client)

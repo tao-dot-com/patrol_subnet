@@ -29,11 +29,9 @@ class TargetGenerator:
                     target_set.add((addr, block))
         return random.sample(list(target_set), min(number_targets, len(target_set)))
 
-    async def generate_targets(self, num_targets: int = 1) -> List[Tuple[str, int]]:
+    async def generate_targets(self, num_targets: int = 1, retries: int = 3) -> List[Tuple[str, int]]:
         bt.logging.debug(f"Fetching {num_targets} target addresses.")
         start_time = time.time()
-
-        target_tuples = None
 
         block_numbers = await self.generate_random_block_tuples(num_targets)
         events = await self.event_fetcher.fetch_all_events(block_numbers)
@@ -41,7 +39,10 @@ class TargetGenerator:
         target_tuples = await self.find_targets(processed_events, num_targets)
 
         if not target_tuples:
-            await self.generate_targets(num_targets)
+            if retries > 0:
+                return await self.generate_targets(num_targets, retries - 1)
+            else:
+                return []
 
         while len(target_tuples) < num_targets:
             target_tuples.append(random.choice(target_tuples))
@@ -54,19 +55,18 @@ if __name__ == "__main__":
     import asyncio
 
     from patrol.chain_data.coldkey_finder import ColdkeyFinder
-    from patrol.chain_data.substrate_client import SubstrateClient, GROUP_INIT_BLOCK
+    from patrol.chain_data.substrate_client import SubstrateClient
+    from patrol.chain_data.runtime_groupings import load_versions
 
     async def example():
 
         bt.debug()
 
         network_url = "wss://archive.chain.opentensor.ai:443/"
-            
-        # Create an instance of SubstrateClient.
-        client = SubstrateClient(groups=GROUP_INIT_BLOCK, network_url=network_url, keepalive_interval=30, max_retries=3)
+        versions = load_versions()
         
-        # Initialize substrate connections for all groups.
-        await client.initialize_connections()
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+        await client.initialize()
 
         fetcher = EventFetcher(substrate_client=client)
         coldkey_finder = ColdkeyFinder(substrate_client=client)
