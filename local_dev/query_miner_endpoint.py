@@ -24,6 +24,10 @@ class MockMinerScoreRepo:
     async def add(self, miner_score):
         self.scores.append(miner_score)
 
+    async def find_latest_overall_scores(self, miner, batch):
+
+        return 1
+
     def return_scores(self):
         return self.scores
     
@@ -64,13 +68,13 @@ async def test_miner(requests):
     wallet_miner.create_if_non_existent(False, False)
     axon = bt.axon(wallet=wallet_miner, ip="0.0.0.0", port=8000)
 
-    miner_scoring = MockMinerScoreRepo()
+    miner_scoring_repo = MockMinerScoreRepo()
 
     miner_validator = Validator(
         validation_mechanism=BittensorValidationMechanism(event_fetcher, event_processor),
         target_generator=TargetGenerator(event_fetcher, coldkey_finder),
-        scoring_mechanism=MinerScoring(),
-        miner_score_repository=miner_scoring,
+        scoring_mechanism=MinerScoring(miner_score_repository=miner_scoring_repo),
+        miner_score_repository=miner_scoring_repo,
         dendrite=dendrite,
         metagraph=None,
         uuid_generator=lambda: uuid.uuid4(),
@@ -82,10 +86,10 @@ async def test_miner(requests):
 
     tasks = [miner_validator.query_miner(uuid.uuid4(), 1, axon.info(), target) for target in targets]
 
-    await asyncio.gather(*tasks)
+    await asyncio.gather(*tasks, return_exceptions=True)
 
     print(f"{requests} made in {time.time() - start_time}")
-    scores = miner_scoring.return_scores()
+    scores = miner_scoring_repo.return_scores()
 
     scores_dict_list = [asdict(score) for score in scores]
 
