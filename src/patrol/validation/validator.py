@@ -200,4 +200,4 @@ def boot():
         logger.info("Exiting")
 
 if __name__ == "__main__":
-   boot()
+    boot()
