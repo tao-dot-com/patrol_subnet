@@ -103,7 +103,7 @@ services:
 ```
 
 ### 4. Start the validator
-`docker compose up`
+`docker compose up --wait`
 
 ### 5. Logging
 !!TODO
