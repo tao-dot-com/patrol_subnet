@@ -94,26 +94,27 @@ class Miner:
         self.axon.start()
 
     async def setup_miner(self):
-            
-        # Create an instance of SubstrateClient.
-        versions = load_versions()
-        
-        client = SubstrateClient(runtime_mappings=versions, network_url=self.network_url, max_retries=3)
-        await client.initialize()
+        try:
+            versions = load_versions()
 
-        event_fetcher = EventFetcher(substrate_client=client)
-        coldkey_finder = ColdkeyFinder(substrate_client=client)
-        event_processor = EventProcessor(coldkey_finder=coldkey_finder)
+            client = SubstrateClient(runtime_mappings=versions, network_url=self.network_url, max_retries=3)
+            await client.initialize()
 
-        self.subgraph_generator = SubgraphGenerator(
-            event_fetcher=event_fetcher,
-            event_processor=event_processor,
-            max_future_events=self.max_future_events,
-            max_past_events=self.max_past_events,
-            batch_sze=self.batch_size
-        )
+            event_fetcher = EventFetcher(substrate_client=client)
+            coldkey_finder = ColdkeyFinder(substrate_client=client)
+            event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
-        bt.logging.info("Successfully initialised, waiting for requests...")
+            self.subgraph_generator = SubgraphGenerator(
+                event_fetcher=event_fetcher,
+                event_processor=event_processor,
+                max_future_events=self.max_future_events,
+                max_past_events=self.max_past_events,
+                batch_size=self.batch_size
+            )
+            bt.logging.info("Successfully initialised, waiting for requests...")
+        except Exception as e:
+            bt.logging.error(f"Unsuccessfuly attempted to set up miner dependencies. Error: {e}")
+            exit()
 
     async def run(self):
         await self.setup_bittensor_objects()
