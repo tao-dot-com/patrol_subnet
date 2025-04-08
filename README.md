@@ -14,24 +14,11 @@ Our mission, simply put, is to secure crypto funds and provide all holders peace
 Patrol is our first step in harnessing Bittensor to collect large volumes of live data which in later stages will be analyzed and used to prevent hacks. 
 
 
-<div align="center">
-  <img src="assets/relational_graph.png" alt="Patrol Subnet" width="600" style="border-radius: 10px;">
-</div>
-
 ## Building a Decentralized Palantir
 In Patrol, miners and validators work together to intelligently collect large volumes of data from various data sources. It lays the foundation for advanced security intelligence by creating a knowledge graph that maps relationships and behaviors, aiding in investigations, threat detection, and risk assessment.
  
-The first data source we’re covering is in our own backyard: The Bittensor chain. But this is just the beginning as we plan to expand to many other chains as well as other types of data sources like social media, code repos, phishing websites, and more. 
+The first data source we’re covering is in our own backyard: The Bittensor chain. But this is just the beginning as we plan to expand to many other chains as well as other types of data sources like social media, code repos, phishing websites, and more. Ultimately, our goal over time is to build a unified graph of relationships for every crypto wallet that shows all its relationships. 
 
-<div align="center">
-  <img src="assets/patrol_data_sources.png" alt="Patrol Subnet" width="600" style="border-radius: 10px;">
-</div>
-
-Ultimately, our goal over time is to build a unified graph of relationships for every crypto wallet that shows all its relationships. 
-
-<div align="center">
-  <img src="assets/patrol_fingerprint.png" alt="Patrol Subnet" width="600" style="border-radius: 10px;">
-</div>
 
 ## Who Needs Patrol?
 
