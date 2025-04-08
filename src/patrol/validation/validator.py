@@ -159,18 +159,18 @@ async def start():
     subtensor = bt.async_subtensor(NETWORK)
     miner_score_repository = DatabaseMinerScoreRepository(engine)
 
-    metagraph = await subtensor.metagraph(NET_UID)
-    coldkey_finder = ColdkeyFinder(subtensor.substrate)
-    weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
-
     my_substrate_client = SubstrateClient(substrate_client.GROUP_INIT_BLOCK, ARCHIVE_SUBTENSOR)
     await my_substrate_client.initialize_connections()
+
+    coldkey_finder = ColdkeyFinder(my_substrate_client)
+    weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
 
     event_fetcher = EventFetcher(my_substrate_client)
     event_processor = EventProcessor(coldkey_finder)
 
     dendrite = bt.Dendrite(wallet)
 
+    metagraph = await subtensor.metagraph(NET_UID)
     miner_validator = Validator(
         validation_mechanism=BittensorValidationMechanism(event_fetcher, event_processor),
         target_generator=TargetGenerator(event_fetcher, event_processor),

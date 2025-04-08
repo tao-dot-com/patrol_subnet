@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import List, Dict, Tuple
 import asyncio
@@ -5,6 +6,8 @@ import bittensor as bt
 
 from bittensor.core.chain_data.utils import decode_account_id
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
+
+logger = logging.getLogger(__name__)
 
 class EventProcessor:
     def __init__(self, coldkey_finder: ColdkeyFinder):
@@ -24,7 +27,7 @@ class EventProcessor:
         try:
             return decode_account_id(addr[0])
         except Exception as e:
-            bt.logging.warning(f"Error parsing address from {addr}: {e}")
+            logger.warning(f"Error parsing address from {addr}: {e}")
             return addr[0]
 
     def process_balance_events(self, event: Dict, block_number: int, chain_operations: Dict) -> List[Dict]:
@@ -195,13 +198,13 @@ class EventProcessor:
                 formatted.extend(new_stake)
                 old_stake_format.extend(old_stake)
             except Exception as e:
-                bt.logging.error(f"Error processing event in block {block_number}: {e}")
+                logger.exception(f"Error processing event in block {block_number}: {e}")
                 continue
 
         try:
             formatted.extend(self.match_old_stake_events(old_stake_format, chain_operations))
         except Exception as e:
-            bt.logging.error(f"Error matching old stake events in block {block_number}: {e}")
+            logger.error(f"Error matching old stake events in block {block_number}: {e}")
 
         return formatted
 
@@ -210,13 +213,13 @@ class EventProcessor:
         Processes event data across multiple blocks.
         """
         if not isinstance(event_data, dict):
-            bt.logging.error(f"Expected event_data to be a dict, got: {type(event_data)}")
+            logger.error(f"Expected event_data to be a dict, got: {type(event_data)}")
             return []
         if not event_data:
-            bt.logging.error("No event data provided.")
+            logger.error("No event data provided.")
             return []
 
-        bt.logging.debug(f"Parsing event data from {len(event_data)} blocks.")
+        logger.debug(f"Parsing event data from {len(event_data)} blocks.")
         start_time = time.time()
 
         tasks = []
@@ -224,11 +227,11 @@ class EventProcessor:
             try:
                 bn = int(block_key)
             except ValueError:
-                bt.logging.error(f"Block key {block_key} is not convertible to int. Skipping...")
+                logger.error(f"Block key {block_key} is not convertible to int. Skipping...")
                 continue
 
             if not isinstance(block_events, (list, tuple)):
-                bt.logging.error(f"Block {bn} events are not in a tuple or list. Skipping...")
+                logger.error(f"Block {bn} events are not in a tuple or list. Skipping...")
                 continue
 
             tasks.append(self.parse_events(block_events, bn, self.semaphore))
@@ -238,11 +241,11 @@ class EventProcessor:
         all_parsed_events = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                bt.logging.error(f"Error parsing block {list(event_data.keys())[i]}: {result}")
+                logger.error(f"Error parsing block {list(event_data.keys())[i]}: {result}")
             else:
                 all_parsed_events.extend(result)
 
-        bt.logging.debug(f"Returning {len(all_parsed_events)} parsed events in {round(time.time() - start_time, 4)} seconds.")
+        logger.debug(f"Returning {len(all_parsed_events)} parsed events in {round(time.time() - start_time, 4)} seconds.")
         return all_parsed_events
     
 if __name__ == "__main__":
@@ -268,6 +271,6 @@ if __name__ == "__main__":
         event_processor = EventProcessor(coldkey_finder=coldkey_finder)
         
         parsed_events = await event_processor.process_event_data(data)
-        bt.logging.info(parsed_events)
+        logger.info(parsed_events)
 
     asyncio.run(example())

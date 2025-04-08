@@ -34,7 +34,7 @@ class PatrolJsonFormatter(JsonFormatter):
 
 import bittensor as bt
 bt.logging.enable_third_party_loggers()
+config.fileConfig(str(Path(__file__).parent.with_name("logging.ini")))
 
-if os.getenv("JSON_LOGGING", "1") == "1":
-    config.fileConfig(str(Path(__file__).parent.with_name("logging.ini")))
+#if os.getenv("JSON_LOGGING", "1") == "1":
 

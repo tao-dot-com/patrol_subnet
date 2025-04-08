@@ -1,8 +1,11 @@
 import asyncio
+import logging
+
 import bittensor as bt
 
 from async_substrate_interface import AsyncSubstrateInterface
-from bittensor import Config
+
+logger = logging.getLogger(__name__)
 
 # Define the initial block numbers for each group.
 GROUP_INIT_BLOCK = {
@@ -26,7 +29,7 @@ class SubstrateClient:
         self.groups = groups
         self.keepalive_interval = keepalive_interval
         self.max_retries = max_retries
-        self.connections = {}  # group_id -> AsyncSubstrateInterface
+        self.connections: dict[int, AsyncSubstrateInterface] = {}  # group_id -> AsyncSubstrateInterface
         self.network_url = network_url
 
     async def _create_connection(self, group: int) -> AsyncSubstrateInterface:
@@ -34,17 +37,6 @@ class SubstrateClient:
         Creates and initializes a substrate connection for a given group.
         """
         init_block = self.groups[group]
-
-        # from bittensor.core.async_subtensor import AsyncSubtensor
-        # subtensor = AsyncSubtensor(self.network_url)
-        # await subtensor.initialize()
-        #
-        # init_block_hash = await subtensor.get_block_hash(block=init_block)
-        # substrate = subtensor.substrate
-        # await substrate.init_runtime(block_hash=init_block_hash)
-        # return substrate
-
-
         substrate = AsyncSubstrateInterface(url=self.network_url)
         init_hash = await substrate.get_block_hash(init_block)
         await substrate.init_runtime(block_hash=init_hash)
@@ -55,7 +47,7 @@ class SubstrateClient:
         Initializes substrate connections for all groups and starts the keepalive tasks.
         """
         for group in self.groups:
-            bt.logging.info(f"Initializing substrate connection for group {group} at block {self.groups[group]}")
+            logger.info(f"Initializing substrate connection for group {group} at block {self.groups[group]}")
             substrate = await self._create_connection(group)
             self.connections[group] = substrate
             # Start a background task for keepalive pings.
@@ -65,22 +57,30 @@ class SubstrateClient:
         """
         Reinitializes the substrate connection for a specific group.
         """
+        existing_substrate = self.connections[group]
+        await existing_substrate.close()
+
+        existing_substrate.runtime_cache.blocks.clear()
+        existing_substrate.runtime_cache.block_hashes.clear()
+        existing_substrate.runtime_cache.versions.clear()
+
         substrate = await self._create_connection(group)
-        bt.logging.info(f"Reinitialized connection for group {group}")
+        logger.info(f"Reinitialized connection for group {group}")
         return substrate
 
     async def _keepalive_task(self, group, substrate):
         """Periodically sends a lightweight ping to keep the connection alive."""
         while True:
             try:
-                bt.logging.debug(f"Performing keep alive ping for group {group}")
+                logger.debug(f"Performing keep alive ping for group {group}")
                 await substrate.get_block(block_number=self.groups[group])
-                bt.logging.debug(f"Keep alive ping successful for group {group}")
+                logger.debug(f"Keep alive ping successful for group {group}")
             except Exception as e:
-                bt.logging.warning(f"Keepalive failed for group {group}: {e}. Reinitializing connection.")
+                logger.warning(f"Keepalive failed for group {group}: {e}. Reinitializing connection.")
                 substrate = await self._reinitialize_connection(group)
                 self.connections[group] = substrate
-            await asyncio.sleep(self.keepalive_interval)
+            finally:
+                await asyncio.sleep(self.keepalive_interval)
 
     async def query(self, group: int, method_name: str, *args, **kwargs):
         """
@@ -111,14 +111,14 @@ class SubstrateClient:
                 return await query_func(*args, **kwargs)
             except Exception as e:
                 errors.append(e)
-                bt.logging.warning(f"Query error on group {group} attempt {attempt + 1}: {e}")
+                logger.warning(f"Query error on group {group} attempt {attempt + 1}: {e}")
                 if "429" in str(e):
                     await asyncio.sleep(2 * (attempt + 1))
                 else:
                     await asyncio.sleep(0.25)
                 
                 if attempt == self.max_retries - 2:
-                    bt.logging.info(f"Initial query attempts failed for group {group}. Attempting to reinitialize connection.")
+                    logger.info(f"Initial query attempts failed for group {group}. Attempting to reinitialize connection.")
                     substrate = await self._reinitialize_connection(group)
                     self.connections[group] = substrate
             
@@ -128,7 +128,7 @@ class SubstrateClient:
         """Return the substrate connection for a given group."""
         substrate = self.connections.get(group)
         if substrate is None:
-            bt.logging.info(f"No active connection for group {group}. Reinitializing connection.")
+            logger.info(f"No active connection for group {group}. Reinitializing connection.")
             substrate = await self._reinitialize_connection(group)
             self.connections[group] = substrate
 
@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
         block_hash = await client.query(1, "get_block_hash", 3784340)
 
-        bt.logging.info(block_hash)
+        logger.info(block_hash)
         
         # Keep the main loop running to observe repeated keepalive pings.
         await asyncio.sleep(30)

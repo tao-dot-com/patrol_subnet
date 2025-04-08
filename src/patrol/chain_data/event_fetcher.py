@@ -1,9 +1,12 @@
 import asyncio
+import logging
 import time
 from typing import Dict, List, Tuple, Any
 
 import bittensor as bt
 from async_substrate_interface import AsyncSubstrateInterface
+
+logger = logging.getLogger(__name__)
 
 def group_block(block: int, current_block: int) -> int:
     if block <= 3014340:
@@ -46,7 +49,7 @@ def group_blocks(
         if group:
             grouped.setdefault(group, []).append((block_number, block_hash))
         else:
-            bt.logging.warning(f"Block {block_number} is outside current groupings.")
+            logger.warning(f"Block {block_number} is outside current groupings.")
 
     batched: Dict[int, List[List[Tuple[int, str]]]] = {}
     for group_id, block_list in grouped.items():
@@ -130,19 +133,19 @@ class EventFetcher:
 
         # Validate input: check if block_numbers is empty.
         if not block_numbers:
-            bt.logging.warning("No block numbers provided. Returning empty event dictionary.")
+            logger.warning("No block numbers provided. Returning empty event dictionary.")
             return {}
 
         # Validate that all items in block_numbers are integers.
         if any(not isinstance(b, int) for b in block_numbers):
-            bt.logging.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
+            logger.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
             return {}
 
         # Get rid of duplicates
         block_numbers = set(block_numbers)
 
         async with self.semaphore:
-            bt.logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
+            logger.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
 
             block_hash_tasks = [
                 self.substrate_client.query(6, "get_block_hash", n)
@@ -159,17 +162,17 @@ class EventFetcher:
             all_events: Dict[int, Any] = {}
             for group, batches in grouped.items():
                 for batch in batches:
-                    bt.logging.debug(f"\nFetching events for group {group} (batch of {len(batch)} blocks)...")
+                    logger.debug(f"\nFetching events for group {group} (batch of {len(batch)} blocks)...")
                     try:
                         events = await self.get_block_events(group, batch)
                         all_events.update(events)
-                        bt.logging.debug(f"Successfully fetched events for group {group} batch.")
+                        logger.debug(f"Successfully fetched events for group {group} batch.")
                     except Exception as e:
-                        bt.logging.warning(
+                        logger.warning(
                             f"Error fetching events for group {group} batch on final attempt: {e}. Continuing..."
                         )
             # Continue to next group even if the current one fails.
-        bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
+        logger.debug(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
 
 async def example():
@@ -195,11 +198,11 @@ async def example():
 
     for test_case in test_cases:
 
-        bt.logging.info("Starting next test case.")
+        logger.info("Starting next test case.")
 
         start_time = time.time()
         all_events = await fetcher.fetch_all_events(test_case)
-        bt.logging.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
+        logger.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
         with open('raw_event_data.json', 'w') as file:
             json.dump(all_events, file, indent=4)
