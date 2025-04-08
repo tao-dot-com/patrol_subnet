@@ -51,7 +51,6 @@ async def test_calculate_score_error(scoring):
         payload=error,
         response_time=2.0,
         batch_id=uuid.uuid4(),
-        previous_overall_scores=[],
         moving_average_denominator=20
     )
     assert result.validation_passed is False
@@ -76,7 +75,6 @@ async def test_calculate_score_success(scoring):
         payload=payload,
         response_time=0.2,
         batch_id=uuid.uuid4(),
-        previous_overall_scores=[],
         moving_average_denominator=20,
     )
     assert result.validation_passed is True
