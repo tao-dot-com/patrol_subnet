@@ -19,8 +19,9 @@ class StakeEvidence:
     delegate_hotkey_destination: Optional[str] = None
 
     def __post_init__(self):
-        if self.destination_net_uid is None and self.source_net_uid is None:
-            raise ValueError("Either destination_net_uid or source_net_uid must be provided.")
+        if self.block_number > 4920351: # block dTAO was implemented
+            if self.destination_net_uid is None and self.source_net_uid is None:
+                raise ValueError("Either destination_net_uid or source_net_uid must be provided.")
         if self.delegate_hotkey_source is None and self.delegate_hotkey_destination is None:
             raise ValueError("Either delegate_hotkey_source or delegate_hotkey_destination must be provided.")
 

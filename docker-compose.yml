@@ -6,3 +6,15 @@ services:
     environment:
       POSTGRES_USER: patrol
       POSTGRES_PASSWORD: password
+
+  validator:
+    init: true
+    depends_on:
+      - db
+    image: tensora/patrol-validator
+    environment:
+      DB_URL: postgresql+asyncpg://patrol:password@db:5432/patrol
+    volumes:
+      - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
+
+
