@@ -90,7 +90,10 @@ class Miner:
         self.axon = bt.axon(wallet=self.wallet, port=self.port, external_ip=self.external_ip)
         self.axon.attach(forward_fn=self.forward, blacklist_fn=self.blacklist_fn).attach(forward_fn=self.forward_ping)
         if not self.dev_flag:
-            await self.axon.serve(netuid=self.netuid, subtensor=self.subtensor)
+            await self.subtensor.serve_axon(
+                netuid=self.netuid,
+                axon=self.axon
+            )
         self.axon.start()
 
     async def setup_miner(self):
