@@ -1,12 +1,12 @@
 ## Running a Miner
 
 REQUIREMENTS:
-  Ubuntu 22.04+
-  Python 3.10+
+- Ubuntu 22.04+
+- Python 3.10+
 
 HARDWARE REQUIREMENTS:
-    8gb Ram
-    2 vCPUs
+- 8gb Ram
+- 2 vCPUs
 
 ### Getting Started
 
