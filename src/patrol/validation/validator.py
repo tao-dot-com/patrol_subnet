@@ -193,7 +193,7 @@ async def start():
 
 def boot():
     try:
-        from config import DB_URL
+        from patrol.validation.config import DB_URL
         migrate_db(DB_URL)
         asyncio.run(start())
     except KeyboardInterrupt as ex:
