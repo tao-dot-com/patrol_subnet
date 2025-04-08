@@ -25,7 +25,7 @@ def get_event_loop():
     return loop
 
 class Miner:
-    def __init__(self, dev_flag: bool, wallet_path: str, coldkey: str, hotkey: str, port: int, external_ip: str, netuid: int, subtensor: AsyncSubtensor, network_url: str, max_future_events: int= 500, max_past_events: int = 500):
+    def __init__(self, dev_flag: bool, wallet_path: str, coldkey: str, hotkey: str, port: int, external_ip: str, netuid: int, subtensor: AsyncSubtensor, network_url: str, max_future_events: int= 50, max_past_events: int = 50, batch_size: int = 25):
         self.dev_flag = dev_flag
         self.wallet_path = wallet_path
         self.coldkey = coldkey
@@ -37,6 +37,7 @@ class Miner:
         self.network_url = network_url
         self.max_future_events = max_future_events
         self.max_past_events = max_past_events
+        self.batch_size = batch_size
         self.subgraph_loop = get_event_loop()
         self.subgraph_generator = None
 
@@ -108,7 +109,8 @@ class Miner:
             event_fetcher=event_fetcher,
             event_processor=event_processor,
             max_future_events=self.max_future_events,
-            max_past_events=self.max_past_events
+            max_past_events=self.max_past_events,
+            batch_sze=self.batch_size
         )
 
         bt.logging.info("Successfully initialised, waiting for requests...")
@@ -149,6 +151,7 @@ async def boot():
     parser.add_argument('--archive_node_address', type=str, default="wss://archive.chain.opentensor.ai:443/")
     parser.add_argument('--max_future_events', type=int, default=50)
     parser.add_argument('--max_past_events', type=int, default=50)
+    parser.add_argument('--event_batch_size', type=int, default=25)
     args = parser.parse_args()
 
     async with AsyncSubtensor(network=args.archive_node_address) as subtensor:
@@ -163,7 +166,8 @@ async def boot():
             subtensor=subtensor,
             network_url=args.archive_node_address,
             max_future_events=args.max_future_events,
-            max_past_events=args.max_past_events
+            max_past_events=args.max_past_events,
+            batch_size=args.event_batch_size
         )
         await miner.run()
 

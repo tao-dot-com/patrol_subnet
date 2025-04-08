@@ -127,7 +127,7 @@ async def test_fetch_all_events_success(monkeypatch):
     fake_substrate_client.query = AsyncMock(side_effect=fake_query)
     
     # For grouping, override group_blocks to control grouping.
-    def fake_group_blocks(block_numbers, block_hashes, current_block, batch_size=500):
+    def fake_group_blocks(block_numbers, block_hashes, current_block, versions, batch_size):
         # Return a single group (say, group 6) with one batch containing all block info.
         return {6: [[(n, f"hash{n}") for n in block_numbers]]}
     

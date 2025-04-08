@@ -73,7 +73,7 @@ class EventFetcher:
             for (block_number, block_hash) in block_info
         }
     
-    async def fetch_all_events(self, block_numbers: List[int]) -> Dict[int, Any]:
+    async def fetch_all_events(self, block_numbers: List[int], batch_size: int = 25) -> Dict[int, Any]:
         """
         Retrieve events for all given block numbers.
         """
@@ -106,7 +106,7 @@ class EventFetcher:
 
             # Group blocks by group while maintaining the block number alongside its hash.
             versions = self.substrate_client.return_runtime_versions()
-            grouped = group_blocks(block_numbers, block_hashes, current_block, versions)
+            grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
 
             all_events: Dict[int, Any] = {}
             for runtime_version, batches in grouped.items():
@@ -117,8 +117,8 @@ class EventFetcher:
                         all_events.update(events)
                         bt.logging.debug(f"Successfully fetched events for runtime version {runtime_version} batch.")
                     except Exception as e:
-                        bt.logging.warning(
-                            f"Error fetching events for runtime version {runtime_version} batch on final attempt: {e}. Continuing..."
+                        bt.logging.debug(
+                            f"Unable to fetch events for runtime version {runtime_version} batch on final attempt: {e}. Continuing..."
                         )
             # Continue to next version even if the current one fails.
         bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
@@ -149,7 +149,7 @@ async def example():
         bt.logging.info("Starting next test case.")
 
         start_time = time.time()
-        all_events = await fetcher.fetch_all_events(test_case)
+        all_events = await fetcher.fetch_all_events(test_case, 50)
         bt.logging.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
         with open('raw_event_data.json', 'w') as file:
