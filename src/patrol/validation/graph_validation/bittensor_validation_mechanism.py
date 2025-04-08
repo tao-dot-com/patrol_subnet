@@ -66,9 +66,8 @@ class BittensorValidationMechanism:
                 seen_nodes.add(node_id)
                 nodes.append(Node(**node))
             
-            seen_edges = set()  # To track unique edges
+            seen_edges = set()
             for edge in payload['edges']:
-                # Create a key tuple from the edge properties
                 evidence = edge.get('evidence')
                 if evidence is None:
                     raise PayloadValidationError("Edge is missing the 'evidence' field.")
@@ -82,7 +81,6 @@ class BittensorValidationMechanism:
                     evidence.get('block_number')
                 )
                 
-                # Check for duplicate edge
                 if key in seen_edges:
                     raise PayloadValidationError(f"Duplicate edge detected: {key}")
                 seen_edges.add(key)
@@ -137,7 +135,6 @@ class BittensorValidationMechanism:
         Checks whether the graph is fully connected using a union-find algorithm.
         Raises a ValueError if the graph is not fully connected.
         """
-        # Initialize union-find parent dictionary for each node
         parent = {}
 
         def find(x: str) -> str:
@@ -151,11 +148,9 @@ class BittensorValidationMechanism:
             if rootX != rootY:
                 parent[rootY] = rootX
 
-        # Initialize each node's parent to itself
         for node in self.graph_payload.nodes:
             parent[node.id] = node.id
 
-        # Process all edges, treating them as undirected connections
         for edge in self.graph_payload.edges:
             src = edge.coldkey_source
             dst = edge.coldkey_destination
@@ -172,7 +167,6 @@ class BittensorValidationMechanism:
                 union(src, own)
                 union(dst, own)
 
-        # Check that all nodes have the same root
         roots = {find(node.id) for node in self.graph_payload.nodes}
         if len(roots) != 1:
             raise ValueError("Graph is not fully connected.")

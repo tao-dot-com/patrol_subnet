@@ -79,17 +79,14 @@ class EventFetcher:
         """
         start_time = time.time()
 
-        # Validate input: check if block_numbers is empty.
         if not block_numbers:
             bt.logging.warning("No block numbers provided. Returning empty event dictionary.")
             return {}
-
-        # Validate that all items in block_numbers are integers.
+        
         if any(not isinstance(b, int) for b in block_numbers):
             bt.logging.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
             return {}
 
-        # Get rid of duplicates
         block_numbers = set(block_numbers)
 
         async with self.semaphore:
@@ -101,10 +98,8 @@ class EventFetcher:
             ]
             block_hashes = await asyncio.gather(*block_hash_tasks)
 
-            # Need to make sure we always use the latest substrate to get the current block otherwise it can throw off older substrate
             current_block = await self.get_current_block()
 
-            # Group blocks by group while maintaining the block number alongside its hash.
             versions = self.substrate_client.return_runtime_versions()
             grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
 
@@ -120,7 +115,7 @@ class EventFetcher:
                         bt.logging.debug(
                             f"Unable to fetch events for runtime version {runtime_version} batch on final attempt: {e}. Continuing..."
                         )
-            # Continue to next version even if the current one fails.
+        # Continue to next version even if the current one fails.
         bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
 
