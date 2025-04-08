@@ -47,7 +47,7 @@ class MinerScoring:
         previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), moving_average_denominator - 1)
 
         if isinstance(payload, ErrorPayload):
-            bt.logging.warning(f"Error received as output from validation process, adding details to miner {uid} records.")
+            bt.logging.warning(f"Zero score added to records for {uid}, reason: {payload.message}.")
             return MinerScore(
                 id=uuid.uuid4(),
                 batch_id=batch_id,
