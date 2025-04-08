@@ -1,6 +1,10 @@
+import logging
+
 from bittensor_wallet.bittensor_wallet import Wallet
 from patrol.validation.scoring import MinerScoreRepository
 from bittensor.core.async_subtensor import AsyncSubtensor
+
+logger = logging.getLogger(__name__)
 
 class WeightSetter:
 
@@ -35,6 +39,8 @@ class WeightSetter:
         uid_values = list(uids)
 
         await self.subtensor.set_weights(wallet=self.wallet, netuid=self.net_uid, uids=uid_values, weights=weight_values)
+        for
+        logger.info("Set weights", extra=weights)
 
     async def is_weight_setting_due(self) -> bool:
         my_hotkey = self.wallet.get_hotkey().ss58_address
