@@ -94,7 +94,7 @@ def test_verify_graph_connected_failure():
         validator.verify_graph_connected()
 
 @pytest.mark.asyncio
-async def test_verify_edge_data_missing_match(valid_payload):
+async def test_verify_edge_data_missing_pass(valid_payload):
     # Simulate that no matching on-chain events were found for the provided edge.
     event_fetcher = AsyncMock()
     event_fetcher.fetch_all_events.return_value = {1: []}
@@ -103,5 +103,31 @@ async def test_verify_edge_data_missing_match(valid_payload):
 
     validator = BittensorValidationMechanism(event_fetcher, event_processer)
     validator.parse_graph_payload(valid_payload)
-    with pytest.raises(PayloadValidationError, match="edges not found"):
+    await validator.verify_edge_data()
+
+@pytest.mark.asyncio
+async def test_verify_edge_fail(valid_payload):
+    # Simulate that no matching on-chain events were found for the provided edge.
+    event_fetcher = AsyncMock()
+    event_fetcher.fetch_all_events.return_value = {1: []}
+    event_processer = AsyncMock()
+    event_processer.process_event_data.return_value = [
+         {
+                "coldkey_source": "B",
+                "coldkey_destination": "C",
+                "category": "staking",
+                "type": "add",
+                "evidence": {
+                    "rao_amount": 100,
+                    "block_number": 1,
+                    "delegate_hotkey_destination": "B",
+                    "alpha_amount": 1,
+                    "destination_net_uid": 1
+                }
+            }
+    ]
+
+    validator = BittensorValidationMechanism(event_fetcher, event_processer)
+    validator.parse_graph_payload(valid_payload)
+    with pytest.raises(PayloadValidationError, match="1 edges not found in on-chain events."):
         await validator.verify_edge_data()

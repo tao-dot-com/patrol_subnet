@@ -184,6 +184,8 @@ class BittensorValidationMechanism:
         # Create a normalized event key set from on-chain events
         event_keys = {}
 
+        validation_block_numbers = []
+
         event_keys = set()
         for event in processed_events:
             evidence = event.get('evidence', {})
@@ -201,6 +203,7 @@ class BittensorValidationMechanism:
                 "delegate_hotkey_source": evidence.get("delegate_hotkey_source"),
                 "delegate_hotkey_destination": evidence.get("delegate_hotkey_destination"),
             }, sort_keys=True)
+            validation_block_numbers.append(evidence.get("block_number"))
             event_keys.add(event_key)
 
         # Check each graph edge against processed chain events
@@ -223,7 +226,11 @@ class BittensorValidationMechanism:
             }, sort_keys=True)
 
             if edge_key not in event_keys:
-                missing_edges.append(edge_key)
+                block_number = ev.get("block_number")
+                if block_number not in validation_block_numbers:
+                    continue  # Skip this edge; block was never fetched
+                else:
+                    missing_edges.append(edge_key)  # Block was fetched, but the edge did not match any event
 
         if missing_edges:
             raise PayloadValidationError(f"{len(missing_edges)} edges not found in on-chain events.")
