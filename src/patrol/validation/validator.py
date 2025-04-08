@@ -1,4 +1,5 @@
 """Functionality for asynchronously sending requests to a miner"""
+from ast import Sub
 import uuid
 from typing import Callable, Tuple
 
@@ -8,6 +9,7 @@ import patrol
 from patrol.chain_data import substrate_client
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
+from patrol.chain_data.runtime_groupings import load_versions
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 from patrol.validation.scoring import MinerScoreRepository
 import asyncio
@@ -159,8 +161,10 @@ async def start():
     subtensor = bt.async_subtensor(NETWORK)
     miner_score_repository = DatabaseMinerScoreRepository(engine)
 
-    my_substrate_client = SubstrateClient(substrate_client.GROUP_INIT_BLOCK, ARCHIVE_SUBTENSOR)
-    await my_substrate_client.initialize_connections()
+    versions = load_versions()
+
+    my_substrate_client = SubstrateClient(versions, ARCHIVE_SUBTENSOR)
+    await my_substrate_client.initialize()
 
     coldkey_finder = ColdkeyFinder(my_substrate_client)
     weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)

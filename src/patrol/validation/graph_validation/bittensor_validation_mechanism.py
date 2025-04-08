@@ -6,7 +6,7 @@ import time
 import json
 
 from patrol.protocol import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
-from patrol.validation.graph_validation.errors import PayloadValidationError, ErrorPayload
+from patrol.validation.graph_validation.errors import PayloadValidationError, ErrorPayload, SingleNodeResponse
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.event_processor import EventProcessor
 
@@ -32,6 +32,10 @@ class BittensorValidationMechanism:
             self.verify_graph_connected()
 
             await self.verify_edge_data()
+
+        except SingleNodeResponse as e:
+            bt.logging.error(f"Validation skipped for uid {uid}: {e}")
+            return ErrorPayload(message=f"Error: {str(e)}")
 
         except Exception as e: 
             bt.logging.error(f"Validation error for uid {uid}: {e}")
@@ -110,7 +114,7 @@ class BittensorValidationMechanism:
     def verify_target_in_graph(self, target: str) -> None:
 
         if len(self.graph_payload.nodes) < 2:
-            raise PayloadValidationError("Only single node provided.")
+            raise SingleNodeResponse("Only single node provided.")
 
         def find_target(target):
             for edge in self.graph_payload.edges:
