@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Sequence
+from typing import Dict, Any
 import bittensor as bt
 import math
 import uuid
@@ -41,11 +41,9 @@ class MinerScoring:
         payload: GraphPayload | ErrorPayload,
         response_time: float,
         batch_id: UUID,
-        previous_overall_scores: Sequence[float],
         moving_average_denominator: int = 20
     ) -> MinerScore:
 
-        assert len(previous_overall_scores) < moving_average_denominator
         previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), moving_average_denominator - 1)
 
         if isinstance(payload, ErrorPayload):
