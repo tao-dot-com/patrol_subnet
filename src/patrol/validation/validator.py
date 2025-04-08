@@ -94,9 +94,9 @@ class Validator:
                             response_time = timings['response_received'] - timings["request_start"]
 
                 except aiohttp.ClientConnectorError as e:
-                    logger.exception(f"Failed to connect to miner {uid}.  Skipping.")
+                    logger.exception(f"Failed to connect to miner {uid}. Skipping.")
                 except TimeoutError as e:
-                    logger.error(f"Timeout error for miner {uid}.  Skipping.")
+                    logger.error(f"Timeout error for miner {uid}. Skipping.")
                 except Exception as e:
                     logger.error(f"Error for miner {uid}.  Skipping.  Error: {e}")
 
@@ -104,14 +104,14 @@ class Validator:
             try:
                 payload_subgraph = json_response['subgraph_output']
             except KeyError:
-                logger.warning(f"Miner {uid} returned a non-standard response.  returned: {json_response}")
+                logger.warning(f"Miner {uid} returned a non-standard response. Returned: {json_response}")
                 payload_subgraph = None
 
-            logger.debug(f"Payload received for UID {uid} in {response_time} seconds.")
+            logger.info(f"Payload received for UID {uid} in {response_time} seconds.")
 
         validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
 
-        logger.debug(f"calculating coverage score for miner {uid}")
+        logger.info(f"calculating coverage score for miner {uid}")
         miner_score = await self.scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id)
 
         await self.miner_score_repository.add(miner_score)

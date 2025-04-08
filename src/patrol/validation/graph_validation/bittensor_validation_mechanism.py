@@ -1,4 +1,4 @@
-from re import S
+import logging
 from typing import Dict, Any
 import bittensor as bt
 import asyncio
@@ -11,6 +11,8 @@ from patrol.validation.graph_validation.errors import PayloadValidationError, Er
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.event_processor import EventProcessor
 
+logger = logging.getLogger(__name__)
+
 class BittensorValidationMechanism:
 
     def __init__(self,  event_fetcher: EventFetcher, event_processer: EventProcessor):
@@ -20,7 +22,7 @@ class BittensorValidationMechanism:
 
     async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None) -> Dict[str, Any]:
         start_time = time.time()
-        bt.logging.info(f"Starting validation process for uid: {uid}")
+        logger.info(f"Starting validation process for uid: {uid}")
 
         try:
             if not payload:
@@ -35,15 +37,15 @@ class BittensorValidationMechanism:
             await self.verify_edge_data()
 
         except SingleNodeResponse as e:
-            bt.logging.error(f"Validation skipped for uid {uid}: {e}")
+            logger.error(f"Validation skipped for uid {uid}: {e}")
             return ErrorPayload(message=f"Error: {str(e)}")
 
         except Exception as e: 
-            bt.logging.error(f"Validation error for uid {uid}: {e}")
+            logger.error(f"Validation error for uid {uid}: {e}")
             return ErrorPayload(message=f"Error: {str(e)}")
 
         validation_time = time.time() - start_time
-        bt.logging.info(f"Validation finished for {uid}. Completed in {validation_time:.2f} seconds")
+        logger.info(f"Validation finished for {uid}. Completed in {validation_time:.2f} seconds")
 
         return self.graph_payload
 
@@ -251,7 +253,7 @@ class BittensorValidationMechanism:
         if missing_edges:
             raise PayloadValidationError(f"{len(missing_edges)} edges not found in on-chain events.")
 
-        bt.logging.debug("All edges matched with on-chain events.")
+        logger.debug("All edges matched with on-chain events.")
 
 # Example usage:
 if __name__ == "__main__":
