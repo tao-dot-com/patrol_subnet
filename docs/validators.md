@@ -16,7 +16,7 @@ Be sure to create a wallet in advance following instructions from http://docs.bi
 
 Register your validator with the Patrol subnet using the following command  
 `btcli subnet register --netuid <UID> --wallet.name <YOUR_COLDKEY> --wallet.hotkey <YOUR_HOTKEY> --network <your_network>`  
-where `<your network>` is either 81 (Mainet) or 275 (Testnet)
+where `<your network>` is either 81 (Mainnet) or 275 (Testnet)
 
 ### 2. Install docker
 See (https://docs.docker.com/engine/install/)
