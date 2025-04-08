@@ -2,6 +2,12 @@
 
 This repository implements a modular incentive mechanism designed to reward nodes based on the quality, quantity, and efficiency of their payload submissions. The scoring system currently includes two active components — Volume and Responsiveness — with a third component, Novelty, coming soon.
 
+Scoring contributions: 
+- Volume - 90%
+- Responsiveness - 10%
+
+Along with the scoring mechanism there are a number of pass/fail validation checks, which if failed, result in a score of zero. The code for these checks are [here](src/patrol/validation/graph_validation/bittensor_validation_mechanism.py).
+
 ⸻
 
 ### Volume Score
@@ -60,3 +66,5 @@ Stay tuned — this feature is actively being developed and will be integrated s
 ### Overall Scoring Design
 
 Each component (Volume, Responsiveness, Novelty) is normalized between 0.0 and 1.0, and can be combined via weighted averaging or other aggregation logic to produce a final incentive score per payload.
+
+[View the full score calculation here](../src/patrol/validation/miner_scoring.py).

@@ -59,10 +59,10 @@ These subgraphs are then submitted to the validator for evaluation.
 
 ### Validator verifies miner’s subgraph
 
-Once miners submit their subgraphs, [Validators](src/patrol/validation/validator.py) will [verify](src/patrol/validation/graph_validation/bittensor_validation_mechanism.py) the data by checking the *evidence* against the *node* and *edge* data submitted by the miners.  This verification process currently supports the following node and edges types:
+Once miners submit their subgraphs, [Validators](src/patrol/validation/validator.py) will [verify](src/patrol/validation/graph_validation/bittensor_validation_mechanism.py) the data by checking the *evidence* against the *node* and *edge* data submitted by the miners. This validation is pass/fail, failing will result in a score of 0 for that submission. This verification process currently supports the following node and edges types:
 
 Nodes:
-- Wallet nodes: Contains wallet addresses, balances, age, density metrics
+- Wallet nodes: Contains wallet addresses and types.
 
 Edges:
 - Transaction edges: Direct token transfers between wallets
@@ -72,11 +72,10 @@ See [here](src/patrol/protocol.py) for more details on the supported node and ed
 
 ### Validator scores subgraph
 
-Once the data has been verified, validators will calculate a *Coverage score* for the miner based on the following criteria:
-- **Accuracy** (pass/fail): Validation of node and edge data against the evidence
-- **Connectedness** (pass/fail): Whether the miner's subgraph is fully connected
+Once the data has been verified, validators will calculate a *score* for the miner based on the following criteria:
 - **Volume** (90%): Amount of valid data submitted, with reasonable caps
 - **Responsiveness** (10%): How quickly the miner can submit data
+- **Novelty** (will be implemented soon) : How unique the data returned by the miner is.
 
 ```python
    volume = len(payload.nodes) + len(payload.edges)
@@ -89,7 +88,7 @@ Once the data has been verified, validators will calculate a *Coverage score* fo
         ])
 
 ```
-[View the full score calculation here](src/patrol/validation/miner_scoring.py).
+[View detailed overview of incentive mechanism here](docs/incentive.md).
 
 Ultimately, the mission for each miner is to achieve the highest coverage score by delivering data that is high quality, high quantity, and novel. By doing so, miners ensure that only top-tier data is presented to validators, fortifying a comprehensive and dynamic knowledge graph. This invaluable resource is pivotal for a wide array of security applications, driving the future of digital asset protection and intelligence.
 
