@@ -6,28 +6,33 @@ import bittensor as bt
 
 from patrol.constants import Constants
 from patrol.chain_data.event_fetcher import EventFetcher
-from patrol.chain_data.event_parser import process_event_data
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
+from patrol.chain_data.event_processor import EventProcessor
+from patrol.protocol import GraphPayload, Node, Edge, TransferEvidence, StakeEvidence
 
 class SubgraphGenerator:
     
     # These parameters control the subgraph generation:
     # - _max_future_events: The number of events into the past you will collect
-    # - _max_historic_events: The number of events into the future you will collect
+    # - _max_past_events: The number of events into the future you will collect
+    # - _batch_size: The number of events fetched in one go from the block chain
     # Adjust these based on your needs - higher values give higher chance of being able to find and deliver larger subgraphs, 
     # but will require more time and resources to generate
-    def __init__(self,  event_fetcher: EventFetcher, coldkey_finder: ColdkeyFinder, max_future_events=900, max_historic_events=900, timeout=Constants.MAX_RESPONSE_TIME):
+    
+    def __init__(self,  event_fetcher: EventFetcher, event_processor: EventProcessor, max_future_events: int = 50, max_past_events: int = 50, batch_size: int = 25, timeout=10):
         self.event_fetcher = event_fetcher
-        self.coldkey_finder = coldkey_finder
+        self.event_processor = event_processor
         self._max_future_events = max_future_events
-        self._max_historic_events = max_historic_events
+        self._max_past_events = max_past_events
+        self._batch_size = batch_size
         self.timeout = timeout
     
-    def generate_block_numbers(self, target_block: int, upper_block_limit: int, lower_block_limit: int = Constants.LOWER_BLOCK_LIMIT) -> List[int]:
+    async def generate_block_numbers(self, target_block: int, lower_block_limit: int = Constants.LOWER_BLOCK_LIMIT) -> List[int]:
 
         bt.logging.info(f"Generating block numbers for target block: {target_block}")
 
-        start_block = max(target_block - self._max_historic_events, lower_block_limit)
+        upper_block_limit = await self.event_fetcher.get_current_block()
+
+        start_block = max(target_block - self._max_past_events, lower_block_limit)
         end_block = min(target_block + self._max_future_events, upper_block_limit)
 
         return list(range(start_block, end_block + 1))
@@ -63,10 +68,9 @@ class SubgraphGenerator:
     def generate_subgraph_from_adjacency_graph(self, adjacency_graph: Dict, target_address: str) -> Dict:
         start_time = time.time()
 
-        subgraph = {
-            "nodes": [],
-            "edges": []
-        }
+        nodes = []
+        edges = []
+
         seen_nodes = set()
         seen_edges = set()
         queue = [target_address]
@@ -75,11 +79,12 @@ class SubgraphGenerator:
             current = queue.pop(0)
 
             if current not in seen_nodes:
-                subgraph["nodes"].append({
-                    "id": current,
-                    "type": "wallet",
-                    "origin": "bittensor"
-                })
+                nodes.append(
+                    Node(
+                        id=current,
+                        type="wallet",
+                        origin="bittensor"
+                    ))
                 seen_nodes.add(current)
 
             for conn in adjacency_graph.get(current, []):
@@ -95,26 +100,51 @@ class SubgraphGenerator:
                     evidence.get('block_number')
                 )
 
-                if edge_key not in seen_edges:
-                    subgraph["edges"].append(event)
-                    seen_edges.add(edge_key)
+                try:
+
+                    if edge_key not in seen_edges:
+                        seen_edges.add(edge_key)
+                        if event.get('category') == "balance":                
+                            edges.append(
+                                Edge(
+                                    coldkey_source=event['coldkey_source'],
+                                    coldkey_destination=event['coldkey_destination'],
+                                    category=event['category'],
+                                    type=event['type'],
+                                    evidence=TransferEvidence(**event['evidence'])
+                                )
+                            )
+                        elif event.get('category') == "staking":
+                            edges.append(
+                                Edge(
+                                    coldkey_source=event['coldkey_source'],
+                                    coldkey_destination=event['coldkey_destination'],
+                                    coldkey_owner=event.get('coldkey_owner'),
+                                    category=event['category'],
+                                    type=event['type'],
+                                    evidence=StakeEvidence(**event['evidence'])
+                                )
+                            )
+                except Exception as e:
+                    print(event)
+
 
                 if neighbor not in seen_nodes and neighbor not in queue:
                     queue.append(neighbor)
 
-        subgraph_length = len(subgraph['nodes']) + len(subgraph['edges'])
+        subgraph_length = len(nodes) + len(edges)
         bt.logging.info(f"Subgraph graph of length {subgraph_length} created in {time.time() - start_time} seconds.")
 
-        return subgraph
+        return GraphPayload(nodes=nodes, edges=edges)
 
 
-    async def run(self, target_address:str, target_block:int, current_block: int):
+    async def run(self, target_address:str, target_block:int):
 
-        block_numbers = self.generate_block_numbers(target_block, current_block)
+        block_numbers = await self.generate_block_numbers(target_block)
 
         events = await self.event_fetcher.fetch_all_events(block_numbers)
 
-        processed_events = await process_event_data(events, self.coldkey_finder)
+        processed_events = await self.event_processor.process_event_data(events)
 
         adjacency_graph = self.generate_adjacency_graph_from_events(processed_events)
 
@@ -124,38 +154,34 @@ class SubgraphGenerator:
 
 if __name__ == "__main__":
 
-    from async_substrate_interface import AsyncSubstrateInterface
-    from patrol.constants import Constants
+    from patrol.chain_data.coldkey_finder import ColdkeyFinder
 
     async def example():
 
         bt.debug()
 
-        fetcher = EventFetcher()
-        await fetcher.initialise_substrate_connections()
+        from patrol.chain_data.substrate_client import SubstrateClient
+        from patrol.chain_data.runtime_groupings import load_versions
 
+        network_url = "wss://archive.chain.opentensor.ai:443/"
+        versions = load_versions()
+        
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+        await client.initialize()
+            
         start_time = time.time()
 
-        target = "5HBtpwxuGNL1gwzwomwR7sjwUt8WXYSuWcLYN6f9KpTZkP4k"
-        target_block = 5163655
-        current_block = 6000000
+        target = "5FyCncAf9EBU8Nkcm5gL1DQu3hVmY7aphiqRn3CxwoTmB1cZ"
+        target_block = 4179349
 
-        coldkey_finder = ColdkeyFinder()
-        await coldkey_finder.initialise_substrate_connection()
+        fetcher = EventFetcher(substrate_client=client)
+        coldkey_finder = ColdkeyFinder(substrate_client=client)
+        event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
-        subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, coldkey_finder=coldkey_finder, max_future_events=500, max_historic_events=500)
-        subpgraph = await subgraph_generator.run(target, target_block, current_block)
+        subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, event_processor=event_processor, max_future_events=50, max_past_events=50, batch_size=50)
+        subgraph = await subgraph_generator.run(target, target_block)
 
-        volume = len(subpgraph['nodes']) + len(subpgraph['edges'])
-
-        filename = 'example_subgraph_output.json'
-        import json
-
-        # Open the file in write mode and dump the dictionary to it
-        with open(filename, 'w') as json_file:
-            json.dump(subpgraph, json_file, indent=4)
-
-        # print(f"Volume: {volume}")
+        volume = len(subgraph.nodes) + len(subgraph.edges)
 
         # bt.logging.info(output)
         bt.logging.info(f"Finished: {time.time() - start_time} with volume: {volume}")

@@ -1,7 +1,7 @@
 import uuid
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Iterable
 from datetime import datetime
 
 @dataclass(frozen=True)
@@ -12,6 +12,7 @@ class MinerScore:
     uid: int
     coldkey: str
     hotkey: str
+    overall_score_moving_average: float
     overall_score: float
     volume_score: float
     volume: int
@@ -21,12 +22,20 @@ class MinerScore:
     validation_passed: bool
     error_message: Optional[str]
 
-class MinerScoreRepository():
+    @property
+    def miner(self) -> tuple[str, int]:
+        return self.hotkey, self.uid
+
+class MinerScoreRepository(ABC):
 
     @abstractmethod
     async def add(self, score: MinerScore):
         pass
 
     @abstractmethod
-    async def find_by_batch_id(self, batch_id: uuid.UUID) -> list[MinerScore]:
+    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Iterable[float]:
+        pass
+
+    @abstractmethod
+    async def find_last_average_overall_scores(self) -> dict[tuple[str, int], float]:
         pass

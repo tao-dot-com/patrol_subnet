@@ -1,23 +1,22 @@
 [project]
 name = "patrol-subnet"
-version = "0.1.0"
+version = "1.0.0"
 description = "Patrol Subnet"
 requires-python = ">=3.11"
 dependencies = [
-    #"substrate-interface==1.7.11",
     "bittensor==9.1.0",
-    "docker==7.1.0",
-    #"async-substrate-interface>=1.0.0,<2.0.0",
     "aiochclient[aiohttp]",
     "aiohttp",
     "sqlalchemy",
     "aiosqlite",
     "psycopg2-binary",
-    "asyncpg"
+    "asyncpg",
+    "alembic",
+    "python-json-logger"
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx"]
+test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "flake8"]
 
 [build-system]
 requires = ["setuptools>=57", "wheel", "setuptools-git-versioning>=2.0,<3"]
