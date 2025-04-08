@@ -13,8 +13,8 @@ from patrol.constants import Constants
 class MinerScoring:
     def __init__(self, miner_score_repository: MinerScoreRepository):
         self.importance = {
-            'volume': 0.5,
-            'responsiveness': 0.5,
+            'volume': 0.9,
+            'responsiveness': 0.1,
         }
         self.miner_score_repository = miner_score_repository
 
