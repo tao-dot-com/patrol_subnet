@@ -16,3 +16,6 @@ __pycache__
 env.local
 
 !example_subgraph_output.json
+
+publish.sh
+.github
