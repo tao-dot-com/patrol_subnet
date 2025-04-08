@@ -5,6 +5,7 @@ import asyncio
 import time
 import json
 
+from patrol import constants
 from patrol.protocol import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
 from patrol.validation.graph_validation.errors import PayloadValidationError, ErrorPayload, SingleNodeResponse
 from patrol.chain_data.event_fetcher import EventFetcher
@@ -174,6 +175,18 @@ class BittensorValidationMechanism:
         if len(roots) != 1:
             raise ValueError("Graph is not fully connected.")
     
+    async def verify_block_ranges(self, block_numbers):
+
+        current_block = await self.event_fetcher.get_current_block()
+        min_block = constants.Constants.LOWER_BLOCK_LIMIT
+
+        invalid_blocks = [b for b in block_numbers if not (min_block <= b <= current_block)]
+        if invalid_blocks:
+            raise PayloadValidationError(
+                f"Found {len(invalid_blocks)} invalid block(s) outside the allowed range "
+                f"[{min_block}, {current_block}]: {invalid_blocks}"
+            )
+
     async def verify_edge_data(self):
 
         block_numbers = []
@@ -181,12 +194,11 @@ class BittensorValidationMechanism:
         for edge in self.graph_payload.edges:
             block_numbers.append(edge.evidence.block_number)
 
+        await self.verify_block_ranges(block_numbers)
+
         events = await self.event_fetcher.fetch_all_events(block_numbers)
 
         processed_events = await self.event_processer.process_event_data(events)
-
-        # Create a normalized event key set from on-chain events
-        event_keys = {}
 
         validation_block_numbers = []
 
