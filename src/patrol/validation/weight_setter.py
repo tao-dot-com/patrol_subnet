@@ -39,8 +39,8 @@ class WeightSetter:
         uid_values = list(uids)
 
         await self.subtensor.set_weights(wallet=self.wallet, netuid=self.net_uid, uids=uid_values, weights=weight_values)
-        
-        logger.info("Set weights", extra=weights)
+        weights_for_logging = {str(k): v for k, v in weights.items()}
+        logger.info("Set weights", extra=weights_for_logging)
 
     async def is_weight_setting_due(self) -> bool:
         my_hotkey = self.wallet.get_hotkey().ss58_address
