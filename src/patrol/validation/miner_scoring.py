@@ -22,16 +22,13 @@ class MinerScoring:
         # Placeholder for future implementation
         return 0.0
 
-    def calculate_volume_score(self, payload: GraphPayload | Dict) -> float:
-        if isinstance(payload, dict) and "error" in payload:
-            return 0.0
-        total_items = len(payload.nodes) + len(payload.edges)
-        base_score = math.log(total_items + 1) / math.log(101)
-        return min(1.0, base_score)
+    def calculate_volume_score(self, total_items: int) -> float:
+        # Sigmoid formula
+        score = 1 / (1 + math.exp(-Constants.STEEPNESS * (total_items - Constants.INFLECTION_POINT)))
+        return score
 
     def calculate_responsiveness_score(self, response_time: float) -> float:
-        response_time = min(response_time, Constants.MAX_RESPONSE_TIME)
-        return 1.0 - (response_time / Constants.MAX_RESPONSE_TIME)
+        return Constants.RESPONSE_TIME_HALF_SCORE / (response_time + Constants.RESPONSE_TIME_HALF_SCORE)
 
     async def calculate_score(
         self,
@@ -67,7 +64,7 @@ class MinerScoring:
             )
 
         volume = len(payload.nodes) + len(payload.edges)
-        volume_score = self.calculate_volume_score(payload)
+        volume_score = self.calculate_volume_score(volume)
         responsiveness_score = self.calculate_responsiveness_score(response_time)
 
         overall_score = sum([

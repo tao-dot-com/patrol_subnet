@@ -18,7 +18,7 @@ class SubgraphGenerator:
     # Adjust these based on your needs - higher values give higher chance of being able to find and deliver larger subgraphs, 
     # but will require more time and resources to generate
     
-    def __init__(self,  event_fetcher: EventFetcher, event_processor: EventProcessor, max_future_events: int = 50, max_past_events: int = 50, batch_size: int = 25, timeout=Constants.MAX_RESPONSE_TIME):
+    def __init__(self,  event_fetcher: EventFetcher, event_processor: EventProcessor, max_future_events: int = 50, max_past_events: int = 50, batch_size: int = 25, timeout=10):
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
         self._max_future_events = max_future_events

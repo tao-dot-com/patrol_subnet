@@ -1,6 +1,9 @@
 
 class Constants:
-    MAX_RESPONSE_TIME: int = 160  # timeout response time in seconds
+    RESPONSE_TIME_HALF_SCORE: int = 2
+    INFLECTION_POINT = 1000
+    STEEPNESS = 0.005 
     U64_MAX = 2**64 - 1
     LOWER_BLOCK_LIMIT: int = 3014341
+    MAX_RESPONSE_TIME: int = 12
 

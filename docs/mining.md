@@ -47,8 +47,8 @@ HARDWARE REQUIREMENTS:
 
 ### Optimising your miner
 
-> **Note:** You will at the very least need to optimize your miner's performance by adjusting the *max_future_events*, *max_past_events* and *event_batch_size* parameters.
+You will at the very least need to optimize your miner's performance by adjusting the *max_future_events*, *max_past_events* and *event_batch_size* parameters.
 
-As the subnet gets more competitive, you will need to enhance and optimise the miner code, so that it can fetch larger subgraphs in less time. 
+As the subnet gets more competitive, you will need to enhance and optimise the miner code, so that it can fetch larger subgraphs in less time. Here is an in depth overview of the [incentive](incentive.md) mechanism to help.
 
 To aid with this experimentation, we have provided some local_dev resource, which allow you to test your miner offline (without the need for testnet). Please see (./local_dev/local_development.md)

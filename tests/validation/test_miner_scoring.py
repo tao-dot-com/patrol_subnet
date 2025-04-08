@@ -18,29 +18,15 @@ def scoring(mock_miner_score_repository):
     return MinerScoring(mock_miner_score_repository)
 
 def test_calculate_volume_score_valid(scoring):
-    payload = GraphPayload(
-        nodes=[Node(id="A", type="wallet", origin="bittensor")],
-        edges=[Edge(
-            coldkey_source="A",
-            coldkey_destination="B",
-            category="balance",
-            type="transfer",
-            evidence=TransferEvidence(rao_amount=10, block_number=1)
-        )]
-    )
-    score = scoring.calculate_volume_score(payload)
+    score = scoring.calculate_volume_score(1200)
     assert 0 < score <= 1.0
-
-def test_calculate_volume_score_error_payload(scoring):
-    score = scoring.calculate_volume_score({"error": "bad format"})
-    assert score == 0.0
 
 def test_calculate_responsiveness_score(scoring):
     fast = scoring.calculate_responsiveness_score(0.5)
     assert fast > 0.5
 
-    slow = scoring.calculate_responsiveness_score(Constants.MAX_RESPONSE_TIME)
-    assert slow == 0.0
+    slow = scoring.calculate_responsiveness_score(10)
+    assert slow < 0.2
 
 async def test_calculate_score_error(scoring):
     error = ErrorPayload(message="Missing field")
