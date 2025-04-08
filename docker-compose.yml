@@ -17,4 +17,5 @@ services:
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
 
-
+#volumes:
+#  sqlite:
