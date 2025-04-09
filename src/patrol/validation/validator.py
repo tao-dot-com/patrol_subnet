@@ -63,11 +63,11 @@ class Validator:
     ) -> MinerScore:
 
         try:
-            async with self.miner_timing_semaphore:
-                synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
-                processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
-                url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
-                json_response, response_time = await self._invoke_miner(url, processed_synapse)
+            #async with self.miner_timing_semaphore:
+            synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
+            processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
+            url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
+            json_response, response_time = await self._invoke_miner(url, processed_synapse)
 
             payload_subgraph = json_response['subgraph_output']
             logger.info(f"Payload received for UID % in %s seconds.", uid, response_time)
