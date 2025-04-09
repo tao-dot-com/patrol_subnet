@@ -44,8 +44,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: ./validator.dockerfile
-          build-args:
-            - SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
+          build-args: |
+            SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
           push: true
           tags: public.ecr.aws/tensora/patrol/validator:${{ env.VERSION }}
 
