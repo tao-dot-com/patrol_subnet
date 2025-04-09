@@ -24,7 +24,7 @@ class BittensorValidationMechanism:
         logger.info(f"Starting validation process for uid: {uid}")
 
         if not payload:
-            return ErrorPayload(message=f"Error: Empty/Null Payload received.")
+            return ErrorPayload(message="Error: Empty/Null Payload received.")
 
         try:
             graph_payload = self._parse_graph_payload(payload)
@@ -129,10 +129,11 @@ class BittensorValidationMechanism:
 
     def _verify_graph_connected(self, graph_payload: GraphPayload):
         """
-        Checks whether the graph is fully connected using a union-find algorithm.
+        Checks whether the graph is fully connected using a union-find algorithm (iterative find).
         Raises a ValueError if the graph is not fully connected.
         """
         parent = {}
+        size = {}
 
         def find(x: str) -> str:
             if parent[x] != x:
@@ -142,14 +143,20 @@ class BittensorValidationMechanism:
         def union(x: str, y: str):
             rootX = find(x)
             rootY = find(y)
-            if rootX != rootY:
-                parent[rootY] = rootX
 
-        # Initialize each node's parent to itself
+            if rootX != rootY:
+                # Always attach the smaller tree under the larger one
+                if size[rootX] < size[rootY]:
+                    parent[rootX] = rootY
+                    size[rootY] += size[rootX]
+                else:
+                    parent[rootY] = rootX
+                    size[rootX] += size[rootY]
+
         for node in graph_payload.nodes:
             parent[node.id] = node.id
+            size[node.id] = 1
 
-        # Process all edges, treating them as undirected connections
         for edge in graph_payload.edges:
             src = edge.coldkey_source
             dst = edge.coldkey_destination
