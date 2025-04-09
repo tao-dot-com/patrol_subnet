@@ -1,11 +1,7 @@
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-
-permissions:
-  id-token: write # This is required for requesting the JWT
-  contents: read  # This is required for actions/checkout
+    branches:
+      - develop
 
 jobs:
   build:
@@ -19,48 +15,19 @@ jobs:
           - "5432:5432"
 
     runs-on: ubuntu-latest
-    environment: release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 4
-          fetch-tags: true
-          clean: true
-
-      - name: AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: github
-          aws-region: us-east-1
-
-      - name: Set version
-        run: |
-          pip install setuptools setuptools-scm
-          VERSION=$(python -m setuptools_scm)
-          echo "Generated version: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "TAG=${VERSION//+/_}" >> $GITHUB_ENV
 
       - name: Setup buildx
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: network=host
 
-      - name: ECR login
-        uses: aws-actions/amazon-ecr-login@v2
-        with:
-          registry-type: public
-
       - name: Build
         uses: docker/build-push-action@v6
         with:
           file: ./validator.dockerfile
           build-args: |
-            SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
             TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
-          push: true
-          tags: |
-            public.ecr.aws/c9f7n4n0/patrol/validator:${{ env.TAG }}
-            public.ecr.aws/c9f7n4n0/patrol/validator:latest
+          push: false
