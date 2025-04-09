@@ -14,7 +14,7 @@ jobs:
     services:
       postgres:
         image: postgres:alpine
-        environment:
+        env:
           POSTGRES_USER: patrol
           POSTGRES_PASSWORD: password
 
