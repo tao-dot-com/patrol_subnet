@@ -2,6 +2,8 @@ from typing import Callable, Tuple, Any
 
 import uuid
 import bittensor as bt
+from aiohttp import TCPConnector
+
 import patrol
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
@@ -54,6 +56,7 @@ class Validator:
         self.weight_setter = weight_setter
         self.miner_timing_semaphore = asyncio.Semaphore(1)
         self.enable_weight_setting = enable_weight_setting
+        self.conn = TCPConnector(limit_per_host=20)
 
     async def query_miner(self,
         batch_id: UUID,
@@ -112,7 +115,7 @@ class Validator:
         async def on_response_end(sess, ctx, params):
             timings['response_received'] = time.perf_counter()
 
-        async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
+        async with aiohttp.ClientSession(connector=self.conn, trace_configs=[trace_config]) as session:
 
             logger.info(f"Requesting url: {url}")
             async with session.post(

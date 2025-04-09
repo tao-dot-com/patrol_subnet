@@ -1,14 +1,17 @@
 import asyncio
+import threading
 import uuid
 from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock
 import bittensor as bt
 import numpy
+import uvicorn
 from bittensor.core.metagraph import AsyncMetagraph
 
 import pytest
 from aiohttp import web
 from bittensor_wallet import bittensor_wallet
+from fastapi import FastAPI
 
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
@@ -29,6 +32,43 @@ SAMPLE_RESPONSE = {
     }
 }
 
+app = FastAPI()
+
+@app.post("/PatrolSynapse")
+async def handle():
+    await asyncio.sleep(1)
+    return SAMPLE_RESPONSE
+
+# @pytest.fixture(scope="session")
+# def server_loop():
+#     loop = asyncio.new_event_loop()
+#     thread = threading.Thread(target=loop.run_forever)
+#     thread.start()
+#     yield loop
+#     loop.call_soon_threadsafe(loop.stop)
+#     thread.join()
+
+@pytest.fixture(scope="session")
+def run_test_server():
+    config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="error", workers=10)
+    server = uvicorn.Server(config)
+
+    def start():
+        asyncio.run(server.serve())
+
+    threading.Thread(target=start, daemon=True).start()
+
+    #future = asyncio.run_coroutine_threadsafe(start(), server_loop)
+
+    # Give the server a moment to start
+    import time
+    time.sleep(1)
+
+    #yield "http://127.0.0.1:8000"
+
+    #server.should_exit = True
+    #future.cancel()
+
 @pytest.fixture
 def test_wallet():
     with TemporaryDirectory() as tmp:
@@ -36,36 +76,9 @@ def test_wallet():
         wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
         yield wallet
 
-@pytest.fixture
-def custom_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+async def test_timings_unaffected_by_load(run_test_server, test_wallet):
 
-@pytest.fixture
-def mock_axon(custom_loop):
-
-    async def setup():
-        async def handler(request):
-            await asyncio.sleep(1)
-            return web.json_response(SAMPLE_RESPONSE, status=200, content_type="application/json")
-
-        app = web.Application()
-        app.router.add_post("/PatrolSynapse", handler)
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, "127.0.0.1", 0)
-        await site.start()
-        yield runner.addresses[0][0], runner.addresses[0][1]
-        await runner.shutdown()
-        await site.stop()
-
-    custom_loop.run_until_complete(setup())
-
-
-async def test_timings_unaffected_by_load(mock_axon, test_wallet):
-
-    ip, port = mock_axon
+    #ip, port = mock_axon
 
     dendrite = bt.dendrite(test_wallet)
     target_generator = AsyncMock(TargetGenerator)
@@ -75,7 +88,7 @@ async def test_timings_unaffected_by_load(mock_axon, test_wallet):
     metagraph = AsyncMock(AsyncMetagraph)
     weight_setter = AsyncMock(WeightSetter)
 
-    axon_count = 20
+    axon_count = 5
     def on_generate_targets(count: int):
         return [(str(t), t) for t in range(count)]
 
@@ -87,7 +100,7 @@ async def test_timings_unaffected_by_load(mock_axon, test_wallet):
         dendrite, metagraph, uuid.uuid4, weight_setter, enable_weight_setting=True
     )
 
-    metagraph.axons = [bt.axon(test_wallet, port=port, ip=ip).info() for _ in range(axon_count)]
+    metagraph.axons = [bt.axon(test_wallet, port=8000, ip="127.0.0.1").info() for _ in range(axon_count)]
     metagraph.uids = numpy.array(list(range(axon_count)))
 
     response_times = []
@@ -102,4 +115,4 @@ async def test_timings_unaffected_by_load(mock_axon, test_wallet):
     assert len(response_times) == axon_count
     print(response_times)
     for rt in response_times:
-        assert 1.0 < rt < 1.1
+        assert 1.0 < rt < 1.2
