@@ -76,7 +76,6 @@ class Validator:
                 miner_score = await self.scoring_mechanism.calculate_score(
                     uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id
                 )
-
             except Exception as ex:
                 if isinstance(ex, aiohttp.ClientConnectorError):
                     logger.info(f"Failed to connect to miner UID %s; assigning zero score.", uid)
