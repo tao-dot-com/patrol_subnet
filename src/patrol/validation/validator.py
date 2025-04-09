@@ -90,7 +90,7 @@ class Validator:
                 logger.info(f"Error for miner {uid}.  Skipping.  Error: {ex}")
                 error_message = "Unknown error"
 
-            miner_score = self.scoring_mechanism.calculate_zero_score(
+            miner_score = await self.scoring_mechanism.calculate_zero_score(
                 batch_id, uid, axon_info.coldkey, axon_info.hotkey, error_message
             )
 
