@@ -22,9 +22,6 @@ test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "flake8"]
 requires = ["setuptools>=57", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools-git-versioning]
-enabled = true
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope="function"
