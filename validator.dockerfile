@@ -10,7 +10,8 @@ WORKDIR /build
 RUN apt-get update
 RUN pip install --upgrade pip
 
-COPY .git ./.git
+ARG SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0"
+ENV SETUPTOOLS_SCM_PRETEND_VERSION=$SETUPTOOLS_SCM_PRETEND_VERSION
 COPY pyproject.toml .
 RUN pip install -e .
 
