@@ -61,38 +61,39 @@ class Validator:
         target_tuple: Tuple
     ) -> MinerScore:
 
-        async with self.miner_timing_semaphore:
-            synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
-            processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
-            url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
 
-            try:
+        try:
+            async with self.miner_timing_semaphore:
+                synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
+                processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
+                url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
                 json_response, response_time = await self._invoke_miner(url, processed_synapse)
-                payload_subgraph = json_response['subgraph_output']
-                logger.info(f"Payload received for UID % in %s seconds.", uid, response_time)
 
-                validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
-                logger.info(f"calculating coverage score for miner %s", uid)
-                miner_score = await self.scoring_mechanism.calculate_score(
-                    uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id
-                )
-            except Exception as ex:
-                if isinstance(ex, aiohttp.ClientConnectorError):
-                    logger.info(f"Failed to connect to miner UID %s; assigning zero score.", uid)
-                    error_message = "Miner unresponsive"
-                elif isinstance(ex, KeyError):
-                    logger.info(f"Miner UID %s returned a non-standard response: %s", uid, json_response)
-                    error_message = "Invalid response"
-                elif isinstance(ex, TimeoutError):
-                    logger.info(f"Timeout error for miner {uid}. Skipping.")
-                    error_message = "Timeout"
-                else:
-                    logger.info(f"Error for miner {uid}.  Skipping.  Error: {ex}")
-                    error_message = "Unknown error"
+            payload_subgraph = json_response['subgraph_output']
+            logger.info(f"Payload received for UID % in %s seconds.", uid, response_time)
 
-                miner_score = self.scoring_mechanism.calculate_zero_score(
-                    batch_id, uid, axon_info.coldkey, axon_info.hotkey, error_message
-                )
+            validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
+            logger.info(f"calculating coverage score for miner %s", uid)
+            miner_score = await self.scoring_mechanism.calculate_score(
+                uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id
+            )
+        except Exception as ex:
+            if isinstance(ex, aiohttp.ClientConnectorError):
+                logger.info(f"Failed to connect to miner UID %s; assigning zero score.", uid)
+                error_message = "Miner unresponsive"
+            elif isinstance(ex, KeyError):
+                logger.info(f"Miner UID %s returned a non-standard response: %s", uid, json_response)
+                error_message = "Invalid response"
+            elif isinstance(ex, TimeoutError):
+                logger.info(f"Timeout error for miner {uid}. Skipping.")
+                error_message = "Timeout"
+            else:
+                logger.info(f"Error for miner {uid}.  Skipping.  Error: {ex}")
+                error_message = "Unknown error"
+
+            miner_score = self.scoring_mechanism.calculate_zero_score(
+                batch_id, uid, axon_info.coldkey, axon_info.hotkey, error_message
+            )
 
         await self.miner_score_repository.add(miner_score)
 
