@@ -12,7 +12,7 @@ RUN pip install --upgrade pip
 
 COPY pyproject.toml .
 ENV PSEUDO_VERSION="0.0.0"
-RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MY_PACKAGE=${PSEUDO_VERSION} pip install -e .
+RUN SETUPTOOLS_SCM_PRETEND_VERSION=${PSEUDO_VERSION} pip install -e .
 
 FROM base AS build
 
