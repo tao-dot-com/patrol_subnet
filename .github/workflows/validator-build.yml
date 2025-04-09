@@ -27,9 +27,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -44,11 +41,16 @@ jobs:
           echo "Generated version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAG=${VERSION//+/_}" >> $GITHUB_ENV
+
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+
       - name: Build
         uses: docker/build-push-action@v6
         with:
           file: ./validator.dockerfile
-          driver-opts: network=host
           build-args: |
             SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
             TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
