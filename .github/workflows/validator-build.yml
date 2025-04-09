@@ -40,7 +40,7 @@ jobs:
           VERSION=$(python -m setuptools_scm)
           echo "Generated version: $VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "TAG=${VERSION//+/_" >> $GITHUB_ENV
+          echo "TAG=${VERSION//+/_}" >> $GITHUB_ENV
       - name: Build
         uses: docker/build-push-action@v6
         with:
