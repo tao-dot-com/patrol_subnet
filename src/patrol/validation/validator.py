@@ -61,23 +61,23 @@ class Validator:
         target_tuple: Tuple
     ) -> MinerScore:
 
-        synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
-        processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
-
-        url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
-
-        trace_config = aiohttp.TraceConfig()
-        timings = {}
-
-        @trace_config.on_request_start.append
-        async def on_request_start(sess, ctx, params):
-            timings['request_start'] = time.perf_counter()
-
-        @trace_config.on_response_chunk_received.append
-        async def on_response_end(sess, ctx, params):
-            timings['response_received'] = time.perf_counter()
-
         async with self.miner_timing_semaphore:
+            
+            synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
+            processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
+
+            url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
+
+            trace_config = aiohttp.TraceConfig()
+            timings = {}
+
+            @trace_config.on_request_start.append
+            async def on_request_start(sess, ctx, params):
+                timings['request_start'] = time.perf_counter()
+
+            @trace_config.on_response_chunk_received.append
+            async def on_response_end(sess, ctx, params):
+                timings['response_received'] = time.perf_counter()
 
             async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
 
