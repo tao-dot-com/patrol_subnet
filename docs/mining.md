@@ -44,8 +44,8 @@ HARDWARE REQUIREMENTS:
    - Initialize the miner with the specified wallet name and network
    - Start the primary miner script that will process requests from the validators and submit subgraphs gathered from the archive node
 
-[!NOTE] 
-If you are attempting to run a miner on testnet, you will need to change '--subtensor_address' to the testnet network, but '--archive_node_address' always needs to point toward an archive node synced for mainnet, as regardless of testnet/mainnet, the data collected is always live.
+> [!NOTE]
+> If you are attempting to run a miner on testnet, you will need to change '--subtensor_address' to the testnet network, but '--archive_node_address' always needs to point toward an archive node synced for mainnet, as regardless of testnet/mainnet, the data collected is always live.
 
 ### Optimising your miner
 
