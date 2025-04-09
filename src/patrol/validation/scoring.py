@@ -26,6 +26,7 @@ class MinerScore:
     def miner(self) -> tuple[str, int]:
         return self.hotkey, self.uid
 
+
 class MinerScoreRepository(ABC):
 
     @abstractmethod

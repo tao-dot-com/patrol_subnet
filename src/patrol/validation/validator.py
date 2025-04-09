@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Any
 
 import uuid
 import bittensor as bt
@@ -62,62 +62,70 @@ class Validator:
     ) -> MinerScore:
 
         async with self.miner_timing_semaphore:
-            
             synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
             processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
-
             url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
 
-            trace_config = aiohttp.TraceConfig()
-            timings = {}
-
-            @trace_config.on_request_start.append
-            async def on_request_start(sess, ctx, params):
-                timings['request_start'] = time.perf_counter()
-
-            @trace_config.on_response_chunk_received.append
-            async def on_response_end(sess, ctx, params):
-                timings['response_received'] = time.perf_counter()
-
-            async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
-
-                logger.info(f"Requesting url: {url}")
-                try:
-                    async with session.post(
-                            url,
-                            headers=processed_synapse.to_headers(),
-                            json=processed_synapse.model_dump(),
-                            timeout=Constants.MAX_RESPONSE_TIME
-                        ) as response:
-                            # Extract the JSON response from the server
-                            json_response = await response.json()
-                            response_time = timings['response_received'] - timings["request_start"]
-
-                except aiohttp.ClientConnectorError as e:
-                    logger.exception(f"Failed to connect to miner {uid}. Skipping.")
-                except TimeoutError as e:
-                    logger.error(f"Timeout error for miner {uid}. Skipping.")
-                except Exception as e:
-                    logger.error(f"Error for miner {uid}.  Skipping.  Error: {e}")
-
-            # Handling the post-processing
             try:
+                json_response, response_time = await self._invoke_miner(url, processed_synapse)
                 payload_subgraph = json_response['subgraph_output']
-            except KeyError:
-                logger.warning(f"Miner {uid} returned a non-standard response. Returned: {json_response}")
-                payload_subgraph = None
+                logger.info(f"Payload received for UID % in %s seconds.", uid, response_time)
 
-            logger.info(f"Payload received for UID {uid} in {response_time} seconds.")
+                validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
+                logger.info(f"calculating coverage score for miner %s", uid)
+                miner_score = await self.scoring_mechanism.calculate_score(
+                    uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id
+                )
 
-        validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
+            except Exception as ex:
+                if isinstance(ex, aiohttp.ClientConnectorError):
+                    logger.info(f"Failed to connect to miner UID %s; assigning zero score.", uid)
+                    error_message = "Miner unresponsive"
+                elif isinstance(ex, KeyError):
+                    logger.info(f"Miner UID %s returned a non-standard response: %s", uid, json_response)
+                    error_message = "Invalid response"
+                elif isinstance(ex, TimeoutError):
+                    logger.info(f"Timeout error for miner {uid}. Skipping.")
+                    error_message = "Timeout"
+                else:
+                    logger.info(f"Error for miner {uid}.  Skipping.  Error: {ex}")
+                    error_message = "Unknown error"
 
-        logger.info(f"calculating coverage score for miner {uid}")
-        miner_score = await self.scoring_mechanism.calculate_score(uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id)
+                miner_score = self.scoring_mechanism.calculate_zero_score(
+                    batch_id, uid, axon_info.coldkey, axon_info.hotkey, error_message
+                )
 
         await self.miner_score_repository.add(miner_score)
 
         logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
         return miner_score
+
+    async def _invoke_miner(self, url, processed_synapse) -> tuple[dict[str, Any], float]:
+        trace_config = aiohttp.TraceConfig()
+        timings = {}
+
+        @trace_config.on_request_start.append
+        async def on_request_start(sess, ctx, params):
+            timings['request_start'] = time.perf_counter()
+
+        @trace_config.on_response_chunk_received.append
+        async def on_response_end(sess, ctx, params):
+            timings['response_received'] = time.perf_counter()
+
+        async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
+
+            logger.info(f"Requesting url: {url}")
+            async with session.post(
+                    url,
+                    headers=processed_synapse.to_headers(),
+                    json=processed_synapse.model_dump(),
+                    timeout=Constants.MAX_RESPONSE_TIME
+            ) as response:
+                json_response = await response.json()
+                response_time = timings['response_received'] - timings["request_start"]
+
+                return json_response, response_time
+
 
     async def query_miner_batch(self):
         batch_id = self.uuid_generator()

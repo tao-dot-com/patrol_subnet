@@ -92,6 +92,33 @@ class MinerScoring:
             error_message=None
         )
 
+    async def calculate_zero_score(
+            self, batch_id, uid, coldkey, hotkey, error_message,
+            moving_average_denominator: int = 20
+    ):
+        previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores(
+            (hotkey, uid), moving_average_denominator - 1
+        )
+
+        return MinerScore(
+            id=uuid.uuid4(),
+            batch_id=batch_id,
+            created_at=datetime.now(UTC),
+            uid=uid,
+            coldkey=coldkey,
+            hotkey=hotkey,
+            overall_score_moving_average=(sum(previous_overall_scores) + 0) / moving_average_denominator,
+            overall_score=0,
+            volume_score=0,
+            volume=0,
+            responsiveness_score=0,
+            response_time_seconds=0,
+            novelty_score=None,
+            validation_passed=True,
+            error_message=error_message
+        )
+
+
 def normalize_scores(scores: Dict[int, float]) -> dict[float]:
     """
         Normalize a dictionary of miner Coverage scores to ensure fair comparison.
