@@ -55,4 +55,4 @@ On top of this we also recommend setting up your own archive node, which will al
 
 As the subnet gets more competitive, you will need to enhance and optimise the miner code, so that it can fetch larger subgraphs in less time. Here is an in depth overview of the [incentive](incentive.md) mechanism to help.
 
-To aid with this experimentation, we have provided some local_dev resource, which allow you to test your miner offline (without the need for testnet). Please see (../src/local_dev/local_development.md)
+To aid with this experimentation, we have provided some local_dev resource, which allow you to test your miner offline (without the need for testnet). Please see [here](../src/local_dev/local_development.md).
