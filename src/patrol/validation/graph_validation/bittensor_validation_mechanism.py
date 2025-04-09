@@ -163,20 +163,20 @@ class BittensorValidationMechanism:
             own = edge.coldkey_owner
 
             if src not in parent or dst not in parent:
-                raise ValueError("Edge refers to a node not in the payload")
+                raise PayloadValidationError("Edge refers to a node not in the payload")
 
             union(src, dst)
 
             if own:
                 if own not in parent:
-                    raise ValueError("Edge owner refers to a node not in the payload")
+                    raise PayloadValidationError("Edge owner refers to a node not in the payload")
                 union(src, own)
                 union(dst, own)
 
         # Check that all nodes have the same root
         roots = {find(node.id) for node in graph_payload.nodes}
         if len(roots) != 1:
-            raise ValueError("Graph is not fully connected.")
+            raise PayloadValidationError("Graph is not fully connected.")
     
     async def _verify_block_ranges(self, block_numbers):
 
