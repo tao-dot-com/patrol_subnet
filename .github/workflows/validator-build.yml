@@ -16,6 +16,7 @@ jobs:
         image: postgres:alpine
 
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
