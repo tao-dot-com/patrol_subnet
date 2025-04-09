@@ -10,6 +10,7 @@ WORKDIR /build
 RUN apt-get update
 RUN pip install --upgrade pip
 
+COPY ./.git ./.git
 COPY pyproject.toml .
 RUN pip install -e .
 
