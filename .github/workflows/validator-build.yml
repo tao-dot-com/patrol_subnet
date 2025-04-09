@@ -34,18 +34,12 @@ jobs:
           role-session-name: github
           aws-region: us-east-1
 
-      - name: Set version
-        run: |
-          pip install setuptools setuptools-scm
-          VERSION=$(python -m setuptools_scm)
-          echo "Generated version: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: Build
         uses: docker/build-push-action@v6
         with:
           file: ./validator.dockerfile
           build-args: |
-            SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
+            TEST_POSTGRESQL_URL=postgres+asyncpg://patrol:password@localhost:5432/patrol
           push: true
           tags: public.ecr.aws/tensora/patrol/validator:${{ env.VERSION }}
 
