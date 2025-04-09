@@ -24,7 +24,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          fetch-depth: 4
           fetch-tags: true
+          clean: true
 
       - name: AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
