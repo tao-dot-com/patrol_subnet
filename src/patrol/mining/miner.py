@@ -25,7 +25,7 @@ def get_event_loop():
     return loop
 
 class Miner:
-    def __init__(self, dev_flag: bool, wallet_path: str, coldkey: str, hotkey: str, port: int, external_ip: str, netuid: int, subtensor: AsyncSubtensor, network_url: str, max_future_events: int= 50, max_past_events: int = 50, batch_size: int = 25):
+    def __init__(self, dev_flag: bool, wallet_path: str, coldkey: str, hotkey: str, port: int, external_ip: str, netuid: int, subtensor: AsyncSubtensor, min_stake_allowed: int, network_url: str, max_future_events: int= 50, max_past_events: int = 50, batch_size: int = 25):
         self.dev_flag = dev_flag
         self.wallet_path = wallet_path
         self.coldkey = coldkey
@@ -34,6 +34,7 @@ class Miner:
         self.external_ip = external_ip
         self.netuid = netuid
         self.subtensor = subtensor
+        self.min_stake_allowed = min_stake_allowed
         self.network_url = network_url
         self.max_future_events = max_future_events
         self.max_past_events = max_past_events
@@ -66,7 +67,7 @@ class Miner:
         if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
             return True, "Unrecognized hotkey"
         uid = self.metagraph.hotkeys.index(synapse.dendrite.hotkey)
-        if not self.metagraph.validator_permit[uid] or self.metagraph.S[uid] < 30000:
+        if not self.metagraph.validator_permit[uid] or self.metagraph.S[uid] < self.min_stake_allowed:
             return True, "Non-validator hotkey"
         return False, None
 
@@ -149,13 +150,15 @@ async def boot():
     parser.add_argument('--port', type=int, default=8000)
     parser.add_argument('--external_ip', type=str, default=None)
     parser.add_argument('--dev_flag', type=bool, default=False)
+    parser.add_argument('--min_stake_allowed', type=int, default=30000)
+    parser.add_argument('--subtensor_address', type=str, default="finney")
     parser.add_argument('--archive_node_address', type=str, default="wss://archive.chain.opentensor.ai:443/")
     parser.add_argument('--max_future_events', type=int, default=50)
     parser.add_argument('--max_past_events', type=int, default=50)
     parser.add_argument('--event_batch_size', type=int, default=25)
     args = parser.parse_args()
 
-    async with AsyncSubtensor(network=args.archive_node_address) as subtensor:
+    async with AsyncSubtensor(network=args.subtensor_address) as subtensor:
         miner = Miner(
             dev_flag=args.dev_flag,
             wallet_path=args.wallet_path,
@@ -165,6 +168,7 @@ async def boot():
             external_ip=args.external_ip,
             netuid=args.netuid,
             subtensor=subtensor,
+            min_stake_allowed=args.min_stake_allowed,
             network_url=args.archive_node_address,
             max_future_events=args.max_future_events,
             max_past_events=args.max_past_events,
