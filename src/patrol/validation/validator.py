@@ -61,7 +61,6 @@ class Validator:
         target_tuple: Tuple
     ) -> MinerScore:
 
-
         try:
             async with self.miner_timing_semaphore:
                 synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
