@@ -60,6 +60,3 @@ jobs:
             TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
           push: true
           tags: public.ecr.aws/c9f7n4n0/patrol/validator:${{ env.TAG }}
-
-
-
