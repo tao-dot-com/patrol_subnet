@@ -16,25 +16,22 @@ logger = logging.getLogger(__name__)
 class BittensorValidationMechanism:
 
     def __init__(self,  event_fetcher: EventFetcher, event_processer: EventProcessor):
-        self.graph_payload = None
         self.event_fetcher = event_fetcher
         self.event_processer = event_processer
 
-    async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None) -> Dict[str, Any]:
+    async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None) -> ErrorPayload | GraphPayload:
         start_time = time.time()
         logger.info(f"Starting validation process for uid: {uid}")
 
+        if not payload:
+            return ErrorPayload(message=f"Error: Empty/Null Payload received.")
+
         try:
-            if not payload:
-                raise PayloadValidationError("Empty/Null Payload recieved.")
-            
-            self.parse_graph_payload(payload)
-            
-            self.verify_target_in_graph(target)
+            graph_payload = self._parse_graph_payload(payload)
+            self._verify_target_in_graph(target, graph_payload)
+            self._verify_graph_connected(graph_payload)
 
-            self.verify_graph_connected()
-
-            await self.verify_edge_data()
+            await self._verify_edge_data(graph_payload)
 
         except SingleNodeResponse as e:
             logger.error(f"Validation skipped for uid {uid}: {e}")
@@ -47,9 +44,9 @@ class BittensorValidationMechanism:
         validation_time = time.time() - start_time
         logger.info(f"Validation finished for {uid}. Completed in {validation_time:.2f} seconds")
 
-        return self.graph_payload
+        return graph_payload
 
-    def parse_graph_payload(self, payload: dict) -> None:
+    def _parse_graph_payload(self, payload: dict) -> GraphPayload:
         """
         Parses a dictionary into a GraphPayload data structure.
         This will raise an error if required fields are missing, if there are extra fields,
@@ -80,7 +77,7 @@ class BittensorValidationMechanism:
                     evidence.get('rao_amount'),
                     evidence.get('block_number')
                 )
-                
+
                 if key in seen_edges:
                     raise PayloadValidationError(f"Duplicate edge detected: {key}")
                 seen_edges.add(key)
@@ -110,15 +107,15 @@ class BittensorValidationMechanism:
         except TypeError as e:
             raise PayloadValidationError(f"Payload validation error: {e}")
         
-        self.graph_payload = GraphPayload(nodes=nodes, edges=edges)
+        return GraphPayload(nodes=nodes, edges=edges)
     
-    def verify_target_in_graph(self, target: str) -> None:
+    def _verify_target_in_graph(self, target: str, graph_payload: GraphPayload) -> None:
 
-        if len(self.graph_payload.nodes) < 2:
+        if len(graph_payload.nodes) < 2:
             raise SingleNodeResponse("Only single node provided.")
 
         def find_target(target):
-            for edge in self.graph_payload.edges:
+            for edge in graph_payload.edges:
                 if edge.coldkey_destination == target:
                     return True
                 elif edge.coldkey_source == target:
@@ -130,7 +127,7 @@ class BittensorValidationMechanism:
         if not find_target(target):
             raise PayloadValidationError("Target not found in payload.")
 
-    def verify_graph_connected(self):
+    def _verify_graph_connected(self, graph_payload: GraphPayload):
         """
         Checks whether the graph is fully connected using a union-find algorithm.
         Raises a ValueError if the graph is not fully connected.
@@ -148,10 +145,12 @@ class BittensorValidationMechanism:
             if rootX != rootY:
                 parent[rootY] = rootX
 
-        for node in self.graph_payload.nodes:
+        # Initialize each node's parent to itself
+        for node in graph_payload.nodes:
             parent[node.id] = node.id
 
-        for edge in self.graph_payload.edges:
+        # Process all edges, treating them as undirected connections
+        for edge in graph_payload.edges:
             src = edge.coldkey_source
             dst = edge.coldkey_destination
             own = edge.coldkey_owner
@@ -167,11 +166,12 @@ class BittensorValidationMechanism:
                 union(src, own)
                 union(dst, own)
 
-        roots = {find(node.id) for node in self.graph_payload.nodes}
+        # Check that all nodes have the same root
+        roots = {find(node.id) for node in graph_payload.nodes}
         if len(roots) != 1:
             raise ValueError("Graph is not fully connected.")
     
-    async def verify_block_ranges(self, block_numbers):
+    async def _verify_block_ranges(self, block_numbers):
 
         current_block = await self.event_fetcher.get_current_block()
         min_block = constants.Constants.LOWER_BLOCK_LIMIT
@@ -183,14 +183,14 @@ class BittensorValidationMechanism:
                 f"[{min_block}, {current_block}]: {invalid_blocks}"
             )
 
-    async def verify_edge_data(self):
+    async def _verify_edge_data(self, graph_payload: GraphPayload):
 
         block_numbers = []
 
-        for edge in self.graph_payload.edges:
+        for edge in graph_payload.edges:
             block_numbers.append(edge.evidence.block_number)
 
-        await self.verify_block_ranges(block_numbers)
+        await self._verify_block_ranges(block_numbers)
 
         events = await self.event_fetcher.fetch_all_events(block_numbers)
 
@@ -220,7 +220,7 @@ class BittensorValidationMechanism:
 
         # Check each graph edge against processed chain events
         missing_edges = []
-        for edge in self.graph_payload.edges:
+        for edge in graph_payload.edges:
             ev = vars(edge.evidence)
             edge_key = json.dumps({
                 "coldkey_source": edge.coldkey_source,
