@@ -29,7 +29,6 @@ def valid_payload():
         ]
     }
 
-@pytest.mark.asyncio
 async def test_validate_payload_success(valid_payload):
     event_fetcher = AsyncMock()
     event_fetcher.fetch_all_events.return_value = {
