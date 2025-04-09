@@ -1,5 +1,5 @@
+import logging
 from typing import Dict, Any
-import bittensor as bt
 import math
 import uuid
 from datetime import datetime, UTC
@@ -9,6 +9,8 @@ from patrol.protocol import GraphPayload
 from patrol.validation.graph_validation.errors import ErrorPayload
 from patrol.validation.scoring import MinerScore, MinerScoreRepository
 from patrol.constants import Constants
+
+logger = logging.getLogger(__name__)
 
 class MinerScoring:
     def __init__(self, miner_score_repository: MinerScoreRepository):
@@ -44,7 +46,7 @@ class MinerScoring:
         previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), moving_average_denominator - 1)
 
         if isinstance(payload, ErrorPayload):
-            bt.logging.warning(f"Zero score added to records for {uid}, reason: {payload.message}.")
+            logger.warning(f"Zero score added to records for {uid}, reason: {payload.message}.")
             return MinerScore(
                 id=uuid.uuid4(),
                 batch_id=batch_id,
@@ -72,7 +74,7 @@ class MinerScoring:
             responsiveness_score * self.importance["responsiveness"]
         ])
 
-        bt.logging.info(f"Scoring completed for miner {uid}, with overall score: {overall_score}")
+        logger.info(f"Scoring completed for miner {uid}, with overall score: {overall_score}")
 
         return MinerScore(
             id=uuid.uuid4(),
