@@ -11,7 +11,7 @@ RUN apt-get update
 RUN pip install --upgrade pip
 
 COPY pyproject.toml .
-ARG PSEUDO_VERSION=0.0.0
+ENV PSEUDO_VERSION="0.0.0"
 RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_MY_PACKAGE=${PSEUDO_VERSION} pip install -e .
 
 FROM base AS build
@@ -26,7 +26,9 @@ COPY src/patrol/__init__.py ./src/patrol/__init__.py
 COPY tests/validation ./tests/validation
 COPY src/logging.ini ./src
 
-RUN --mount=source=.git,target=.git,type=bind pip install -e '.[test]'
+ARG SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0"
+ENV SETUPTOOLS_SCM_PRETEND_VERSION=$SETUPTOOLS_SCM_PRETEND_VERSION
+RUN pip install -e '.[test]'
 ARG TEST_POSTGRESQL_URL
 RUN export TEST_POSTGRESQL_URL=$TEST_POSTGRESQL_URL && pytest ./tests
 
