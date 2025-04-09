@@ -17,6 +17,8 @@ jobs:
         env:
           POSTGRES_USER: patrol
           POSTGRES_PASSWORD: password
+        ports: 5432:5432
+
 
     runs-on: ubuntu-latest
     environment: release
@@ -45,11 +47,10 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           file: ./validator.dockerfile
-          allow: network.host
-          network: host
+          driver-opts: network=host
           build-args: |
             SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
-            TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@172.17.0.1:5432/patrol
+            TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
           push: true
           tags: public.ecr.aws/tensora/patrol/validator:${{ env.TAG }}
 
