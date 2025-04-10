@@ -6,6 +6,7 @@ import patrol
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
+from patrol.validation import auto_update
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 from patrol.validation.scoring import MinerScoreRepository
@@ -156,7 +157,14 @@ class Validator:
 
 async def start():
 
-    from patrol.validation.config import DB_URL, NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH, ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS
+    from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
+                                          ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS, ENABLE_AUTO_UPDATE)
+
+    if ENABLE_AUTO_UPDATE:
+        logger.info("Auto update is enabled")
+    else:
+        logger.warning("Auto update is disabled")
+
     if not ENABLE_WEIGHT_SETTING:
         logger.warning("Weight setting is not enabled.")
 
@@ -168,7 +176,7 @@ async def start():
     versions = load_versions()
 
     my_substrate_client = SubstrateClient(versions, ARCHIVE_SUBTENSOR)
-    await my_substrate_client.initialize()
+    #await my_substrate_client.initialize()
 
     coldkey_finder = ColdkeyFinder(my_substrate_client)
     weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
@@ -191,11 +199,18 @@ async def start():
         enable_weight_setting=ENABLE_WEIGHT_SETTING
     )
 
-    while True:
+
+    update_available = False
+    while not update_available:
         try:
+            update_available = ENABLE_AUTO_UPDATE and await auto_update.check_for_update()
+            if update_available:
+                break
             await miner_validator.query_miner_batch()
+
         except Exception as ex:
             logger.exception("Error!")
+
         await asyncio.sleep(SCORING_INTERVAL_SECONDS)
 
 def boot():
@@ -203,6 +218,7 @@ def boot():
         from patrol.validation.config import DB_URL
         migrate_db(DB_URL)
         asyncio.run(start())
+        logger.info("Service Terminated.")
     except KeyboardInterrupt as ex:
         logger.info("Exiting")
 

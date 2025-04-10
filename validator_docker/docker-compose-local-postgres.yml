@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:alpine
+    image: docker.io/postgres:16-alpine
     ports:
       - "5432:5432"
     environment:
@@ -11,10 +11,14 @@ services:
     init: true
     depends_on:
       - db
-    image: tensora/patrol-validator
+    image: public.ecr.aws/c9f7n4n0/patrol/validator:latest
+    pull_policy: always
+    restart: unless-stopped
     environment:
       DB_URL: postgresql+asyncpg://patrol:password@db:5432/patrol
+      ENABLE_AUTO_UPDATE: 1
+      # WALLET_NAME: my_wallet
+      # HOTKEY_NAME: my_hotkey
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
-
-
+      - /var/run/docker.sock:/var/run/docker.sock

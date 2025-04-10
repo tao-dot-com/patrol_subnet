@@ -42,4 +42,4 @@ ENV PYTHONUNBUFFERED=1
 CMD ["python", "-m", "patrol.validation.validator"]
 
 ENV DB_DIR=/var/patrol/sqlite
-ENV DB_URL="sqlite+aiosqlite://${DB_DIR}/patrol.db"
+ENV DB_URL="sqlite+aiosqlite:///${DB_DIR}/patrol.db"

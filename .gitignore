@@ -21,3 +21,4 @@ env.local
 publish.sh
 .github
 main.py
+docker-compose.yml
