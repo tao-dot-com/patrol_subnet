@@ -19,6 +19,4 @@ env.local
 !runtime_versions.json
 
 publish.sh
-.github
 main.py
-docker-compose.yml
