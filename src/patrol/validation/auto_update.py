@@ -42,8 +42,9 @@ async def is_update_available():
         package_version = version("patrol-subnet")
         docker_tag = package_version.replace("+", "_")
 
+        logger.info(f"Fetching digest for tag  %s",docker_tag)
         current_digest = await get_digest(session, docker_tag, token)
-        logger.info("Current digest: %s", current_digest)
+        logger.info("Current digest for tag %s: %s", docker_tag, current_digest)
 
         latest_digest = await get_digest(session, "latest", token)
         logger.info("Latest digest: %s", latest_digest)
