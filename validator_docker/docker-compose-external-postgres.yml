@@ -11,4 +11,3 @@ services:
       # HOTKEY_NAME: my_hotkey
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
-      - /var/run/docker.sock:/var/run/docker.sock
