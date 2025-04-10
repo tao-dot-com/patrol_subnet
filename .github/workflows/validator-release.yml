@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 4
+          fetch-tags: true
+          ref: ${{ github.ref }}
           clean: true
 
       - name: AWS Credentials
