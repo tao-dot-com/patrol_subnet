@@ -10,7 +10,7 @@ import bittensor as bt
 from bittensor import AsyncSubtensor
 from bittensor.utils.networking import get_external_ip
 
-from patrol.protocol import PatrolSynapse, MinerPingSynapse
+from patrol.protocol import PatrolSynapse
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.chain_data.event_processor import EventProcessor

@@ -45,15 +45,6 @@ class GraphPayload:
     nodes: List[Node]
     edges: List[Edge]
 
-
-class MinerPingSynapse(bt.Synapse):
-    """
-    A simple ping synapse that inherits from bt.Synapse.
-    This synapse handles ping request and response communication between
-    the miner and the validator.
-    """
-    is_available: typing.Optional[bool] = False
-
 class PatrolSynapse(bt.Synapse):
     """
     A simple event graph protocol that inherits from bt.Synapse.
