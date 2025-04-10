@@ -1,5 +1,5 @@
 # Copyright (c) 2025 Tensora
-
+import logging
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
@@ -34,5 +34,5 @@ import bittensor as bt
 bt.logging.enable_third_party_loggers()
 config.fileConfig(str(Path(__file__).parent.with_name("logging.ini")))
 
-#if os.getenv("JSON_LOGGING", "1") == "1":
-
+from importlib.metadata import version
+logging.info("Patrol Subnet Validator. Version %s", version("patrol-subnet"))
