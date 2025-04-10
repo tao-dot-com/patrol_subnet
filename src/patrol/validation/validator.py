@@ -176,7 +176,7 @@ async def start():
     versions = load_versions()
 
     my_substrate_client = SubstrateClient(versions, ARCHIVE_SUBTENSOR)
-    #await my_substrate_client.initialize()
+    await my_substrate_client.initialize()
 
     coldkey_finder = ColdkeyFinder(my_substrate_client)
     weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
