@@ -12,7 +12,8 @@ dependencies = [
     "psycopg2-binary",
     "asyncpg",
     "alembic",
-    "python-json-logger"
+    "python-json-logger",
+    "docker"
 ]
 
 [project.optional-dependencies]

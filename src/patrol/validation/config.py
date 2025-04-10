@@ -1,4 +1,5 @@
 import os
+
 from sqlalchemy.ext.asyncio import create_async_engine
 
 NETWORK = os.getenv('NETWORK', "finney")
@@ -17,3 +18,4 @@ ENABLE_WEIGHT_SETTING = os.getenv('ENABLE_WEIGHT_SETTING', "1") == "1"
 ARCHIVE_SUBTENSOR = os.getenv('ARCHIVE_SUBTENSOR', "wss://archive.chain.opentensor.ai:443")
 
 SCORING_INTERVAL_SECONDS = int(os.getenv('SCORING_INTERVAL_SECONDS', "600"))
+ENABLE_AUTO_UPDATE = os.getenv('ENABLE_AUTO_UPDATE', "0") == "1"
