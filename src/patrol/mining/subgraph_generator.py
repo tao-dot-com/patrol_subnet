@@ -101,7 +101,6 @@ class SubgraphGenerator:
                 )
 
                 try:
-
                     if edge_key not in seen_edges:
                         seen_edges.add(edge_key)
                         if event.get('category') == "balance":                
@@ -126,8 +125,7 @@ class SubgraphGenerator:
                                 )
                             )
                 except Exception as e:
-                    print(event)
-
+                    bt.logging.debug(f"Issue with adding edge to subgraph, skipping for now. Error: {e}")
 
                 if neighbor not in seen_nodes and neighbor not in queue:
                     queue.append(neighbor)
