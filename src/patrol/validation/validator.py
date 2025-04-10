@@ -203,7 +203,7 @@ async def start():
     update_available = False
     while not update_available:
         try:
-            update_available = ENABLE_AUTO_UPDATE and await auto_update.check_for_update()
+            update_available = ENABLE_AUTO_UPDATE and await auto_update.is_update_available()
             if update_available:
                 break
             await miner_validator.query_miner_batch()
