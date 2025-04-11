@@ -34,7 +34,7 @@ The following environment variables can be used to configure the validator by in
 |------------------------|-----------------------------------------|------------------------------------------------------------------|
 | NETWORK                | finney                                  | a subtensor network                                              |
 | NET_UID                | 81                                      | the net UID                                                      | 
-| DB_DIR                 | /tmp/sqlite                             | The database directory - only used for SQLite if DB_URL is unset |
+| DB_DIR                 | /var/patrol/sqlite                      | The database directory - only used for SQLite if DB_URL is unset |
 | DB_URL                 | sqlite+aiosqlite:///${DB_DIR}/patrol.db | The database URL                                                 |
 | WALLET_NAME            | default                                 | your wallet coldkey name                                         |
 | HOTKEY_NAME            | default                                 | your wallet hotkey name                                          |                            
