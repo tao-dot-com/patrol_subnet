@@ -45,6 +45,7 @@ class Validator:
         uuid_generator: Callable[[], UUID],
         weight_setter: WeightSetter,
         enable_weight_setting: bool,
+        concurrency: int = 10
     ):
         self.validation_mechanism = validation_mechanism
         self.scoring_mechanism = scoring_mechanism
@@ -54,9 +55,9 @@ class Validator:
         self.metagraph = metagraph
         self.uuid_generator = uuid_generator
         self.weight_setter = weight_setter
-        self.miner_timing_semaphore = asyncio.Semaphore(1)
+        self.miner_timing_semaphore = asyncio.Semaphore(concurrency)
         self.enable_weight_setting = enable_weight_setting
-        self.conn = TCPConnector(limit_per_host=20)
+        self.concurrency = concurrency
 
     async def query_miner(self,
         batch_id: UUID,
@@ -66,11 +67,11 @@ class Validator:
     ) -> MinerScore:
 
         try:
-            #async with self.miner_timing_semaphore:
-            synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
-            processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
-            url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
-            json_response, response_time = await self._invoke_miner(url, processed_synapse)
+            async with self.miner_timing_semaphore:
+                synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
+                processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
+                url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
+                json_response, response_time = await self._invoke_miner(url, processed_synapse)
 
             payload_subgraph = json_response['subgraph_output']
             logger.info(f"Payload received for UID % in %s seconds.", uid, response_time)
@@ -107,15 +108,17 @@ class Validator:
         trace_config = aiohttp.TraceConfig()
         timings = {}
 
-        @trace_config.on_request_start.append
+        @trace_config.on_request_chunk_sent.append
         async def on_request_start(sess, ctx, params):
             timings['request_start'] = time.perf_counter()
 
         @trace_config.on_response_chunk_received.append
         async def on_response_end(sess, ctx, params):
-            timings['response_received'] = time.perf_counter()
+            if 'response_received' not in timings:
+                timings['response_received'] = time.perf_counter()
 
-        async with aiohttp.ClientSession(connector=self.conn, trace_configs=[trace_config]) as session:
+        conn = TCPConnector(limit_per_host=self.concurrency, limit=self.concurrency)
+        async with aiohttp.ClientSession(connector=conn, trace_configs=[trace_config]) as session:
 
             logger.info(f"Requesting url: {url}")
             async with session.post(
