@@ -34,11 +34,11 @@ class BittensorValidationMechanism:
             await self._verify_edge_data(graph_payload)
 
         except SingleNodeResponse as e:
-            logger.error(f"Validation skipped for uid {uid}: {e}")
+            logger.info(f"Validation skipped for uid {uid}: {e}")
             return ErrorPayload(message=f"Error: {str(e)}")
 
         except Exception as e: 
-            logger.error(f"Validation error for uid {uid}: {e}")
+            logger.info(f"Validation error for uid {uid}: {e}")
             return ErrorPayload(message=f"Error: {str(e)}")
 
         validation_time = time.time() - start_time
