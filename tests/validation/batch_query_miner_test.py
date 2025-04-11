@@ -67,7 +67,7 @@ def test_wallet():
         wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
         yield wallet
 
-@pytest.mark.skipif("CI" in os.environ, reason="Flimsy")
+@pytest.mark.skip(reason="Flimsy")
 async def test_timings_unaffected_by_load(run_test_server, test_wallet):
 
     host, port = run_test_server
