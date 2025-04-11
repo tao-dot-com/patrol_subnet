@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
+from patrol.validation import hooks
+from patrol.validation.hooks import HookType
+
 logger = logging.getLogger(__name__)
 
 # this is the Alembic Config object, which provides
@@ -51,11 +54,7 @@ async def run_async_migrations() -> None:
         poolclass=pool.NullPool,
     )
 
-    dynamic_password_module = os.getenv("DB_ENGINE_CONSUMER")
-    if dynamic_password_module:
-        module = importlib.import_module(dynamic_password_module)
-        func = getattr(module, 'consume_db_engine')
-        func(connectable)
+    hooks.invoke(HookType.ON_CREATE_DB_ENGINE, connectable)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
