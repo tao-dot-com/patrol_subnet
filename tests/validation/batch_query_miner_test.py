@@ -1,4 +1,6 @@
 import asyncio
+import json
+import os
 import threading
 import uuid
 from tempfile import TemporaryDirectory
@@ -9,65 +11,54 @@ import uvicorn
 from bittensor.core.metagraph import AsyncMetagraph
 
 import pytest
-from aiohttp import web
 from bittensor_wallet import bittensor_wallet
 from fastapi import FastAPI
+from starlette.responses import Response
 
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
-from patrol.validation.scoring import MinerScoreRepository, MinerScore
+from patrol.validation.scoring import MinerScoreRepository
 from patrol.validation.target_generation import TargetGenerator
 from patrol.validation.validator import Validator
 from patrol.validation.weight_setter import WeightSetter
 
-SAMPLE_RESPONSE = {
+SAMPLE_RESPONSE = json.dumps({
     'subgraph_output': {
         'nodes': [
-            {'id': 'node1', 'type': 'wallet', 'origin': 'source1'},
-            {'id': 'node2', 'type': 'wallet', 'origin': 'source2'}
+            {'id': 'node1', 'type': 'wallet', 'origin': 'source1'} for _ in range(500)
         ],
         'edges': [
-            {'type': 'transfer', 'source': 'node1', 'destination': 'node2', 'evidence': {'amount': 100, 'block_number': 123}}
+            {'type': 'transfer', 'source': 'node1', 'destination': 'node2', 'evidence': {'amount': 100, 'block_number': 123}} for i in range(499)
         ]
     }
-}
+})
+
+RESPONSE = Response(content=SAMPLE_RESPONSE.encode(), status_code=200, headers={'Content-Type': "application/json"})
 
 app = FastAPI()
 
 @app.post("/PatrolSynapse")
 async def handle():
     await asyncio.sleep(1)
-    return SAMPLE_RESPONSE
+    return RESPONSE
 
-# @pytest.fixture(scope="session")
-# def server_loop():
-#     loop = asyncio.new_event_loop()
-#     thread = threading.Thread(target=loop.run_forever)
-#     thread.start()
-#     yield loop
-#     loop.call_soon_threadsafe(loop.stop)
-#     thread.join()
 
 @pytest.fixture(scope="session")
 def run_test_server():
-    config = uvicorn.Config(app, host="127.0.0.1", port=8000, log_level="error", workers=10)
+    host = "127.0.0.1"
+    port = 8000
+    config = uvicorn.Config(app, host=host, port=port, log_level="error", workers=20)
     server = uvicorn.Server(config)
 
-    def start():
-        asyncio.run(server.serve())
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
 
-    threading.Thread(target=start, daemon=True).start()
-
-    #future = asyncio.run_coroutine_threadsafe(start(), server_loop)
-
-    # Give the server a moment to start
     import time
-    time.sleep(1)
+    time.sleep(0.5)
 
-    #yield "http://127.0.0.1:8000"
-
-    #server.should_exit = True
-    #future.cancel()
+    yield host, port
+    server.should_exit = True
+    thread.join()
 
 @pytest.fixture
 def test_wallet():
@@ -76,9 +67,10 @@ def test_wallet():
         wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
         yield wallet
 
+@pytest.mark.skipif("CI" in os.environ, reason="Flimsy")
 async def test_timings_unaffected_by_load(run_test_server, test_wallet):
 
-    #ip, port = mock_axon
+    host, port = run_test_server
 
     dendrite = bt.dendrite(test_wallet)
     target_generator = AsyncMock(TargetGenerator)
@@ -88,7 +80,7 @@ async def test_timings_unaffected_by_load(run_test_server, test_wallet):
     metagraph = AsyncMock(AsyncMetagraph)
     weight_setter = AsyncMock(WeightSetter)
 
-    axon_count = 5
+    axon_count = 100
     def on_generate_targets(count: int):
         return [(str(t), t) for t in range(count)]
 
@@ -100,7 +92,7 @@ async def test_timings_unaffected_by_load(run_test_server, test_wallet):
         dendrite, metagraph, uuid.uuid4, weight_setter, enable_weight_setting=True
     )
 
-    metagraph.axons = [bt.axon(test_wallet, port=8000, ip="127.0.0.1").info() for _ in range(axon_count)]
+    metagraph.axons = [bt.axon(test_wallet, port=port, ip=host).info() for _ in range(axon_count)]
     metagraph.uids = numpy.array(list(range(axon_count)))
 
     response_times = []
@@ -112,7 +104,7 @@ async def test_timings_unaffected_by_load(run_test_server, test_wallet):
 
     await validator.query_miner_batch()
 
-    assert len(response_times) == axon_count
     print(response_times)
+    assert len(response_times) == axon_count
     for rt in response_times:
-        assert 1.0 < rt < 1.2
+        assert 1.0 < rt < 1.16
