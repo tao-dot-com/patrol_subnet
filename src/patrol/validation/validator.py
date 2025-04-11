@@ -178,7 +178,10 @@ async def start():
         logger.warning("Weight setting is not enabled.")
 
     wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
+
     engine = create_async_engine(DB_URL)
+    hooks.invoke(HookType.ON_CREATE_DB_ENGINE, engine)
+
     subtensor = bt.async_subtensor(NETWORK)
     miner_score_repository = DatabaseMinerScoreRepository(engine)
 
