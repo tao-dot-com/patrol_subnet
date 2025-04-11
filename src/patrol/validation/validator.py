@@ -8,7 +8,8 @@ import patrol
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
-from patrol.validation import auto_update
+from patrol.validation import auto_update, hooks
+from patrol.validation.hooks import HookType
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 from patrol.validation.scoring import MinerScoreRepository
@@ -221,6 +222,8 @@ async def start():
 
 def boot():
     try:
+        hooks.invoke(HookType.BEFORE_START)
+
         from patrol.validation.config import DB_URL
         migrate_db(DB_URL)
         asyncio.run(start())
