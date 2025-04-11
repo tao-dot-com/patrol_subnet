@@ -1,28 +1,10 @@
 import asyncio
-import logging
-
 import bittensor as bt
 
-from async_substrate_interface import AsyncSubstrateInterface
-from async_substrate_interface.async_substrate import Websocket
-
-class CustomAsyncSubstrateInterface(AsyncSubstrateInterface):
-    def __init__(self, url=None, ws=None, **kwargs):
-        """
-        Extends AsyncSubstrateInterface to allow injecting a custom websocket connection.
-        
-        Args:
-            url: the URI of the chain to connect to.
-            ws: Optional websocket connection to use. If provided, it overrides the default one.
-            **kwargs: any additional keyword arguments for the parent class.
-        """
-        # Initialize the parent class with all normal parameters.
-        super().__init__(url, **kwargs)
-        # Override the websocket connection if one is provided.
-        self.ws = ws
+from patrol.chain_data.custom_async_substrate_interface import CustomAsyncSubstrateInterface, CustomWebsocket
 
 class SubstrateClient:
-    def __init__(self, runtime_mappings: dict, network_url: str, websocket: Websocket = None, keepalive_interval: int = 20, max_retries: int = 3):
+    def __init__(self, runtime_mappings: dict, network_url: str, websocket: CustomWebsocket = None, max_retries: int = 3):
         """
         Args:
             runtime_mappings: A dict mapping group_id to runtime versions.
@@ -31,7 +13,6 @@ class SubstrateClient:
             max_retries: Number of times to retry a query before reinitializing the connection.
         """
         self.runtime_mappings = runtime_mappings
-        self.keepalive_interval = keepalive_interval
         self.max_retries = max_retries
         self.websocket = websocket
         self.substrate_cache = {}  # group_id -> AsyncSubstrateInterface
@@ -43,8 +24,9 @@ class SubstrateClient:
         """
         bt.logging.info("Initializing websocket connection.")
         if self.websocket is None:
-            self.websocket = Websocket(
+            self.websocket = CustomWebsocket(
                     self.network_url,
+                    shutdown_timer=300,
                     options={
                         "max_size": 2**32,
                         "write_limit": 2**16,
@@ -63,24 +45,6 @@ class SubstrateClient:
             self.substrate_cache[int(version)] = substrate
 
         bt.logging.info("Substrate client successfully initialized.")
-
-    async def _reinitialize_connection(self):
-        """
-        Reinitializes the websocket connection.
-        """
-        if self.websocket:
-            await self.websocket.shutdown()
-        
-        self.websocket = Websocket(
-                self.network_url,
-                options={
-                    "max_size": 2**32,
-                    "write_limit": 2**16,
-                },
-            )
-        
-        await self.websocket.connect(force=True)
-        bt.logging.info("Reinitialized websocket connection.")
 
     async def query(self, method_name: str, runtime_version: int = None, *args, **kwargs):
         """
@@ -118,9 +82,6 @@ class SubstrateClient:
                 else:
                     await asyncio.sleep(0.25)
 
-                    if attempt == self.max_retries - 2:
-                        await self._reinitialize_connection()
-            
         raise Exception(f"Query failed for version {runtime_version} after reinitialization attempts. Errors: {errors}")
     
     def return_runtime_versions(self):
