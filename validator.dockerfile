@@ -24,7 +24,7 @@ COPY src/patrol/constants.py ./src/patrol/constants.py
 COPY src/patrol/protocol.py ./src/patrol/protocol.py
 COPY src/patrol/__init__.py ./src/patrol/__init__.py
 COPY tests/validation ./tests/validation
-COPY src/logging.ini ./src
+COPY src/patrol/logging.ini ./src/patrol/logging.ini
 
 ARG SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0"
 RUN SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION} pip install -e '.[test]'
