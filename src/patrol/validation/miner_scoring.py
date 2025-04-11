@@ -116,7 +116,7 @@ class MinerScoring:
             responsiveness_score=0,
             response_time_seconds=0,
             novelty_score=None,
-            validation_passed=True,
+            validation_passed=False,
             error_message=error_message
         )
 
