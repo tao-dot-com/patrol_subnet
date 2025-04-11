@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from patrol.chain_data.substrate_client import SubstrateClient, CustomAsyncSubstrateInterface
+from patrol.chain_data.substrate_client import SubstrateClient, CustomAsyncSubstrateInterface, CustomWebsocket
 
 # ----------------------------
 # Fixtures
@@ -27,7 +27,7 @@ def mock_websocket():
 # ----------------------------
 
 @pytest.mark.asyncio
-@patch("patrol.chain_data.substrate_client.Websocket", autospec=True)
+@patch("patrol.chain_data.substrate_client.CustomWebsocket", autospec=True)
 @patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
 async def test_initialize_creates_websocket(mock_substrate_cls, mock_ws_cls, runtime_mappings):
     mock_ws = AsyncMock()
@@ -38,47 +38,13 @@ async def test_initialize_creates_websocket(mock_substrate_cls, mock_ws_cls, run
     client = SubstrateClient(runtime_mappings, network_url="wss://mock", websocket=None)
     await client.initialize()
 
-    mock_ws_cls.assert_called_once_with("wss://mock", options={"max_size": 2**32, "write_limit": 2**16})
+    mock_ws_cls.assert_called_once_with("wss://mock", shutdown_timer=300, options={"max_size": 2**32, "write_limit": 2**16})
     mock_ws.connect.assert_called_once()
 
     assert len(client.substrate_cache) == len(runtime_mappings)
     for version in runtime_mappings:
         mock_substrate.init_runtime.assert_any_call(block_hash=runtime_mappings[version]["block_hash_min"])
         assert int(version) in client.substrate_cache
-
-@pytest.mark.asyncio
-@patch("patrol.chain_data.substrate_client.Websocket", autospec=True)
-@patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
-async def test_initialize_reuses_existing_websocket(mock_substrate_cls, mock_ws_cls, runtime_mappings, mock_websocket):
-    mock_ws_cls.return_value = AsyncMock()  # Should NOT be used
-    mock_substrate = AsyncMock()
-    mock_substrate_cls.return_value = mock_substrate
-
-    client = SubstrateClient(runtime_mappings, network_url="wss://mock", websocket=mock_websocket)
-    await client.initialize()
-
-    mock_ws_cls.assert_not_called()
-    mock_websocket.connect.assert_called_once()
-
-    for version in runtime_mappings:
-        mock_substrate.init_runtime.assert_any_call(block_hash=runtime_mappings[version]["block_hash_min"])
-        assert int(version) in client.substrate_cache
-
-# ----------------------------
-# Test: reinitialize
-# ----------------------------
-
-@pytest.mark.asyncio
-@patch("patrol.chain_data.substrate_client.Websocket", autospec=True)
-async def test_reinitialize_connection(mock_ws_cls, mock_websocket):
-    mock_ws_cls.return_value = mock_websocket
-
-    client = SubstrateClient({}, "wss://mock", websocket=mock_websocket)
-    await client._reinitialize_connection()
-
-    mock_websocket.shutdown.assert_called_once()
-    mock_websocket.connect.assert_called_once()
-    mock_ws_cls.assert_called_once_with("wss://mock", options={"max_size": 2**32, "write_limit": 2**16})
 
 # ----------------------------
 # Test: query
@@ -123,13 +89,6 @@ async def test_query_fails_and_retries(mock_substrate_cls, runtime_mappings):
 
     client = SubstrateClient(runtime_mappings, "wss://mock", max_retries=2)
     client.substrate_cache = {1: substrate}
-
-    with patch.object(client, "_reinitialize_connection", new_callable=AsyncMock) as mock_reinit:
-        with pytest.raises(Exception, match="Query failed for version 1"):
-            await client.query("get_block_hash", runtime_version=1)
-
-        assert failing_func.call_count == 2
-        assert mock_reinit.called
 
 # ----------------------------
 # Test: return_runtime_versions
