@@ -3,7 +3,7 @@
 ## Hardware requirements
 Min spec:
 CPU: 2
-Memory: 4 GB
+Memory: 6 GB
 Disk space: 50 GB if running a local database, 20 GB if running an external database.
 
 ## Prerequsites
@@ -17,6 +17,8 @@ Be sure to create a wallet in advance following instructions from http://docs.bi
 Register your validator with the Patrol subnet using the following command  
 `btcli subnet register --netuid <UID> --wallet.name <YOUR_COLDKEY> --wallet.hotkey <YOUR_HOTKEY> --network <your_network>`  
 where `<your network>` is either 81 (Mainnet) or 275 (Testnet)
+
+**Note: running the validator on testnet is not yet supported.**
 
 ### 2. Install docker
 See (https://docs.docker.com/engine/install/)
@@ -57,7 +59,7 @@ services:
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
 ```
-#### 3.2 Postgres Database im docker (recommended for most validators)
+#### 3.2 Postgres Database in docker (recommended for most validators)
 ```
 services:
   db:
