@@ -3,6 +3,7 @@ from typing import Callable, Tuple, Any
 import uuid
 import bittensor as bt
 from aiohttp import TCPConnector
+from sqlalchemy.ext.asyncio import create_async_engine
 
 import patrol
 from patrol.chain_data.event_processor import EventProcessor
@@ -165,7 +166,8 @@ class Validator:
 async def start():
 
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
-                                          ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS, ENABLE_AUTO_UPDATE)
+                                          ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS,
+                                          ENABLE_AUTO_UPDATE, DB_URL)
 
     if ENABLE_AUTO_UPDATE:
         logger.info("Auto update is enabled")
@@ -176,7 +178,7 @@ async def start():
         logger.warning("Weight setting is not enabled.")
 
     wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
-    engine = patrol.validation.config.db_engine
+    engine = create_async_engine(DB_URL)
     subtensor = bt.async_subtensor(NETWORK)
     miner_score_repository = DatabaseMinerScoreRepository(engine)
 
