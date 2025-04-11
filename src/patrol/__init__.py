@@ -32,7 +32,7 @@ class PatrolJsonFormatter(JsonFormatter):
 
 import bittensor as bt
 bt.logging.enable_third_party_loggers()
-config.fileConfig(str(Path(__file__).parent.with_name("logging.ini")))
+config.fileConfig(str(Path(__file__).with_name("logging.ini")))
 
 from importlib.metadata import version
 logging.info("Patrol Subnet Validator. Version %s", version("patrol-subnet"))
