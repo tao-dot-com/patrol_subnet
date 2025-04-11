@@ -28,11 +28,17 @@ class WeightSetter:
         scores_to_convert = {k: v for k, v in overall_scores.items() if k in miners}
 
         sum_of_scores = sum(scores_to_convert.values())
-        overall_weights = {k: v / sum_of_scores for k, v in scores_to_convert.items()}
+        if sum_of_scores == 0:
+            return {}
 
+        overall_weights = {k: v / sum_of_scores for k, v in scores_to_convert.items()}
         return overall_weights
 
     async def set_weights(self, weights: dict[tuple[str, int], float]):
+        if not weights:
+            logger.info("No weights to set.")
+            return
+
         _, uids = zip(*weights.keys())
 
         weight_values = list(weights.values())
