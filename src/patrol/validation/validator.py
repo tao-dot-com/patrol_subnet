@@ -5,7 +5,6 @@ import bittensor as bt
 from aiohttp import TCPConnector
 from sqlalchemy.ext.asyncio import create_async_engine
 
-import patrol
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
@@ -76,10 +75,10 @@ class Validator:
                 json_response, response_time = await self._invoke_miner(url, processed_synapse)
 
             payload_subgraph = json_response['subgraph_output']
-            logger.info(f"Payload received for UID % in %s seconds.", uid, response_time)
+            logger.info(f"Payload received for UID %s in %s seconds.", uid, response_time)
 
             validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
-            logger.info(f"calculating coverage score for miner %s", uid)
+            logger.info(f"Calculating score for miner %s", uid)
             miner_score = await self.scoring_mechanism.calculate_score(
                 uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id
             )
