@@ -136,9 +136,12 @@ class BittensorValidationMechanism:
         size = {}
 
         def find(x: str) -> str:
-            if parent[x] != x:
-                parent[x] = find(parent[x])
-            return parent[x]
+            root = x
+            while parent[root] != root:
+                root = parent[root]
+            while x != root:
+                parent[x], x = root, parent[x]
+            return root
 
         def union(x: str, y: str):
             rootX = find(x)
