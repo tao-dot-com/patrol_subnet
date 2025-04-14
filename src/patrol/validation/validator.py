@@ -160,6 +160,10 @@ class Validator:
         batch_id = self.uuid_generator()
 
         await self.metagraph.sync()
+
+        if self.enable_weight_setting and await self.weight_setter.is_weight_setting_due():
+            await self._set_weights()
+
         axons = self.metagraph.axons
         uids = self.metagraph.uids.tolist()
 
@@ -176,9 +180,6 @@ class Validator:
                 tasks.append(self.query_miner(batch_id, uids[i], axon, target, max_block))
 
         await asyncio.gather(*tasks, return_exceptions=True)
-
-        if self.enable_weight_setting and await self.weight_setter.is_weight_setting_due():
-            await self._set_weights()
 
 
     async def _set_weights(self):
