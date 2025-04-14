@@ -202,7 +202,7 @@ async def start():
 
     wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
 
-    engine = create_async_engine(DB_URL)
+    engine = create_async_engine(DB_URL, pool_pre_ping=True)
     hooks.invoke(HookType.ON_CREATE_DB_ENGINE, engine)
 
     subtensor = bt.async_subtensor(NETWORK)
