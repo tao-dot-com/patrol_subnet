@@ -63,7 +63,7 @@ class SubstrateClient:
             The result of the query method.
         """
         if runtime_version is None:
-            logger.info("No runtime version provided, setting default.")
+            logger.debug("No runtime version provided, setting default.")
             runtime_version = max(self.substrate_cache.keys())
 
         if runtime_version not in self.substrate_cache:
