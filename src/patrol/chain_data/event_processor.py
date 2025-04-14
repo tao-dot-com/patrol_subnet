@@ -2,7 +2,6 @@ import logging
 import time
 from typing import List, Dict, Tuple
 import asyncio
-import bittensor as bt
 
 from bittensor.core.chain_data.utils import decode_account_id
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
@@ -259,8 +258,6 @@ if __name__ == "__main__":
 
     async def example():
 
-        bt.debug()
-        
         file_path = "raw_event_data.json"  # you will need to create this by running event_fetcher and saving the output.
         with open(file_path, "r") as f:
             data = json.load(f)

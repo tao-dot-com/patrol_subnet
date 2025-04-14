@@ -1,6 +1,5 @@
 import logging
 from typing import Dict, Any
-import bittensor as bt
 import asyncio
 import time
 import json
@@ -267,7 +266,6 @@ if __name__ == "__main__":
     from patrol.chain_data.coldkey_finder import ColdkeyFinder
     from patrol.chain_data.substrate_client import SubstrateClient
     from patrol.chain_data.runtime_groupings import load_versions
-    bt.debug()
 
     file_path = "example_subgraph_output.json"
     with open(file_path, "r") as f:

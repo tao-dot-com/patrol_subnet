@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, call
 
 from patrol.chain_data.runtime_groupings import get_version_for_block, group_blocks, VersionData
 
@@ -44,7 +44,7 @@ def test_group_blocks_basic():
     assert result[3] == [[(310, "hash_310"), (320, "hash_320")]]
 
 
-@patch("bittensor.logging.warning")
+@patch("patrol.chain_data.runtime_groupings.logger.warning")
 def test_group_blocks_with_out_of_range_blocks(mock_warning):
     block_numbers = [90, 150, 999]
     block_hashes = [f"hash_{b}" for b in block_numbers]
@@ -57,3 +57,7 @@ def test_group_blocks_with_out_of_range_blocks(mock_warning):
 
     # Ensure warning was called twice (for 90 and 999)
     assert mock_warning.call_count == 2
+    mock_warning.assert_has_calls([
+        call("Block 90 is outside current groupings."),
+        call("Block 999 is outside current groupings.")
+    ])

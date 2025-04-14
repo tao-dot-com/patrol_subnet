@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import List, Dict, Optional
 from pathlib import Path
-import bittensor as bt
+
+logger = logging.getLogger(__name__)
+
 
 # Define type aliases for clarity
 VersionRange = Dict[str, int]
@@ -77,7 +80,7 @@ def group_blocks(
         if group is not None:
             grouped.setdefault(group, []).append((block_number, block_hash))
         else:
-            bt.logging.warning(f"Block {block_number} is outside current groupings.")
+            logger.warning(f"Block {block_number} is outside current groupings.")
 
     batched: Dict[int, List[List[int]]] = {}
     for group_id, block_list in grouped.items():

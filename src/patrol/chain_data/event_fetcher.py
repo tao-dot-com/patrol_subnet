@@ -3,9 +3,10 @@ import logging
 import time
 from typing import Dict, List, Tuple, Any
 
-import bittensor as bt
 from async_substrate_interface import AsyncSubstrateInterface
 from patrol.chain_data.runtime_groupings import group_blocks
+
+logger = logging.getLogger(__name__)
 
 class EventFetcher:
     def __init__(self, substrate_client):
@@ -80,17 +81,17 @@ class EventFetcher:
         start_time = time.time()
 
         if not block_numbers:
-            bt.logging.warning("No block numbers provided. Returning empty event dictionary.")
+            logger.warning("No block numbers provided. Returning empty event dictionary.")
             return {}
         
         if any(not isinstance(b, int) for b in block_numbers):
-            bt.logging.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
+            logger.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
             return {}
 
         block_numbers = set(block_numbers)
 
         async with self.semaphore:
-            bt.logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
+            logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
 
             block_hash_tasks = [
                 self.substrate_client.query("get_block_hash", None, n)
@@ -106,17 +107,17 @@ class EventFetcher:
             all_events: Dict[int, Any] = {}
             for runtime_version, batches in grouped.items():
                 for batch in batches:
-                    bt.logging.debug(f"\nFetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
+                    logger.info(f"\nFetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
                     try:
                         events = await self.get_block_events(runtime_version, batch)
                         all_events.update(events)
-                        bt.logging.debug(f"Successfully fetched events for runtime version {runtime_version} batch.")
+                        logger.info(f"Successfully fetched events for runtime version {runtime_version} batch.")
                     except Exception as e:
-                        bt.logging.debug(
+                        logger.warning(
                             f"Unable to fetch events for runtime version {runtime_version} batch on final attempt: {e}. Continuing..."
                         )
         # Continue to next version even if the current one fails.
-        bt.logging.debug(f"All events collected in {time.time() - start_time} seconds.")
+        logger.info(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
 
 async def example():
@@ -141,11 +142,11 @@ async def example():
 
     for test_case in test_cases:
 
-        bt.logging.info("Starting next test case.")
+        logger.info("Starting next test case.")
 
         start_time = time.time()
         all_events = await fetcher.fetch_all_events(test_case, 50)
-        bt.logging.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
+        logger.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
         with open('raw_event_data.json', 'w') as file:
             json.dump(all_events, file, indent=4)
