@@ -5,11 +5,9 @@ from patrol.protocol import Node, Edge, GraphPayload, StakeEvidence, TransferEvi
 
 @pytest.mark.asyncio
 async def test_generate_block_numbers():
-    mock_fetcher = AsyncMock()
-    mock_fetcher.get_current_block.return_value = 6000000
 
-    gen = SubgraphGenerator(event_fetcher=mock_fetcher, event_processor=AsyncMock(), max_future_events=10, max_past_events=10)
-    result = await gen.generate_block_numbers(5000000, lower_block_limit=4990000)
+    gen = SubgraphGenerator(event_fetcher=AsyncMock(), event_processor=AsyncMock(), max_future_events=10, max_past_events=10)
+    result = await gen.generate_block_numbers(5000000, lower_block_limit=4990000, upper_block_limit=6000000)
 
     assert result[0] == 4999990
     assert result[-1] == 5000010

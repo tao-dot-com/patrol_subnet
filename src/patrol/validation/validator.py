@@ -73,12 +73,13 @@ class Validator:
         batch_id: UUID,
         uid: int,
         axon_info: bt.AxonInfo,
-        target_tuple: Tuple
+        target_tuple: Tuple,
+        max_block_number: int
     ) -> MinerScore:
-
+    
         try:
             async with self.miner_timing_semaphore:
-                synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1])
+                synapse = PatrolSynapse(target=target_tuple[0], target_block_number=target_tuple[1], max_block_number=max_block_number)
                 processed_synapse = self.dendrite.preprocess_synapse_for_request(axon_info, synapse)
                 url = self.dendrite._get_endpoint_url(axon_info, "PatrolSynapse")
                 json_response, response_time = await self._invoke_miner(url, processed_synapse)
@@ -86,7 +87,7 @@ class Validator:
             payload_subgraph = json_response['subgraph_output']
             logger.info(f"Payload received for UID %s in %s seconds.", uid, response_time)
 
-            validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0])
+            validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0], max_block_number=max_block_number)
             logger.info(f"Calculating score for miner %s", uid)
             miner_score = await self.scoring_mechanism.calculate_score(
                 uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id
@@ -163,6 +164,8 @@ class Validator:
         uids = self.metagraph.uids.tolist()
 
         targets = await self.target_generator.generate_targets(len(uids))
+        current_block = await self.target_generator.get_current_block()
+        max_block = current_block - 10 # provide a small buffer
 
         logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
 
@@ -170,7 +173,7 @@ class Validator:
         for i, axon in enumerate(axons):
             if axon.port != 0:
                 target = targets.pop()
-                tasks.append(self.query_miner(batch_id, uids[i], axon, target))
+                tasks.append(self.query_miner(batch_id, uids[i], axon, target, max_block))
 
         await asyncio.gather(*tasks, return_exceptions=True)
 

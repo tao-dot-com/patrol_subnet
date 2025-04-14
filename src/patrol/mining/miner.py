@@ -75,7 +75,7 @@ class Miner:
         bt.logging.info(f"Received request: {synapse.target}, with block number: {synapse.target_block_number}")
         start_time = time.time()
         future = run_coroutine_threadsafe(
-            self.subgraph_generator.run(synapse.target, synapse.target_block_number),
+            self.subgraph_generator.run(synapse.target, synapse.target_block_number, synapse.max_block_number),
             self.subgraph_loop
         )
         synapse.subgraph_output = future.result()

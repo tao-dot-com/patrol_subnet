@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 import asyncio
 import time
 import json
@@ -18,7 +18,7 @@ class BittensorValidationMechanism:
         self.event_fetcher = event_fetcher
         self.event_processer = event_processer
 
-    async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None) -> ErrorPayload | GraphPayload:
+    async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None, max_block_number: int = None) -> ErrorPayload | GraphPayload:
         start_time = time.time()
         logger.info(f"Starting validation process for uid: {uid}")
 
@@ -30,7 +30,7 @@ class BittensorValidationMechanism:
             self._verify_target_in_graph(target, graph_payload)
             self._verify_graph_connected(graph_payload)
 
-            await self._verify_edge_data(graph_payload)
+            await self._verify_edge_data(graph_payload, max_block_number)
 
         except SingleNodeResponse as e:
             logger.info(f"Validation skipped for uid {uid}: {e}")
@@ -180,26 +180,25 @@ class BittensorValidationMechanism:
         if len(roots) != 1:
             raise PayloadValidationError("Graph is not fully connected.")
     
-    async def _verify_block_ranges(self, block_numbers):
+    async def _verify_block_ranges(self, block_numbers: List[int], max_block_number: int):
 
-        current_block = await self.event_fetcher.get_current_block()
         min_block = constants.Constants.LOWER_BLOCK_LIMIT
 
-        invalid_blocks = [b for b in block_numbers if not (min_block <= b <= current_block)]
+        invalid_blocks = [b for b in block_numbers if not (min_block <= b <= max_block_number)]
         if invalid_blocks:
             raise PayloadValidationError(
                 f"Found {len(invalid_blocks)} invalid block(s) outside the allowed range "
-                f"[{min_block}, {current_block}]: {invalid_blocks}"
+                f"[{min_block}, {max_block_number}]: {invalid_blocks}"
             )
 
-    async def _verify_edge_data(self, graph_payload: GraphPayload):
+    async def _verify_edge_data(self, graph_payload: GraphPayload, max_block_number: int):
 
         block_numbers = []
 
         for edge in graph_payload.edges:
             block_numbers.append(edge.evidence.block_number)
-
-        await self._verify_block_ranges(block_numbers)
+        
+        await self._verify_block_ranges(block_numbers, max_block_number)
 
         events = await self.event_fetcher.fetch_all_events(block_numbers)
 
@@ -267,10 +266,6 @@ if __name__ == "__main__":
     from patrol.chain_data.substrate_client import SubstrateClient
     from patrol.chain_data.runtime_groupings import load_versions
 
-    file_path = "example_subgraph_output.json"
-    with open(file_path, "r") as f:
-        payload = json.load(f)
-
     async def main():
 
         network_url = "wss://archive.chain.opentensor.ai:443/"
@@ -284,9 +279,13 @@ if __name__ == "__main__":
         event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
         validator = BittensorValidationMechanism(fetcher, event_processor)
-        
+
+        file_path = "subgraph_output.json"
+        with open(file_path, "r") as f:
+            payload = json.load(f)
+
         # Run the validation
-        result = await validator.validate_payload(uid=1, payload=payload, target="5EPdHVcvKSMULhEdkfxtFohWrZbFQtFqwXherScM7B9F6DUD")
+        result = await validator.validate_payload(uid=1, payload=payload, target="5FyCncAf9EBU8Nkcm5gL1DQu3hVmY7aphiqRn3CxwoTmB1cZ", max_block_number=148469638)
             # bt.logging.info("Validated Payload:", result)
 
     asyncio.run(main())

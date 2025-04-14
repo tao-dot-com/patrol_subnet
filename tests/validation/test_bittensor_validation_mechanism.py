@@ -49,14 +49,13 @@ async def test_validate_payload_success(valid_payload):
             }
         }]
     }
-    event_fetcher.get_current_block.return_value = 3014348
 
     event_processer = AsyncMock()
     event_processer.process_event_data.return_value = list(event_fetcher.fetch_all_events.return_value.values())[0]
 
     validator = BittensorValidationMechanism(event_fetcher, event_processer)
 
-    result = await validator.validate_payload(uid=1, payload=valid_payload, target="B")
+    result = await validator.validate_payload(uid=1, payload=valid_payload, target="B", max_block_number=3014343)
 
     assert isinstance(result, GraphPayload)
     assert len(result.nodes) == 2
@@ -66,7 +65,7 @@ async def test_validate_payload_success(valid_payload):
 async def test_validate_payload_target_missing(valid_payload):
     validator = BittensorValidationMechanism(AsyncMock(), AsyncMock())
 
-    error = await validator.validate_payload(2, valid_payload, "Z")
+    error = await validator.validate_payload(2, valid_payload, "Z", max_block_number=3014343)
 
     assert isinstance(error, ErrorPayload)
     assert "Target not found" in error.message
@@ -123,14 +122,13 @@ async def test_verify_graph_connected_failure():
 async def test_verify_edge_data_missing_pass(valid_payload):
     event_fetcher = AsyncMock()
     event_fetcher.fetch_all_events.return_value = {3014342: []}
-    event_fetcher.get_current_block.return_value = 3014348
 
     event_processer = AsyncMock()
     event_processer.process_event_data.return_value = []
 
     validator = BittensorValidationMechanism(event_fetcher, event_processer)
 
-    success = await validator.validate_payload(1, valid_payload, "B")
+    success = await validator.validate_payload(1, valid_payload, "B", max_block_number=3014343)
 
     assert isinstance(success, GraphPayload)
 
@@ -157,7 +155,7 @@ async def test_verify_edge_fail(valid_payload):
 
     validator = BittensorValidationMechanism(event_fetcher, event_processer)
 
-    error = await validator.validate_payload(1, valid_payload, "B")
+    error = await validator.validate_payload(1, valid_payload, "B", max_block_number=3014343)
 
     assert isinstance(error, ErrorPayload)
     assert "edges not found" in error.message
@@ -165,12 +163,11 @@ async def test_verify_edge_fail(valid_payload):
 
 async def test_verify_block_ranges_out_of_bounds(valid_payload):
     event_fetcher = AsyncMock()
-    event_fetcher.get_current_block.return_value = 3000000  # BELOW edge block_number 3014342
     event_processer = AsyncMock()
 
     validator = BittensorValidationMechanism(event_fetcher, event_processer)
 
-    error = await validator.validate_payload(1, valid_payload, "B")
+    error = await validator.validate_payload(1, valid_payload, "B", max_block_number=3000000)
 
     assert isinstance(error, ErrorPayload)
     assert "invalid block(s) outside the allowed range" in error.message

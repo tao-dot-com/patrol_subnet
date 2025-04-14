@@ -59,7 +59,8 @@ async def test_miner(requests):
     target_generator = TargetGenerator(event_fetcher, event_processor)
 
     targets = await target_generator.generate_targets(REQUESTS)
-
+    current_block = await target_generator.get_current_block()
+    max_block_number = current_block - 10
     wallet_vali = bt.wallet(name="validator", hotkey="vali_1")
     wallet_vali.create_if_non_existent(False, False)
     dendrite = bt.dendrite(wallet=wallet_vali)
@@ -84,7 +85,7 @@ async def test_miner(requests):
 
     start_time = time.time()
 
-    tasks = [miner_validator.query_miner(uuid.uuid4(), 1, axon.info(), target) for target in targets]
+    tasks = [miner_validator.query_miner(uuid.uuid4(), 1, axon.info(), target, max_block_number=max_block_number) for target in targets]
 
     await asyncio.gather(*tasks, return_exceptions=True)
 

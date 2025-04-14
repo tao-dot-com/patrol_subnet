@@ -14,8 +14,11 @@ class TargetGenerator:
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
 
+    async def get_current_block(self) -> int:
+        return await self.event_fetcher.get_current_block()
+
     async def generate_random_block_tuples(self, num_targets: int = 1) -> List[int]:
-        current_block = await self.event_fetcher.get_current_block()
+        current_block = await self.get_current_block()
         start_block = random.randint(3_014_342, current_block - num_targets * 4 * 600)
         return [start_block + i * 500 for i in range(num_targets * 4)]
 
