@@ -91,7 +91,7 @@ class EventFetcher:
         block_numbers = set(block_numbers)
 
         async with self.semaphore:
-            logging.info(f"\nAttempting to fetch event data for {len(block_numbers)} blocks...")
+            logging.info(f"Attempting to fetch event data for {len(block_numbers)} blocks...")
 
             block_hash_tasks = [
                 self.substrate_client.query("get_block_hash", None, n)
@@ -107,7 +107,7 @@ class EventFetcher:
             all_events: Dict[int, Any] = {}
             for runtime_version, batches in grouped.items():
                 for batch in batches:
-                    logger.info(f"\nFetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
+                    logger.info(f"Fetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
                     try:
                         events = await self.get_block_events(runtime_version, batch)
                         all_events.update(events)
