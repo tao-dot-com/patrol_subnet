@@ -191,7 +191,7 @@ async def start():
 
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
                                           ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS,
-                                          ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES)
+                                          ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES, BATCH_CONCURRENCY)
 
     if ENABLE_AUTO_UPDATE:
         logger.info("Auto update is enabled")
@@ -233,7 +233,8 @@ async def start():
         uuid_generator=lambda: uuid.uuid4(),
         weight_setter=weight_setter,
         enable_weight_setting=ENABLE_WEIGHT_SETTING,
-        max_response_size_bytes=MAX_RESPONSE_SIZE_BYTES
+        max_response_size_bytes=MAX_RESPONSE_SIZE_BYTES,
+        concurrency=BATCH_CONCURRENCY
     )
 
 
