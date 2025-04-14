@@ -54,5 +54,6 @@ class PatrolSynapse(bt.Synapse):
 
     target: typing.Optional[str] = None
     target_block_number: typing.Optional[int] = None
+    max_block_number: typing.Optional[int] = None
 
     subgraph_output: typing.Optional[GraphPayload] = None

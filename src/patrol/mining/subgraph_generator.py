@@ -26,11 +26,9 @@ class SubgraphGenerator:
         self._batch_size = batch_size
         self.timeout = timeout
     
-    async def generate_block_numbers(self, target_block: int, lower_block_limit: int = Constants.LOWER_BLOCK_LIMIT) -> List[int]:
+    async def generate_block_numbers(self, target_block: int, upper_block_limit: int, lower_block_limit: int = Constants.LOWER_BLOCK_LIMIT) -> List[int]:
 
         bt.logging.info(f"Generating block numbers for target block: {target_block}")
-
-        upper_block_limit = await self.event_fetcher.get_current_block()
 
         start_block = max(target_block - self._max_past_events, lower_block_limit)
         end_block = min(target_block + self._max_future_events, upper_block_limit)
@@ -136,9 +134,9 @@ class SubgraphGenerator:
         return GraphPayload(nodes=nodes, edges=edges)
 
 
-    async def run(self, target_address:str, target_block:int):
+    async def run(self, target_address:str, target_block:int, max_block_number: int):
 
-        block_numbers = await self.generate_block_numbers(target_block)
+        block_numbers = await self.generate_block_numbers(target_block, upper_block_limit=max_block_number)
 
         events = await self.event_fetcher.fetch_all_events(block_numbers)
 
@@ -177,9 +175,16 @@ if __name__ == "__main__":
         event_processor = EventProcessor(coldkey_finder=coldkey_finder)
 
         subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, event_processor=event_processor, max_future_events=50, max_past_events=50, batch_size=50)
-        subgraph = await subgraph_generator.run(target, target_block)
+        subgraph = await subgraph_generator.run(target, target_block, max_block_number=4179351)
 
         volume = len(subgraph.nodes) + len(subgraph.edges)
+
+        import dataclasses
+        import json
+        output = dataclasses.asdict(subgraph)
+
+        with open("subgraph_output.json", "w") as f:
+            json.dump(output, f, indent=2)
 
         # bt.logging.info(output)
         bt.logging.info(f"Finished: {time.time() - start_time} with volume: {volume}")

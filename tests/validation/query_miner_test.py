@@ -83,7 +83,7 @@ async def test_persist_miner_score(mock_axon, test_wallet):
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, dendrite,
         metagraph, lambda: batch_id, AsyncMock(WeightSetter), enable_weight_setting=True
     )
-    await validator.query_miner(batch_id, uid, axon.info(), ("bar", 123))
+    await validator.query_miner(batch_id, uid, axon.info(), ("bar", 123), max_block_number=None)
 
     miner_score_repository_mock.add.assert_awaited_once_with(miner_score)
 
