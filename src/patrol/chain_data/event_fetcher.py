@@ -110,8 +110,9 @@ class EventFetcher:
                     logger.info(f"Fetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
                     try:
                         events = await self.get_block_events(runtime_version, batch)
+                        logger.info(f"Successfully fetched events for runtime version {runtime_version}. Updating...")
                         all_events.update(events)
-                        logger.info(f"Successfully fetched events for runtime version {runtime_version} batch.")
+                        logger.info(f"Updated events for runtime version {runtime_version}.")
                     except Exception as e:
                         logger.warning(
                             f"Unable to fetch events for runtime version {runtime_version} batch on final attempt: {e}. Continuing..."
@@ -152,6 +153,7 @@ async def example():
             json.dump(all_events, file, indent=4)
 
         # bt.logging.debug(all_events)
+
 
 if __name__ == "__main__":
     asyncio.run(example())
