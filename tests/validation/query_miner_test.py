@@ -149,7 +149,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository,
-        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True
+        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True,
     )
 
     await validator.query_miner_batch()
