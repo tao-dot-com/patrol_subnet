@@ -131,8 +131,7 @@ class Validator:
             if 'response_received' not in timings:
                 timings['response_received'] = time.perf_counter()
 
-        conn = TCPConnector(limit_per_host=self.concurrency, limit=self.concurrency)
-        async with aiohttp.ClientSession(connector=conn, trace_configs=[trace_config]) as session:
+        async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
 
             logger.info(f"Requesting url: {url}")
             async with session.post(
@@ -148,7 +147,7 @@ class Validator:
                         if len(buffer) > self.max_response_size_bytes:
                             raise ResponsePayloadTooLarge(f"Response payload too large: Aborted at {len(buffer)} bytes")
                 else:
-                    raise Exception("Bad response")
+                    raise Exception("Bad response status %s", response.status)
 
                 response_time = time.perf_counter() - timings["request_start"]
                 json_response = json.loads(buffer.decode('utf-8'))
