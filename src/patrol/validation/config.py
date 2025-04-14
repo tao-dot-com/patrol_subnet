@@ -16,3 +16,5 @@ ARCHIVE_SUBTENSOR = os.getenv('ARCHIVE_SUBTENSOR', "wss://archive.chain.opentens
 
 SCORING_INTERVAL_SECONDS = int(os.getenv('SCORING_INTERVAL_SECONDS', "600"))
 ENABLE_AUTO_UPDATE = os.getenv('ENABLE_AUTO_UPDATE', "0") == "1"
+
+MAX_RESPONSE_SIZE_BYTES = 1024 * 1024 * int(os.getenv('MAX_RESPONSE_SIZE_MB', "64"))

@@ -1,3 +1,4 @@
+import json
 from typing import Callable, Tuple, Any
 
 import uuid
@@ -34,6 +35,12 @@ from patrol.validation.weight_setter import WeightSetter
 
 logger = logging.getLogger(__name__)
 
+class ResponsePayloadTooLarge(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
 class Validator:
 
     def __init__(self,
@@ -46,7 +53,8 @@ class Validator:
         uuid_generator: Callable[[], UUID],
         weight_setter: WeightSetter,
         enable_weight_setting: bool,
-        concurrency: int = 10
+        concurrency: int = 10,
+        max_response_size_bytes = 64E9
     ):
         self.validation_mechanism = validation_mechanism
         self.scoring_mechanism = scoring_mechanism
@@ -59,6 +67,7 @@ class Validator:
         self.miner_timing_semaphore = asyncio.Semaphore(concurrency)
         self.enable_weight_setting = enable_weight_setting
         self.concurrency = concurrency
+        self.max_response_size_bytes = max_response_size_bytes
 
     async def query_miner(self,
         batch_id: UUID,
@@ -92,6 +101,9 @@ class Validator:
             elif isinstance(ex, TimeoutError):
                 logger.info(f"Timeout error for miner {uid}. Skipping.")
                 error_message = "Timeout"
+            elif isinstance(ex, ResponsePayloadTooLarge):
+                logger.info(f"Payload to large for miner {uid}. Skipping.")
+                error_message = ex.message
             else:
                 logger.info(f"Error for miner {uid}.  Skipping.  Error: {ex}")
                 error_message = "Unknown error"
@@ -128,8 +140,17 @@ class Validator:
                     json=processed_synapse.model_dump(),
                     timeout=Constants.MAX_RESPONSE_TIME
             ) as response:
-                json_response = await response.json()
-                response_time = timings['response_received'] - timings["request_start"]
+                buffer = bytearray()
+                if response.ok:
+                    async for chunk in response.content.iter_chunked(8092):
+                        buffer.extend(chunk)
+                        if len(buffer) > self.max_response_size_bytes:
+                            raise ResponsePayloadTooLarge(f"Response payload too large: Aborted at {len(buffer)} bytes")
+                else:
+                    raise Exception("Bad response")
+
+                response_time = time.perf_counter() - timings["request_start"]
+                json_response = json.loads(buffer.decode('utf-8'))
 
                 return json_response, response_time
 
@@ -166,7 +187,7 @@ async def start():
 
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
                                           ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS,
-                                          ENABLE_AUTO_UPDATE, DB_URL)
+                                          ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES)
 
     if ENABLE_AUTO_UPDATE:
         logger.info("Auto update is enabled")
@@ -207,7 +228,8 @@ async def start():
         metagraph=metagraph,
         uuid_generator=lambda: uuid.uuid4(),
         weight_setter=weight_setter,
-        enable_weight_setting=ENABLE_WEIGHT_SETTING
+        enable_weight_setting=ENABLE_WEIGHT_SETTING,
+        max_response_size_bytes=MAX_RESPONSE_SIZE_BYTES
     )
 
 
