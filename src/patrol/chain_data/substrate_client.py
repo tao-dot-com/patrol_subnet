@@ -1,7 +1,9 @@
 import asyncio
-import bittensor as bt
+import logging
 
 from patrol.chain_data.custom_async_substrate_interface import CustomAsyncSubstrateInterface, CustomWebsocket
+
+logger = logging.getLogger(__name__)
 
 class SubstrateClient:
     def __init__(self, runtime_mappings: dict, network_url: str, websocket: CustomWebsocket = None, max_retries: int = 3):
@@ -22,7 +24,7 @@ class SubstrateClient:
         """
         Initializes the websocket connection and loads metadata instances fol all runtime versions.
         """
-        bt.logging.info("Initializing websocket connection.")
+        logger.info("Initializing websocket connection.")
         if self.websocket is None:
             self.websocket = CustomWebsocket(
                     self.network_url,
@@ -36,7 +38,7 @@ class SubstrateClient:
         await self.websocket.connect(force=True)
 
         for version, mapping in self.runtime_mappings.items():
-            bt.logging.info(f"Initializing substrate instance for version: {version}.")
+            logger.info(f"Initializing substrate instance for version: {version}.")
 
             substrate = CustomAsyncSubstrateInterface(ws=self.websocket)
 
@@ -44,7 +46,7 @@ class SubstrateClient:
 
             self.substrate_cache[int(version)] = substrate
 
-        bt.logging.info("Substrate client successfully initialized.")
+        logger.info("Substrate client successfully initialized.")
 
     async def query(self, method_name: str, runtime_version: int = None, *args, **kwargs):
         """
@@ -61,7 +63,7 @@ class SubstrateClient:
             The result of the query method.
         """
         if runtime_version is None:
-            bt.logging.debug("No runtime version provided, setting default.")
+            logger.info("No runtime version provided, setting default.")
             runtime_version = max(self.substrate_cache.keys())
 
         if runtime_version not in self.substrate_cache:
@@ -76,7 +78,7 @@ class SubstrateClient:
                 return await query_func(*args, **kwargs)
             except Exception as e:
                 errors.append(e)
-                bt.logging.warning(f"Query error on version {runtime_version} attempt {attempt + 1}: {e}")
+                logger.warning(f"Query error on version {runtime_version} attempt {attempt + 1}: {e}")
                 if "429" in str(e):
                     await asyncio.sleep(2 * (attempt + 1))
                 else:
@@ -115,6 +117,6 @@ if __name__ == "__main__":
         await client.websocket.shutdown()
 
         block_hash = await client.query("get_block_hash", version, 3157275)
-        bt.logging.info(block_hash)
+        logger.info(block_hash)
     
     asyncio.run(example())
