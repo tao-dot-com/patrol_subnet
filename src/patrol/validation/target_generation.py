@@ -1,11 +1,13 @@
+import logging
 import random
 import time
 from typing import List, Tuple
 
-import bittensor as bt
-
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.event_fetcher import EventFetcher
+
+
+logger = logging.getLogger(__name__)
 
 class TargetGenerator:
     def __init__(self, event_fetcher: EventFetcher, event_processor: EventProcessor):
@@ -30,7 +32,7 @@ class TargetGenerator:
         return random.sample(list(target_set), min(number_targets, len(target_set)))
 
     async def generate_targets(self, num_targets: int = 1, retries: int = 3) -> List[Tuple[str, int]]:
-        bt.logging.debug(f"Fetching {num_targets} target addresses.")
+        logger.debug(f"Fetching {num_targets} target addresses.")
         start_time = time.time()
 
         block_numbers = await self.generate_random_block_tuples(num_targets)
@@ -47,7 +49,7 @@ class TargetGenerator:
         while len(target_tuples) < num_targets:
             target_tuples.append(random.choice(target_tuples))
 
-        bt.logging.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
+        logger.info(f"Returning {len(target_tuples)} targets, in {time.time() - start_time} seconds.")
         return target_tuples[:num_targets]
 
 if __name__ == "__main__":
@@ -60,7 +62,7 @@ if __name__ == "__main__":
 
     async def example():
 
-        bt.debug()
+        #bt.debug()
 
         network_url = "wss://archive.chain.opentensor.ai:443/"
         versions = load_versions()
@@ -76,6 +78,6 @@ if __name__ == "__main__":
 
         target_tuples = await target_generator.generate_targets(247)
 
-        bt.logging.info(f"Returned: {len(target_tuples)} targets.")
+        logging.info(f"Returned: {len(target_tuples)} targets.")
 
     asyncio.run(example())
