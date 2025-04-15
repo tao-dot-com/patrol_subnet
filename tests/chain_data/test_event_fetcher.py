@@ -140,3 +140,54 @@ async def test_fetch_all_events_success(monkeypatch):
     # Assert: Expect a mapping from block number to the fake event.
     expected = {3100000: "fake_event_for_hash3100000", 3200000: "fake_event_for_hash3200000"}
     assert events == expected
+
+@pytest.mark.asyncio
+async def test_stream_all_events_success(monkeypatch):
+    # Arrange
+    block_numbers = [3100000, 3200000, 3300000]
+    block_hashes = [f"hash{n}" for n in block_numbers]
+    expected_result = {
+        3100000: "event_for_hash3100000",
+        3200000: "event_for_hash3200000",
+        3300000: "event_for_hash3300000"
+    }
+
+    fake_substrate_client = MagicMock()
+    fake_substrate_client.query = AsyncMock(side_effect=lambda method, _, n=None: {
+        "get_block_hash": f"hash{n}",
+        "get_block": {"header": {"number": 6000000}}
+    }[method])
+
+    fake_substrate_client.return_runtime_versions = MagicMock(return_value={6: "version6"})
+
+    ef = EventFetcher(fake_substrate_client)
+    ef.get_block_events = AsyncMock(side_effect=lambda ver, batch: {
+        n: f"event_for_hash{n}" for n, _ in batch
+    })
+
+    # Patch group_blocks to control batching
+    def fake_group_blocks(block_nums, hashes, current_block, versions, batch_size):
+        return {6: [[(n, f"hash{n}") for n in block_nums]]}
+    monkeypatch.setattr("patrol.chain_data.event_fetcher.group_blocks", fake_group_blocks)
+
+    # Act
+    result_batches = []
+    async for batch in ef.stream_all_events(block_numbers, batch_size=3):
+        result_batches.append(batch)
+
+    # Assert
+    assert len(result_batches) == 1
+    assert result_batches[0] == expected_result
+    ef.get_block_events.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_stream_all_events_empty_input():
+    ef = EventFetcher(MagicMock())
+    result = [batch async for batch in ef.stream_all_events([])]
+    assert result == []
+
+@pytest.mark.asyncio
+async def test_stream_all_events_invalid_input():
+    ef = EventFetcher(MagicMock())
+    result = [batch async for batch in ef.stream_all_events(["abc", 123])]
+    assert result == []

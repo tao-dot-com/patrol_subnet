@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple, Any, AsyncGenerator
 
 from async_substrate_interface import AsyncSubstrateInterface
 from patrol.chain_data.runtime_groupings import group_blocks
@@ -91,7 +91,7 @@ class EventFetcher:
         block_numbers = set(block_numbers)
 
         async with self.semaphore:
-            logging.info(f"Attempting to fetch event data for {len(block_numbers)} blocks...")
+            logger.info(f"Attempting to fetch event data for {len(block_numbers)} blocks...")
 
             block_hash_tasks = [
                 self.substrate_client.query("get_block_hash", None, n)
@@ -121,6 +121,53 @@ class EventFetcher:
         logger.info(f"All events collected in {time.time() - start_time} seconds.")
         return all_events
 
+    async def stream_all_events(
+            self,
+            block_numbers: List[int],
+            batch_size: int = 25,
+        ) -> AsyncGenerator[Dict[int, Any], None]:
+            """
+            Stream events for given blocks, yielding each batch as it's fetched.
+            Stops yielding if the total timeout is exceeded.
+            """
+
+            if not block_numbers:
+                logger.warning("No block numbers provided. Nothing to yield.")
+                return
+
+            if any(not isinstance(b, int) for b in block_numbers):
+                logger.warning("Non-integer value found in block_numbers. Nothing to yield.")
+                return
+
+            block_numbers = set(block_numbers)
+
+            async with self.semaphore:
+                logger.info(f"\nAttempting to stream event data for {len(block_numbers)} blocks...")
+
+                try:
+                    block_hash_tasks = [
+                        self.substrate_client.query("get_block_hash", None, n)
+                        for n in block_numbers
+                    ]
+                    block_hashes = await asyncio.gather(*block_hash_tasks)
+                except Exception as e:
+                    logger.warning(f"Failed to retrieve block hashes: {e}")
+                    return
+
+                current_block = await self.get_current_block()
+                versions = self.substrate_client.return_runtime_versions()
+                grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
+
+                for runtime_version, batches in grouped.items():
+                    for batch in batches:
+                        logger.debug(f"Fetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
+                        try:
+                            events = await self.get_block_events(runtime_version, batch)
+                            logger.debug(f"Yielding {len(events)} events from batch.")
+                            yield events 
+                        except Exception as e:
+                            logger.debug(f"Skipping failed batch due to error: {e}")
+
 async def example():
 
     import json
@@ -131,13 +178,17 @@ async def example():
     network_url = "wss://archive.chain.opentensor.ai:443/"
     versions = load_versions()
     
+    keys_to_keep = {"257"}
+    versions = {k: versions[k] for k in keys_to_keep if k in versions}
+    
     client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
     await client.initialize()
 
     fetcher = EventFetcher(substrate_client=client)
 
     test_cases = [
-        [5163655 + i for i in range(1000)],
+        # [3014340 + i for i in range(1000)],
+        [5255099 + i for i in range(1000)]
         # [3804341 + i for i in range(1000)]    # high volume
     ]
 
