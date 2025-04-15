@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict, List, Tuple, Any, AsyncGenerator
+from typing import Dict, Iterable, List, Tuple, Any, AsyncGenerator
 
 from async_substrate_interface import AsyncSubstrateInterface
 from patrol.chain_data.runtime_groupings import group_blocks
@@ -123,7 +123,7 @@ class EventFetcher:
 
     async def stream_all_events(
             self,
-            block_numbers: List[int],
+            block_numbers: Iterable[int],
             batch_size: int = 25,
         ) -> AsyncGenerator[Dict[int, Any], None]:
             """

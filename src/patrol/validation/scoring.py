@@ -5,6 +5,12 @@ from typing import Optional, Iterable
 from datetime import datetime
 
 @dataclass(frozen=True)
+class ValidationResult:
+    validated: bool
+    message: str
+    volume: int
+
+@dataclass(frozen=True)
 class MinerScore:
     id: uuid.UUID
     batch_id: uuid.UUID
