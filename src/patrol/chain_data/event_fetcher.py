@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 class EventFetcher:
     def __init__(self, substrate_client):
         self.substrate_client = substrate_client
-        self.semaphore = asyncio.Semaphore(1)
   
     async def get_current_block(self) -> int:
         current_block = await self.substrate_client.query("get_block", None)
@@ -122,52 +121,70 @@ class EventFetcher:
         return all_events
 
     async def stream_all_events(
-            self,
-            block_numbers: Iterable[int],
-            batch_size: int = 25,
-        ) -> AsyncGenerator[Dict[int, Any], None]:
-            """
-            Stream events for given blocks, yielding each batch as it's fetched.
-            Stops yielding if the total timeout is exceeded.
-            """
+        self,
+        block_numbers: Iterable[int],
+        queue: asyncio.Queue,
+        batch_size: int = 25,
+    ) -> None:
+        """
+        Streams events into a queue. Each batch of events is put into the queue as it's fetched.
+        """
+        if not block_numbers:
+            logger.warning("No block numbers provided. Nothing to yield.")
+            await queue.put(None)
+            return
 
-            if not block_numbers:
-                logger.warning("No block numbers provided. Nothing to yield.")
-                return
+        if any(not isinstance(b, int) for b in block_numbers):
+            logger.warning("Non-integer value found in block_numbers. Nothing to yield.")
+            await queue.put(None)
+            return
 
-            if any(not isinstance(b, int) for b in block_numbers):
-                logger.warning("Non-integer value found in block_numbers. Nothing to yield.")
-                return
+        block_numbers = set(block_numbers)
+        logger.info(f"\nAttempting to stream event data for {len(block_numbers)} blocks...")
 
-            block_numbers = set(block_numbers)
+        hash_semaphore = asyncio.Semaphore(20)
 
-            async with self.semaphore:
-                logger.info(f"\nAttempting to stream event data for {len(block_numbers)} blocks...")
+        async def safe_get_block_hash(n: int) -> str | None:
+            try:
+                async with hash_semaphore:
+                    return await self.substrate_client.query("get_block_hash", None, n)
+            except Exception as e:
+                logger.warning(f"Failed to retrieve block hash for block {n}: {e}")
+                return None
 
+        block_hashes = await asyncio.gather(*[safe_get_block_hash(n) for n in block_numbers])
+        current_block = await self.get_current_block()
+        versions = self.substrate_client.return_runtime_versions()
+        grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
+
+        fetch_semaphore = asyncio.Semaphore(1)
+
+        async def fetch_and_return_events(runtime_version, batch, timeout=2):
+            async with fetch_semaphore:
                 try:
-                    block_hash_tasks = [
-                        self.substrate_client.query("get_block_hash", None, n)
-                        for n in block_numbers
-                    ]
-                    block_hashes = await asyncio.gather(*block_hash_tasks)
+                    logger.debug(f"Fetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
+                    events = await asyncio.wait_for(
+                        self.get_block_events(runtime_version, batch),
+                        timeout=timeout
+                    )
+                    logger.debug(f"Yielding {len(events)} events from batch.")
+                    if events is not None:
+                        await queue.put(events)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout while fetching events for runtime version {runtime_version}, batch of size {len(batch)}")
                 except Exception as e:
-                    logger.warning(f"Failed to retrieve block hashes: {e}")
-                    return
+                    logger.warning(f"Skipping failed batch due to error: {e}")
 
-                current_block = await self.get_current_block()
-                versions = self.substrate_client.return_runtime_versions()
-                grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
+        # Launch all batch tasks
+        tasks = [
+            fetch_and_return_events(runtime_version, batch)
+            for runtime_version, batches in grouped.items()
+            for batch in batches
+        ]
+        await asyncio.gather(*tasks)
 
-                for runtime_version, batches in grouped.items():
-                    for batch in batches:
-                        logger.debug(f"Fetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
-                        try:
-                            events = await self.get_block_events(runtime_version, batch)
-                            logger.debug(f"Yielding {len(events)} events from batch.")
-                            yield events 
-                        except Exception as e:
-                            logger.debug(f"Skipping failed batch due to error: {e}")
-
+        await queue.put(None)
+            
 async def example():
 
     import json
@@ -197,11 +214,19 @@ async def example():
         logger.info("Starting next test case.")
 
         start_time = time.time()
-        all_events = await fetcher.fetch_all_events(test_case, 50)
-        logger.info(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
+        all_events = []
+        async for events in fetcher.stream_all_events(
+                test_case,
+                25
+            ): 
+            all_events.extend(events)
 
-        with open('raw_event_data.json', 'w') as file:
-            json.dump(all_events, file, indent=4)
+        print(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
+        # all_events = await fetcher.fetch_all_events(test_case, 50)
+        # 
+
+        # with open('raw_event_data.json', 'w') as file:
+        #     json.dump(all_events, file, indent=4)
 
         # bt.logging.debug(all_events)
 

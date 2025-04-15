@@ -15,7 +15,7 @@ class EventProcessor:
             coldkey_finder: An instance of ColdkeyFinder to resolve coldkey owners.
         """
         self.coldkey_finder = coldkey_finder
-        self.semaphore = asyncio.Semaphore(25)
+        self.semaphore = asyncio.Semaphore(20)
 
     @staticmethod
     def format_address(addr: List) -> str:
