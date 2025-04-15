@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict, Iterable, List, Tuple, Any, AsyncGenerator
+from typing import Dict, Iterable, List, Tuple, Any
 
 from async_substrate_interface import AsyncSubstrateInterface
 from patrol.chain_data.runtime_groupings import group_blocks
@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 class EventFetcher:
     def __init__(self, substrate_client):
         self.substrate_client = substrate_client
+        self.hash_semaphore = asyncio.Semaphore(20)
+        self.event_semaphore = asyncio.Semaphore(1)
   
     async def get_current_block(self) -> int:
         current_block = await self.substrate_client.query("get_block", None)
@@ -89,7 +91,7 @@ class EventFetcher:
 
         block_numbers = set(block_numbers)
 
-        async with self.semaphore:
+        async with self.event_semaphore:
             logger.info(f"Attempting to fetch event data for {len(block_numbers)} blocks...")
 
             block_hash_tasks = [
@@ -142,11 +144,9 @@ class EventFetcher:
         block_numbers = set(block_numbers)
         logger.info(f"\nAttempting to stream event data for {len(block_numbers)} blocks...")
 
-        hash_semaphore = asyncio.Semaphore(20)
-
         async def safe_get_block_hash(n: int) -> str | None:
             try:
-                async with hash_semaphore:
+                async with self.hash_semaphore:
                     return await self.substrate_client.query("get_block_hash", None, n)
             except Exception as e:
                 logger.warning(f"Failed to retrieve block hash for block {n}: {e}")
@@ -157,10 +157,8 @@ class EventFetcher:
         versions = self.substrate_client.return_runtime_versions()
         grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
 
-        fetch_semaphore = asyncio.Semaphore(1)
-
         async def fetch_and_return_events(runtime_version, batch, timeout=2):
-            async with fetch_semaphore:
+            async with self.event_semaphore:
                 try:
                     logger.debug(f"Fetching events for runtime version {runtime_version} (batch of {len(batch)} blocks)...")
                     events = await asyncio.wait_for(
@@ -186,8 +184,6 @@ class EventFetcher:
         await queue.put(None)
             
 async def example():
-
-    import json
 
     from patrol.chain_data.substrate_client import SubstrateClient
     from patrol.chain_data.runtime_groupings import load_versions
@@ -222,14 +218,6 @@ async def example():
             all_events.extend(events)
 
         print(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
-        # all_events = await fetcher.fetch_all_events(test_case, 50)
-        # 
-
-        # with open('raw_event_data.json', 'w') as file:
-        #     json.dump(all_events, file, indent=4)
-
-        # bt.logging.debug(all_events)
-
 
 if __name__ == "__main__":
     asyncio.run(example())

@@ -10,7 +10,6 @@ class TransferEvidence:
 
 @dataclass(slots=True)
 class StakeEvidence:
-
     block_number: int
     rao_amount: int
     destination_net_uid: Optional[int] = field(default=None)
@@ -28,7 +27,6 @@ class StakeEvidence:
 
 @dataclass(slots=True)
 class Edge:
-
     coldkey_source: str
     coldkey_destination: str
     category: str
@@ -38,7 +36,6 @@ class Edge:
 
 @dataclass(slots=True)
 class Node:
-
     id: str
     type: str
     origin: str

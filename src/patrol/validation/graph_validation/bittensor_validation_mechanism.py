@@ -1,7 +1,7 @@
 import logging
 from collections import deque
 from typing import Tuple, Iterable, Deque
-from typing import Dict, Any, Iterable, List, Tuple
+from typing import Dict, Any, List
 import asyncio
 import time
 import json
@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 
 class BittensorValidationMechanism:
 
-    def __init__(self,  event_fetcher: EventFetcher, event_processor: EventProcessor):
+    def __init__(self,  event_fetcher: EventFetcher, event_processor: EventProcessor, buffer_size: int = 500):
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
+        self.buffer_size = buffer_size
 
     async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None, max_block_number: int = None) -> ValidationResult:
         start_time = time.time()
@@ -195,13 +196,9 @@ class BittensorValidationMechanism:
                 f"Found {len(invalid_blocks)} invalid block(s) outside the allowed range "
                 f"[{min_block}, {max_block_number}]: {invalid_blocks}"
             )
-
-    async def _fetch_event_keys(self, block_numbers: Iterable[int]) -> Tuple[set, set]:
-        event_keys = set()
-        validation_block_numbers = set()
-        queue = asyncio.Queue()
-
-        def _make_event_key(event: dict) -> Tuple:
+    
+    @staticmethod
+    def _make_event_key(event: dict) -> Tuple:
             evidence = event.get('evidence', {})
             event_dict = {
                 "coldkey_source": event.get("coldkey_source"),
@@ -219,6 +216,11 @@ class BittensorValidationMechanism:
             }
             return tuple(sorted(event_dict.items())), evidence.get("block_number")
 
+    async def _fetch_event_keys(self, block_numbers: Iterable[int]) -> Tuple[set[Tuple], set[int]]:
+        event_keys = set()
+        validation_block_numbers = set()
+        queue = asyncio.Queue()
+
         async def process_buffered_events(buffer: Deque[Tuple[int, Any]]) -> None:
             if not buffer:
                 return
@@ -226,13 +228,12 @@ class BittensorValidationMechanism:
             processed_batch = await self.event_processor.process_event_data(to_process)
             logger.info(f"Received and processed {len(processed_batch)} events.")
             for event in processed_batch:
-                key, block_number = _make_event_key(event)
+                key, block_number = self._make_event_key(event)
                 event_keys.add(key)
                 validation_block_numbers.add(block_number)
 
         async def consumer_event_queue() -> None:
             buffer: Deque[Tuple[int, Any]] = deque()
-            batch_size = 500
 
             while True:
                 events = await queue.get()
@@ -240,8 +241,8 @@ class BittensorValidationMechanism:
                     break
 
                 buffer.extend(events.items())
-                while len(buffer) >= batch_size:
-                    temp_buffer = deque(buffer.popleft() for _ in range(batch_size))
+                while len(buffer) >= self.buffer_size:
+                    temp_buffer = deque(buffer.popleft() for _ in range(self.buffer_size))
                     await process_buffered_events(temp_buffer)
 
             await process_buffered_events(buffer)
@@ -325,8 +326,8 @@ if __name__ == "__main__":
         with open(file_path, "r") as f:
             payload = json.load(f)
 
-        # Run the validation
-        result = await validator.validate_payload(uid=1, payload=payload, target="5Ck5g3MaG7Ho29ZqmcTFgq8zTxmnrwxs6FR94RsCEquT6nLy", max_block_number=5352419)
-        logger.info(f"Validated Payload: {result.validated}")
+        tasks = [validator.validate_payload(uid=1, payload=payload, target="5Ck5g3MaG7Ho29ZqmcTFgq8zTxmnrwxs6FR94RsCEquT6nLy", max_block_number=5352419) for _ in range(8)]
+
+        await asyncio.gather(*tasks)
 
     asyncio.run(main())

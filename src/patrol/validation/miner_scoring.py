@@ -5,9 +5,7 @@ import uuid
 from datetime import datetime, UTC
 from uuid import UUID
 
-from patrol.protocol import GraphPayload
-from patrol.validation.graph_validation.errors import ErrorPayload
-from patrol.validation.scoring import MinerScore, MinerScoreRepository
+from patrol.validation.scoring import MinerScore, MinerScoreRepository, ValidationResult
 from patrol.constants import Constants
 
 logger = logging.getLogger(__name__)
@@ -37,7 +35,7 @@ class MinerScoring:
         uid: int,
         coldkey: str,
         hotkey: str,
-        payload: GraphPayload | ErrorPayload,
+        validation_result: ValidationResult,
         response_time: float,
         batch_id: UUID,
         moving_average_denominator: int = 20
@@ -45,8 +43,8 @@ class MinerScoring:
 
         previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), moving_average_denominator - 1)
 
-        if isinstance(payload, ErrorPayload):
-            logger.warning(f"Zero score added to records for {uid}, reason: {payload.message}.")
+        if not validation_result.validated:
+            logger.warning(f"Zero score added to records for {uid}, reason: {validation_result.message}.")
             return MinerScore(
                 id=uuid.uuid4(),
                 batch_id=batch_id,
@@ -62,11 +60,10 @@ class MinerScoring:
                 response_time_seconds=response_time,
                 novelty_score=None,
                 validation_passed=False,
-                error_message=payload.message
+                error_message=validation_result.message
             )
 
-        volume = len(payload.nodes) + len(payload.edges)
-        volume_score = self.calculate_volume_score(volume)
+        volume_score = self.calculate_volume_score(validation_result.volume)
         responsiveness_score = self.calculate_responsiveness_score(response_time)
 
         overall_score = sum([
@@ -86,7 +83,7 @@ class MinerScoring:
             overall_score_moving_average=(sum(previous_overall_scores) + overall_score) / moving_average_denominator,
             overall_score=overall_score,
             volume_score=volume_score,
-            volume=volume,
+            volume=validation_result.volume,
             responsiveness_score=responsiveness_score,
             response_time_seconds=response_time,
             novelty_score=None,
