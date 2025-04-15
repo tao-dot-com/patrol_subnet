@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ def group_blocks(
     current_block: int,
     versions: VersionData,
     batch_size: int = 25
-) -> Dict[int, List[List[int]]]:
+) -> Dict[int, List[List[Tuple[int, str]]]]:
     """
     Groups blocks by version and splits each group into batches.
 
