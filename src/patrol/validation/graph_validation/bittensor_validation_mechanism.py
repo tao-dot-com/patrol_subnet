@@ -1,5 +1,6 @@
 import logging
-import re
+from collections import deque
+from typing import Tuple, Iterable, Deque
 from typing import Dict, Any, Iterable, List, Tuple
 import asyncio
 import time
@@ -194,46 +195,61 @@ class BittensorValidationMechanism:
                 f"Found {len(invalid_blocks)} invalid block(s) outside the allowed range "
                 f"[{min_block}, {max_block_number}]: {invalid_blocks}"
             )
-        
+
     async def _fetch_event_keys(self, block_numbers: Iterable[int]) -> Tuple[set, set]:
         event_keys = set()
         validation_block_numbers = set()
         queue = asyncio.Queue()
 
-        async def consumer_event_queue():
+        def _make_event_key(event: dict) -> Tuple:
+            evidence = event.get('evidence', {})
+            event_dict = {
+                "coldkey_source": event.get("coldkey_source"),
+                "coldkey_destination": event.get("coldkey_destination"),
+                "coldkey_owner": event.get("coldkey_owner"),
+                "category": event.get("category"),
+                "type": event.get("type"),
+                "rao_amount": evidence.get("rao_amount"),
+                "block_number": evidence.get("block_number"),
+                "destination_net_uid": evidence.get("destination_net_uid"),
+                "source_net_uid": evidence.get("source_net_uid"),
+                "alpha_amount": evidence.get("alpha_amount"),
+                "delegate_hotkey_source": evidence.get("delegate_hotkey_source"),
+                "delegate_hotkey_destination": evidence.get("delegate_hotkey_destination"),
+            }
+            return tuple(sorted(event_dict.items())), evidence.get("block_number")
+
+        async def process_buffered_events(buffer: Deque[Tuple[int, Any]]) -> None:
+            if not buffer:
+                return
+            to_process = dict(buffer)
+            processed_batch = await self.event_processor.process_event_data(to_process)
+            logger.info(f"Received and processed {len(processed_batch)} events.")
+            for event in processed_batch:
+                key, block_number = _make_event_key(event)
+                event_keys.add(key)
+                validation_block_numbers.add(block_number)
+
+        async def consumer_event_queue() -> None:
+            buffer: Deque[Tuple[int, Any]] = deque()
+            batch_size = 500
+
             while True:
                 events = await queue.get()
                 if events is None:
                     break
 
-                processed_batch = await self.event_processor.process_event_data(events)
-                logger.info(f"Received and processed {len(processed_batch)} events.")
+                buffer.extend(events.items())
+                while len(buffer) >= batch_size:
+                    temp_buffer = deque(buffer.popleft() for _ in range(batch_size))
+                    await process_buffered_events(temp_buffer)
 
-                for event in processed_batch:
-                    evidence = event.get('evidence', {})
-                    event_dict = {
-                        "coldkey_source": event.get("coldkey_source"),
-                        "coldkey_destination": event.get("coldkey_destination"),
-                        "coldkey_owner": event.get("coldkey_owner"),
-                        "category": event.get("category"),
-                        "type": event.get("type"),
-                        "rao_amount": evidence.get("rao_amount"),
-                        "block_number": evidence.get("block_number"),
-                        "destination_net_uid": evidence.get("destination_net_uid"),
-                        "source_net_uid": evidence.get("source_net_uid"),
-                        "alpha_amount": evidence.get("alpha_amount"),
-                        "delegate_hotkey_source": evidence.get("delegate_hotkey_source"),
-                        "delegate_hotkey_destination": evidence.get("delegate_hotkey_destination"),
-                    }
-                    event_keys.add(tuple(sorted(event_dict.items())))
-                    validation_block_numbers.add(evidence.get("block_number"))
+            await process_buffered_events(buffer)
 
-        # Launch producer and consumer concurrently
         producer_task = asyncio.create_task(self.event_fetcher.stream_all_events(block_numbers, queue, batch_size=25))
         consumer_task = asyncio.create_task(consumer_event_queue())
 
         await asyncio.gather(producer_task, consumer_task)
-
         return event_keys, validation_block_numbers
 
     async def _verify_edge_data(self, graph_payload: GraphPayload, max_block_number: int):
@@ -277,8 +293,8 @@ class BittensorValidationMechanism:
                 else:
                     missing_edges += 1  # Block was fetched, but the edge did not match any event
 
-        # if missing_edges != 0:
-        #     raise PayloadValidationError(f"{missing_edges} edges not found in on-chain events.")
+        if missing_edges != 0:
+            raise PayloadValidationError(f"{missing_edges} edges not found in on-chain events.")
 
         logger.debug("All edges matched with on-chain events.")
 
