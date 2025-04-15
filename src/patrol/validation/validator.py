@@ -87,10 +87,10 @@ class Validator:
                 payload_subgraph = json_response['subgraph_output']
                 logger.info(f"Payload received for UID %s in %s seconds.", uid, response_time)
 
-                validation_results = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0], max_block_number=max_block_number)
+                validation_result = await self.validation_mechanism.validate_payload(uid, payload_subgraph, target=target_tuple[0], max_block_number=max_block_number)
                 logger.info(f"Calculating score for miner %s", uid)
                 miner_score = await self.scoring_mechanism.calculate_score(
-                    uid, axon_info.coldkey, axon_info.hotkey, validation_results, response_time, batch_id
+                    uid, axon_info.coldkey, axon_info.hotkey, validation_result, response_time, batch_id
                 )
         except Exception as ex:
             if isinstance(ex, aiohttp.ClientConnectorError):

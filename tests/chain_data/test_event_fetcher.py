@@ -103,91 +103,117 @@ async def test_fetch_all_events_empty_and_invalid_input():
 
 @pytest.mark.asyncio
 async def test_fetch_all_events_success(monkeypatch):
-    # Arrange: use a list of block numbers.
     block_numbers = [3100000, 3200000]
-
-    fake_preprocessed = FakePreprocessed()
-
-    async def fake_query(method_name, version, *args, **kwargs):
-        if method_name == "get_block":
-            return {"header": {"number": 6000000}}
-        if method_name == "_preprocess":
-            return fake_preprocessed
-        elif method_name == "_make_rpc_request":
-            # Build a fake response mapping:
-            response = {}
-            for arg in args[0]:
-                key = arg['id']
-                response[key] = [f"fake_event_for_{key}"]
-            return response
-        else:
-            return None
-
-    fake_substrate_client = MagicMock()
-    fake_substrate_client.query = AsyncMock(side_effect=fake_query)
-    
-    # For grouping, override group_blocks to control grouping.
-    def fake_group_blocks(block_numbers, block_hashes, current_block, versions, batch_size):
-        # Return a single group (say, group 6) with one batch containing all block info.
-        return {6: [[(n, f"hash{n}") for n in block_numbers]]}
-    
-    monkeypatch.setattr("patrol.chain_data.event_fetcher.group_blocks", fake_group_blocks)
-    
-    ef = EventFetcher(fake_substrate_client)
-
-    events = await ef.fetch_all_events(block_numbers)
-    
-    # Assert: Expect a mapping from block number to the fake event.
-    expected = {3100000: "fake_event_for_hash3100000", 3200000: "fake_event_for_hash3200000"}
-    assert events == expected
-
-@pytest.mark.asyncio
-async def test_stream_all_events_success(monkeypatch):
-    # Arrange
-    block_numbers = [3100000, 3200000, 3300000]
-    block_hashes = [f"hash{n}" for n in block_numbers]
-    expected_result = {
-        3100000: "event_for_hash3100000",
-        3200000: "event_for_hash3200000",
-        3300000: "event_for_hash3300000"
+    fake_events = {
+        3100000: "event_3100000",
+        3200000: "event_3200000"
     }
 
+    # Mock substrate client and return_runtime_versions
     fake_substrate_client = MagicMock()
     fake_substrate_client.query = AsyncMock(side_effect=lambda method, _, n=None: {
         "get_block_hash": f"hash{n}",
         "get_block": {"header": {"number": 6000000}}
     }[method])
-
     fake_substrate_client.return_runtime_versions = MagicMock(return_value={6: "version6"})
 
+    # Create fetcher
     ef = EventFetcher(fake_substrate_client)
-    ef.get_block_events = AsyncMock(side_effect=lambda ver, batch: {
-        n: f"event_for_hash{n}" for n, _ in batch
-    })
 
-    # Patch group_blocks to control batching
-    def fake_group_blocks(block_nums, hashes, current_block, versions, batch_size):
-        return {6: [[(n, f"hash{n}") for n in block_nums]]}
+    # Patch group_blocks
+    def fake_group_blocks(block_numbers, block_hashes, current_block, versions, batch_size):
+        return {6: [[(n, f"hash{n}") for n in block_numbers]]}
     monkeypatch.setattr("patrol.chain_data.event_fetcher.group_blocks", fake_group_blocks)
 
-    # Act
-    result_batches = []
-    async for batch in ef.stream_all_events(block_numbers, batch_size=3):
-        result_batches.append(batch)
+    # Patch get_block_events to return fake events
+    ef.get_block_events = AsyncMock(return_value=fake_events)
 
-    # Assert
-    assert len(result_batches) == 1
-    assert result_batches[0] == expected_result
-    ef.get_block_events.assert_awaited_once()
+    # Run fetch_all_events
+    result = await ef.fetch_all_events(block_numbers)
+
+    assert result == fake_events
+    ef.get_block_events.assert_called_once()
 
 @pytest.mark.asyncio
 async def test_stream_all_events_empty_input():
     ef = EventFetcher(MagicMock())
-    result = [batch async for batch in ef.stream_all_events([])]
-    assert result == []
+    ef.hash_semaphore = asyncio.Semaphore(1)
+    ef.event_semaphore = asyncio.Semaphore(1)
+    
+    queue = asyncio.Queue()
+    await ef.stream_all_events([], queue)
+    
+    result = await queue.get()
+    assert result is None
 
 @pytest.mark.asyncio
 async def test_stream_all_events_invalid_input():
     ef = EventFetcher(MagicMock())
-    result = [batch async for batch in ef.stream_all_events(["abc", 123])]
-    assert result == []
+    ef.hash_semaphore = asyncio.Semaphore(1)
+    ef.event_semaphore = asyncio.Semaphore(1)
+
+    queue = asyncio.Queue()
+    await ef.stream_all_events(["abc", 123], queue)
+    
+    result = await queue.get()
+    assert result is None
+
+@pytest.mark.asyncio
+async def test_stream_all_events_success(monkeypatch):
+    block_numbers = [100, 101, 102]
+    block_hashes = [f"hash{n}" for n in block_numbers]
+    fake_events = {n: f"event_for_{n}" for n in block_numbers}
+
+    fake_substrate_client = MagicMock()
+    fake_substrate_client.query = AsyncMock(side_effect=lambda method, _, n=None: f"hash{n}" if method == "get_block_hash" else {"header": {"number": 9999}})
+    fake_substrate_client.return_runtime_versions = MagicMock(return_value={1: "version1"})
+
+    ef = EventFetcher(fake_substrate_client)
+    ef.hash_semaphore = asyncio.Semaphore(10)
+    ef.event_semaphore = asyncio.Semaphore(10)
+    ef.get_current_block = AsyncMock(return_value=9999)
+    ef.get_block_events = AsyncMock(side_effect=lambda version, batch: {n: f"event_for_{n}" for n, _ in batch})
+
+    def fake_group_blocks(block_nums, hashes, current_block, versions, batch_size):
+        return {1: [[(n, f"hash{n}") for n in block_nums]]}
+
+    monkeypatch.setattr("patrol.chain_data.event_fetcher.group_blocks", fake_group_blocks)
+
+    queue = asyncio.Queue()
+    await ef.stream_all_events(block_numbers, queue)
+
+    results = []
+    while True:
+        batch = await queue.get()
+        if batch is None:
+            break
+        results.append(batch)
+
+    assert len(results) == 1
+    assert results[0] == fake_events
+
+@pytest.mark.asyncio
+async def test_stream_all_events_handles_batch_failure(monkeypatch):
+    block_numbers = [100, 101]
+    block_hashes = [f"hash{n}" for n in block_numbers]
+
+    fake_substrate_client = MagicMock()
+    fake_substrate_client.query = AsyncMock(side_effect=lambda method, _, n=None: f"hash{n}" if method == "get_block_hash" else {"header": {"number": 9999}})
+    fake_substrate_client.return_runtime_versions = MagicMock(return_value={1: "version1"})
+
+    ef = EventFetcher(fake_substrate_client)
+    ef.hash_semaphore = asyncio.Semaphore(10)
+    ef.event_semaphore = asyncio.Semaphore(10)
+    ef.get_current_block = AsyncMock(return_value=9999)
+    ef.get_block_events = AsyncMock(side_effect=Exception("Boom"))
+
+    def fake_group_blocks(block_nums, hashes, current_block, versions, batch_size):
+        return {1: [[(n, f"hash{n}") for n in block_nums]]}
+
+    monkeypatch.setattr("patrol.chain_data.event_fetcher.group_blocks", fake_group_blocks)
+
+    queue = asyncio.Queue()
+    await ef.stream_all_events(block_numbers, queue)
+
+    result = await queue.get()
+    assert result is None

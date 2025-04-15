@@ -3,10 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from patrol.validation.miner_scoring import MinerScoring, normalize_scores
-from patrol.validation.graph_validation.errors import ErrorPayload
-from patrol.protocol import GraphPayload, Node, Edge, TransferEvidence
-from patrol.constants import Constants
-from patrol.validation.scoring import MinerScoreRepository
+from patrol.validation.scoring import MinerScoreRepository, ValidationResult
 
 
 @pytest.fixture
@@ -29,12 +26,12 @@ def test_calculate_responsiveness_score(scoring):
     assert slow < 0.2
 
 async def test_calculate_score_error(scoring):
-    error = ErrorPayload(message="Missing field")
+    error = ValidationResult(validated=False, message="Missing field", volume=0)
     result = await scoring.calculate_score(
         uid=42,
         coldkey="ck",
         hotkey="hk",
-        payload=error,
+        validation_result=error,
         response_time=2.0,
         batch_id=uuid.uuid4(),
         moving_average_denominator=20
@@ -44,21 +41,12 @@ async def test_calculate_score_error(scoring):
     assert result.overall_score == 0.0
 
 async def test_calculate_score_success(scoring):
-    payload = GraphPayload(
-        nodes=[Node(id="A", type="wallet", origin="bittensor")],
-        edges=[Edge(
-            coldkey_source="A",
-            coldkey_destination="B",
-            category="balance",
-            type="transfer",
-            evidence=TransferEvidence(rao_amount=10, block_number=1)
-        )]
-    )
+    validation_result = ValidationResult(validated=True, message="Pass", volume=100)
     result = await scoring.calculate_score(
         uid=1,
         coldkey="ck1",
         hotkey="hk1",
-        payload=payload,
+        validation_result=validation_result,
         response_time=0.2,
         batch_id=uuid.uuid4(),
         moving_average_denominator=20,
