@@ -55,7 +55,7 @@ class MinerScoring:
                 overall_score_moving_average=(sum(previous_overall_scores) + 0.0) / moving_average_denominator,
                 overall_score=0.0,
                 volume_score=0.0,
-                volume=0,
+                volume=validation_result.volume,
                 responsiveness_score=0.0,
                 response_time_seconds=response_time,
                 novelty_score=None,

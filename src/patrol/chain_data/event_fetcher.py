@@ -142,7 +142,7 @@ class EventFetcher:
             return
 
         block_numbers = set(block_numbers)
-        logger.info(f"\nAttempting to stream event data for {len(block_numbers)} blocks...")
+        logger.info(f"Attempting to stream event data for {len(block_numbers)} blocks...")
 
         async def safe_get_block_hash(n: int) -> str | None:
             try:
@@ -217,7 +217,7 @@ async def example():
             ): 
             all_events.extend(events)
 
-        print(f"\nRetrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
+        print(f"Retrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
 if __name__ == "__main__":
     asyncio.run(example())

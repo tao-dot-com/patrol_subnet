@@ -31,6 +31,7 @@ class BittensorValidationMechanism:
 
         try:
             graph_payload = self._parse_graph_payload(payload)
+            volume = len(graph_payload.nodes) + len(graph_payload.edges)
             self._verify_target_in_graph(target, graph_payload)
             self._verify_graph_connected(graph_payload)
 
@@ -38,16 +39,14 @@ class BittensorValidationMechanism:
 
         except SingleNodeResponse as e:
             logger.info(f"Validation skipped for uid {uid}: {e}")
-            return ValidationResult(validated=False, message=f"Validation skipped for uid {uid}: {e}", volume=0)
+            return ValidationResult(validated=False, message=f"Validation skipped for uid {uid}: {e}", volume=volume)
 
         except Exception as e: 
             logger.info(f"Validation error for uid {uid}: {e}")
-            return ValidationResult(validated=False, message=f"Validation error for uid {uid}: {e}", volume=0)
+            return ValidationResult(validated=False, message=f"Validation error for uid {uid}: {e}", volume=volume)
 
         validation_time = time.time() - start_time
         logger.info(f"Validation finished for {uid}. Completed in {validation_time:.2f} seconds")
-
-        volume = len(graph_payload.nodes) + len(graph_payload.edges)
 
         return ValidationResult(validated=True, message="Validation Passed", volume=volume)
 
