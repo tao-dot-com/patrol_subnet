@@ -13,7 +13,7 @@ dependencies = [
     "asyncpg",
     "alembic",
     "python-json-logger",
-    "alru_cache"
+    "async_lru"
 ]
 
 [project.optional-dependencies]
