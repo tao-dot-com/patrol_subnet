@@ -8,6 +8,7 @@ docker compose -f ./validator_docker/docker-compose-local-postgres.yml up db --w
 # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
 #flake8 ./src --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
+pip install -e '.[test]'
 pytest ./tests
 
 docker build \
