@@ -247,6 +247,7 @@ async def start():
             if update_available:
                 break
 
+            await miner_validator.query_miner_batch()
         except Exception as ex:
             logger.exception("Error!")
 
