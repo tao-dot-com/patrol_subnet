@@ -191,18 +191,15 @@ async def example():
     network_url = "wss://archive.chain.opentensor.ai:443/"
     versions = load_versions()
     
-    keys_to_keep = {"257"}
-    versions = {k: versions[k] for k in keys_to_keep if k in versions}
-    
     client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
     await client.initialize()
 
     fetcher = EventFetcher(substrate_client=client)
 
     test_cases = [
-        # [3014340 + i for i in range(1000)],
-        [5255099 + i for i in range(1000)]
-        # [3804341 + i for i in range(1000)]    # high volume
+        [3014340 + i for i in range(10000)],
+        [5255099 + i for i in range(10000)],
+        [3804341 + i for i in range(10000)]    # high volume
     ]
 
     for test_case in test_cases:
@@ -210,12 +207,7 @@ async def example():
         logger.info("Starting next test case.")
 
         start_time = time.time()
-        all_events = []
-        async for events in fetcher.stream_all_events(
-                test_case,
-                25
-            ): 
-            all_events.extend(events)
+        all_events = await fetcher.fetch_all_events(test_case, 100)
 
         print(f"Retrieved events for {len(all_events)} blocks in {time.time() - start_time:.2f} seconds.")
 
