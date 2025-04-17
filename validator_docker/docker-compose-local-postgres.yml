@@ -1,3 +1,6 @@
+volumes:
+  pg_data:
+
 services:
   db:
     image: postgres:16-alpine
@@ -21,3 +24,4 @@ services:
       # HOTKEY_NAME: my_hotkey
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
+      - pg_data:/var/lib/postgresql/data
