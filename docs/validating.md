@@ -61,9 +61,12 @@ services:
 ```
 #### 3.2 Postgres Database in docker (recommended for most validators)
 ```
+volumes:
+  pg_data:
+
 services:
   db:
-    image: docker.io/postgres:16-alpine
+    image: postgres:16-alpine
     ports:
       - "5432:5432"
     environment:
@@ -84,6 +87,8 @@ services:
       # HOTKEY_NAME: my_hotkey
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
+      - pg_data:/var/lib/postgresql/data
+
 ```
 #### 3.3 Embedded SQLite database (Quick & dirty)
 ```
