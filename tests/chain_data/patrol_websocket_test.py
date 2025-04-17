@@ -17,7 +17,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
     async def send_delayed_response(data):
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.2)
         await websocket.send_json(
             {"id": data["id"], "foo": "bar"})
     try:
@@ -27,7 +27,10 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except Exception as ex:
         #logger.error(f"{ex}")
-        await websocket.close()
+        try:
+            await websocket.close()
+        except Exception:
+            pass
 
 def run_uvicorn(app: FastAPI, port: int):
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
@@ -56,7 +59,7 @@ async def test_handle_concurrent_messages_at_volume(websocket_server, websocket)
     async def receive(id):
         res = await websocket.retrieve(id)
         while res is None:
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0.0001)
             res = await websocket.retrieve(id)
 
         return res
@@ -65,7 +68,7 @@ async def test_handle_concurrent_messages_at_volume(websocket_server, websocket)
         id = await websocket.send({"hello": "you"})
 
         if not id.endswith("1"):
-            res = await asyncio.wait_for(receive(id), 5)
+            res = await asyncio.wait_for(receive(id), 2)
             #print(res)
             return res
 
@@ -76,7 +79,7 @@ async def test_handle_concurrent_messages_at_volume(websocket_server, websocket)
 
     assert len(websocket._received) == 625
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
 
     assert len(websocket._received) == 0
     assert len(responses) == requests
