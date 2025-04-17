@@ -104,8 +104,8 @@ class DummyConnection:
         await asyncio.sleep(0.05)
         return json.dumps({"id": 1, "result": "dummy response"})
 
-@pytest.mark.asyncio
-@patch("patrol.chain_data.custom_async_substrate_interface.client.connect", new_callable=AsyncMock)
+
+@patch("patrol.chain_data.patrol_websocket.client.connect", new_callable=AsyncMock)
 async def test_issue_fixed_no_stale_state(mock_connect):
     """
     Test to ensure the specific issue is fixed: self._initialized should only be True
