@@ -79,7 +79,6 @@ class PatrolWebsocket:
                 pass
 
             self.ws = await asyncio.wait_for(client.connect(self.ws_url, **self._options), timeout=10)
-            self._initialized = True
             self._receiving_task = asyncio.create_task(self._start_receiving())
             self._initialized = True
             self._expired_requests_cleanup_task = asyncio.create_task(self._cleanup())
