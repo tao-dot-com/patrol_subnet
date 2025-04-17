@@ -34,7 +34,6 @@ async def test_calculate_score_error(scoring):
         validation_result=error,
         response_time=2.0,
         batch_id=uuid.uuid4(),
-        moving_average_denominator=20
     )
     assert result.validation_passed is False
     assert result.error_message == "Missing field"
@@ -49,7 +48,6 @@ async def test_calculate_score_success(scoring):
         validation_result=validation_result,
         response_time=0.2,
         batch_id=uuid.uuid4(),
-        moving_average_denominator=20,
     )
     assert result.validation_passed is True
     assert result.volume_score > 0
