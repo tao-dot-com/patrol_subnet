@@ -142,7 +142,7 @@ class Validator:
             ) as response:
                 buffer = bytearray()
                 if response.ok:
-                    async for chunk in response.content.iter_chunked(8092):
+                    async for chunk in response.content.iter_chunked(8*1024):
                         buffer.extend(chunk)
                         if len(buffer) > self.max_response_size_bytes:
                             raise ResponsePayloadTooLarge(f"Response payload too large: Aborted at {len(buffer)} bytes")
