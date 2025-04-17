@@ -15,11 +15,9 @@ id_cycle = cycle(range(1, 0xffffff))
 
 async def get_next_id() -> str:
     """
-    Generates a pseudo-random ID by returning the next int of a range from 1-998 prepended with
-    two random ascii characters.
+    Generates an ID by cycling over an integer range between 1 and FFFFFF
     """
-    id = hex(next(id_cycle))[2:].zfill(6)
-    return id
+    return hex(next(id_cycle))[2:].zfill(6)
 
 
 class PatrolWebsocket:

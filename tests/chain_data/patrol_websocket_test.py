@@ -66,7 +66,7 @@ async def test_handle_concurrent_messages_at_volume(websocket_server, websocket)
 
         if not id.endswith("1"):
             res = await asyncio.wait_for(receive(id), 5)
-            print(res)
+            #print(res)
             return res
 
     requests = 10000
