@@ -2,9 +2,11 @@ import asyncio
 import logging
 import multiprocessing
 import time
-
+import json
+from unittest.mock import AsyncMock, patch
 import pytest
 import uvicorn
+
 from patrol.chain_data.patrol_websocket import PatrolWebsocket
 from fastapi import FastAPI, WebSocket
 
@@ -83,3 +85,48 @@ async def test_handle_concurrent_messages_at_volume(websocket_server, websocket)
 
     assert len(websocket._received) == 0
     assert len(responses) == requests
+
+class DummyConnection:
+    """A dummy websocket connection to simulate a successful connection."""
+    def __init__(self, ws_url):
+        self.ws_url = ws_url
+        self.closed = False
+
+    async def send(self, message):
+        # Simulate sending a message.
+        return
+
+    async def close(self):
+        self.closed = True
+
+    async def recv(self, decode=True):
+        # Return a dummy JSON message.
+        await asyncio.sleep(0.05)
+        return json.dumps({"id": 1, "result": "dummy response"})
+
+@pytest.mark.asyncio
+@patch("patrol.chain_data.custom_async_substrate_interface.client.connect", new_callable=AsyncMock)
+async def test_issue_fixed_no_stale_state(mock_connect):
+    """
+    Test to ensure the specific issue is fixed: self._initialized should only be True
+    if a valid connection exists (i.e., self.ws is not None).
+    """
+    # Arrange (first part): Simulate a successful connection.
+    dummy_conn = DummyConnection("ws://dummy")
+    mock_connect.side_effect = lambda ws_url, **options: dummy_conn
+    custom_ws = PatrolWebsocket("ws://example.com")
+
+    # Act and Assert (first connection): Check that a good connection sets state correctly.
+    await custom_ws.connect()
+    assert custom_ws.ws is dummy_conn
+    assert custom_ws._initialized is True
+
+    # Arrange (second part): Now configure the mock to simulate a failed connection.
+    mock_connect.side_effect = Exception("Connection failed")
+    custom_ws_fail = PatrolWebsocket("ws://example.com")
+
+    # Act and Assert (failed connection): Expect an exception and verify state.
+    with pytest.raises(Exception, match="Connection failed"):
+        await custom_ws_fail.connect()
+    assert custom_ws_fail.ws is None
+    assert custom_ws_fail._initialized is False
