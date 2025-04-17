@@ -66,18 +66,20 @@ class PatrolWebsocket:
         if not self._initialized or force:
             try:
                 self._receiving_task.cancel()
-                await self._receiving_task
+                if self._receiving_task:
+                    await self._receiving_task
 
                 self._expired_requests_cleanup_task.cancel()
                 await self._expired_requests_cleanup_task
 
-                await self.ws.close()
+                if self.ws:
+                    await self.ws.close()
             except (AttributeError, asyncio.CancelledError):
                 pass
 
             self.ws = await asyncio.wait_for(connect(self.ws_url, **self._options), timeout=10)
-            self._initialized = True
             self._receiving_task = asyncio.create_task(self._start_receiving())
+            self._initialized = True
             self._expired_requests_cleanup_task = asyncio.create_task(self._cleanup())
 
     async def _cleanup(self):
