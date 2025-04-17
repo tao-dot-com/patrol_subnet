@@ -6,7 +6,8 @@ import time
 from itertools import cycle
 from typing import Optional
 
-from websockets import connect, ConnectionClosed
+from websockets import ConnectionClosed
+from websockets.asyncio import client
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,8 @@ class PatrolWebsocket:
             except (AttributeError, asyncio.CancelledError):
                 pass
 
-            self.ws = await asyncio.wait_for(connect(self.ws_url, **self._options), timeout=10)
+            self.ws = await asyncio.wait_for(client.connect(self.ws_url, **self._options), timeout=10)
+            self._initialized = True
             self._receiving_task = asyncio.create_task(self._start_receiving())
             self._initialized = True
             self._expired_requests_cleanup_task = asyncio.create_task(self._cleanup())
