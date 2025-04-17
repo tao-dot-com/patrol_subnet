@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch
 
-from patrol.chain_data.substrate_client import SubstrateClient, CustomAsyncSubstrateInterface, CustomWebsocket
+from patrol.chain_data.substrate_client import SubstrateClient, CustomAsyncSubstrateInterface
 
 # ----------------------------
 # Fixtures
@@ -27,7 +27,7 @@ def mock_websocket():
 # ----------------------------
 
 @pytest.mark.asyncio
-@patch("patrol.chain_data.substrate_client.CustomWebsocket", autospec=True)
+@patch("patrol.chain_data.substrate_client.PatrolWebsocket", autospec=True)
 @patch("patrol.chain_data.substrate_client.CustomAsyncSubstrateInterface", autospec=True)
 async def test_initialize_creates_websocket(mock_substrate_cls, mock_ws_cls, runtime_mappings):
     mock_ws = AsyncMock()

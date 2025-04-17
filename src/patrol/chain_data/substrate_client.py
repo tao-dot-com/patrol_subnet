@@ -1,12 +1,13 @@
 import asyncio
 import logging
 
-from patrol.chain_data.custom_async_substrate_interface import CustomAsyncSubstrateInterface, CustomWebsocket
+from patrol.chain_data.custom_async_substrate_interface import CustomAsyncSubstrateInterface
+from patrol.chain_data.patrol_websocket import PatrolWebsocket
 
 logger = logging.getLogger(__name__)
 
 class SubstrateClient:
-    def __init__(self, runtime_mappings: dict, network_url: str, websocket: CustomWebsocket = None, max_retries: int = 3):
+    def __init__(self, runtime_mappings: dict, network_url: str, websocket: PatrolWebsocket = None, max_retries: int = 3):
         """
         Args:
             runtime_mappings: A dict mapping group_id to runtime versions.
@@ -26,7 +27,7 @@ class SubstrateClient:
         """
         logger.info("Initializing websocket connection.")
         if self.websocket is None:
-            self.websocket = CustomWebsocket(
+            self.websocket = PatrolWebsocket(
                     self.network_url,
                     shutdown_timer=300,
                     options={

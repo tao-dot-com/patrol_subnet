@@ -3,10 +3,9 @@ import json
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from patrol.chain_data.custom_async_substrate_interface import (
-    CustomAsyncSubstrateInterface, 
-    CustomWebsocket
-)
+from patrol.chain_data.custom_async_substrate_interface import CustomAsyncSubstrateInterface
+from patrol.chain_data.patrol_websocket import PatrolWebsocket
+
 
 # -------------------------------------------------------------------
 # Dummy implementations for testing.
@@ -57,7 +56,7 @@ async def test_custom_websocket_successful_connection(mock_connect):
     mock_connect.side_effect = lambda ws_url, **options: dummy_conn
 
     # Act: Instantiate and connect the websocket.
-    custom_ws = CustomWebsocket("ws://example.com", options={
+    custom_ws = PatrolWebsocket("ws://example.com", options={
                         "max_size": 2**32,
                         "write_limit": 2**16,
                     })
@@ -77,7 +76,7 @@ async def test_custom_websocket_failed_connection(mock_connect):
     mock_connect.side_effect = Exception("Connection failed")
     
     # Act: Instantiate the websocket and try to connect, expecting an exception.
-    custom_ws = CustomWebsocket("ws://example.com")
+    custom_ws = PatrolWebsocket("ws://example.com")
     with pytest.raises(Exception, match="Connection failed"):
         await custom_ws.connect()
     
@@ -95,7 +94,7 @@ async def test_issue_fixed_no_stale_state(mock_connect):
     # Arrange (first part): Simulate a successful connection.
     dummy_conn = DummyConnection("ws://dummy")
     mock_connect.side_effect = lambda ws_url, **options: dummy_conn
-    custom_ws = CustomWebsocket("ws://example.com")
+    custom_ws = PatrolWebsocket("ws://example.com")
 
     # Act and Assert (first connection): Check that a good connection sets state correctly.
     await custom_ws.connect()
@@ -104,7 +103,7 @@ async def test_issue_fixed_no_stale_state(mock_connect):
 
     # Arrange (second part): Now configure the mock to simulate a failed connection.
     mock_connect.side_effect = Exception("Connection failed")
-    custom_ws_fail = CustomWebsocket("ws://example.com")
+    custom_ws_fail = PatrolWebsocket("ws://example.com")
 
     # Act and Assert (failed connection): Expect an exception and verify state.
     with pytest.raises(Exception, match="Connection failed"):
@@ -117,6 +116,6 @@ async def test_custom_async_substrate_interface_injects_websocket():
     """
     Test that CustomAsyncSubstrateInterface properly uses an injected websocket connection.
     """
-    dummy_ws = CustomWebsocket("ws://example.com")
+    dummy_ws = PatrolWebsocket("ws://example.com")
     iface = CustomAsyncSubstrateInterface(url="ws://dummy", ws=dummy_ws)
     assert iface.ws is dummy_ws
