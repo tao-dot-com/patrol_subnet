@@ -26,7 +26,7 @@ async def websocket_endpoint(websocket: WebSocket):
             asyncio.create_task(send_delayed_response(data))
 
     except Exception as ex:
-        logger.error(f"{ex}")
+        #logger.error(f"{ex}")
         await websocket.close()
 
 def run_uvicorn(app: FastAPI, port: int):
@@ -45,7 +45,7 @@ def websocket_server():
     process.join()
 
 
-@pytest.fixture#(scope="session")
+@pytest.fixture
 async def websocket(websocket_server):
     async with PatrolWebsocket(websocket_server, cleanup_interval_seconds=1) as ws:
         yield ws
