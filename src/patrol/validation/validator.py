@@ -226,7 +226,7 @@ async def start():
     miner_validator = Validator(
         validation_mechanism=BittensorValidationMechanism(event_fetcher, event_processor),
         target_generator=TargetGenerator(event_fetcher, event_processor),
-        scoring_mechanism=MinerScoring(miner_score_repository),
+        scoring_mechanism=MinerScoring(miner_score_repository, moving_average_denominator=8),
         miner_score_repository=miner_score_repository,
         dendrite=dendrite,
         metagraph=metagraph,
