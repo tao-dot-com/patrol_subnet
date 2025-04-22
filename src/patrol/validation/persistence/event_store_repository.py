@@ -1,3 +1,5 @@
+import hashlib
+import json
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
@@ -6,6 +8,7 @@ from datetime import datetime, UTC
 from patrol.validation.persistence import Base
 import uuid
 from typing import Any, Dict, List, Optional, Iterable
+
 
 class _EventStore(Base, MappedAsDataclass):
     __tablename__ = "event_store"
@@ -112,3 +115,35 @@ class DatabaseEventScoreRepository:
     async def find_by_event_hash(self, event: Dict[str, Any]) -> List[Dict[str, Any]]:
         # Takes in list of events, hashes on the fly, then querieis for same has in DB
         pass
+
+
+def create_event_hash(event: Dict[str, Any]) -> str:
+    """
+    Creates a unique hash for an event based on its key properties.
+    """
+    # Select fields that make an event unique
+    hash_fields = {
+        "coldkey_source": event.get("coldkey_source"),
+        "coldkey_destination": event.get("coldkey_destination"),
+        "edge_category": event.get("edge_category") or event.get("category"),
+        "edge_type": event.get("edge_type") or event.get("type"),
+        "block_number": event.get("block_number"),
+        "evidence_type": event.get("evidence_type"),
+        "rao_amount": event.get("rao_amount")
+    }
+    
+    # Add stake-specific fields if they exist
+    if event.get("evidence_type") == "stake" or event.get("destination_net_uid") is not None:
+        hash_fields.update({
+            "destination_net_uid": event.get("destination_net_uid"),
+            "source_net_uid": event.get("source_net_uid"),
+            "delegate_hotkey_source": event.get("delegate_hotkey_source"),
+            "delegate_hotkey_destination": event.get("delegate_hotkey_destination")
+        })
+    
+    # Create a consistent string representation
+    hash_string = json.dumps(hash_fields, sort_keys=True, default=str)
+    
+    # Create SHA-256 hash
+    hash_object = hashlib.sha256(hash_string.encode())
+    return hash_object.hexdigest()

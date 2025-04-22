@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.validation import hooks
 from patrol.validation.config import DB_URL
-from patrol.validation.persistence.event_store_repository import DatabaseEventScoreRepository
+from patrol.validation.persistence.event_store_repository import DatabaseEventScoreRepository, create_event_hash
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
@@ -21,11 +21,13 @@ class EventCollector:
     def __init__(
         self,
         event_fetcher: EventFetcher,
+        event_processor: EventProcessor,
         event_repository: DatabaseEventScoreRepository,
         sync_interval: int = 12,  # Default to 12 seconds (one block time)
         batch_size: int = 25
     ):
         self.event_fetcher = event_fetcher
+        self.event_processor = event_processor
         self.event_repository = event_repository
         self.min_block_number = _MIN_BLOCK_NUMBER
         self.batch_size = batch_size
@@ -48,18 +50,25 @@ class EventCollector:
         if not events_by_block:
             logger.info(f"No events found in blocks {start_block} to {end_block}")
             return
-        
-        # Prepare events for database storage
-        event_data_list = []
+
+        # Process events using the EventProcessor
+        processed_events = []
         for block_num, events in events_by_block.items():
-            for event in events:
-                try:
-                    # Add the event directly to the list for database storage
-                    parsed_event = self._convert_to_db_format(event)
-                    event_data_list.append(parsed_event)
-                except Exception as e:
-                    logger.error(f"Error processing event from block {block_num}: {e}")
-                    continue
+            # Process this block's events
+            block_events = await self.event_processor.process_event_data({block_num: events})
+            if block_events:
+                processed_events.extend(block_events)
+        
+        # Convert processed events to database format
+        event_data_list = []
+        for event in processed_events:
+            try:
+                # Convert from the event processor format to database format
+                event_data = self._convert_to_db_format(event)
+                event_data_list.append(event_data)
+            except Exception as e:
+                logger.error(f"Error converting event to database format: {e}")
+                continue
         
         # Store events in the database
         if event_data_list:
@@ -68,7 +77,8 @@ class EventCollector:
                 logger.info(f"Stored {len(event_data_list)} events from blocks {start_block} to {end_block}")
             except Exception as e:
                 logger.error(f"Error storing events in database: {e}")
-    
+
+
     def _convert_to_db_format(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
         Convert an event from the processor format to the database format.
@@ -103,6 +113,8 @@ class EventCollector:
                 "delegate_hotkey_source": evidence.get("delegate_hotkey_source"),
                 "delegate_hotkey_destination": evidence.get("delegate_hotkey_destination")
             })
+
+        db_event["edge_hash"] = create_event_hash(db_event)
         
         return db_event
 
@@ -117,6 +129,8 @@ async def main():
     
     # Setup components
     fetcher = EventFetcher(substrate_client=client)
+    coldkey_finder = ColdkeyFinder(client)
+    processor = EventProcessor(coldkey_finder=coldkey_finder)
     
     # Setup database
     engine = create_async_engine(DB_URL, pool_pre_ping=True)
@@ -126,12 +140,13 @@ async def main():
     # Create and start the syncer
     event_collector = EventCollector(
         event_fetcher=fetcher,
+        event_processor=processor,
         event_repository=event_repository,
         sync_interval=12 
     )
     
     await event_collector._fetch_and_store_events(
-        start_block=_MIN_BLOCK_NUMBER, end_block=_MIN_BLOCK_NUMBER+2
+        start_block=_MIN_BLOCK_NUMBER+10, end_block=_MIN_BLOCK_NUMBER+12
     )
 
 
