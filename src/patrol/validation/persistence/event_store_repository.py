@@ -148,10 +148,10 @@ class DatabaseEventScoreRepository:
             events = [_EventStore.from_event(**data) for data in event_data_list]
             
             # Extract hashes from incoming events
-            event_hashes = [event.edge_hash_ for event in events]
+            event_hashes = [event.edge_hash for event in events]
             
             # Query database for matching hashes
-            query = select(_EventStore.edge_hash_).where(_EventStore.edge_hash_.in_(event_hashes))
+            query = select(_EventStore.edge_hash).where(_EventStore.edge_hash.in_(event_hashes))
             result = await session.execute(query)
             existing_hashes = {row[0] for row in result.fetchall()}
             
