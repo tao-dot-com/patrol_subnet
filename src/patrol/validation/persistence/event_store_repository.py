@@ -105,7 +105,7 @@ class _EventStore(Base, MappedAsDataclass):
         return instant if instant.tzinfo is not None else instant.replace(tzinfo=UTC)
 
 
-class DatabaseEventScoreRepository:
+class DatabaseEventStoreRepository:
 
     def __init__(self, engine: AsyncEngine):
         self.LocalAsyncSession = async_sessionmaker(bind=engine)
@@ -142,7 +142,16 @@ class DatabaseEventScoreRepository:
             result = await session.execute(query)
             return [self._to_dict(event) for event in result.scalars().all()]
 
-    async def check_events_by_hash(self, event_data_list: List[Dict[str, Any]]) -> bool:
+    async def check_events_by_hash(self, event_data_list: List[Dict[str, Any]]) -> int:
+        """
+        Check if events exist in the database by their hash.
+        
+        Args:
+            event_data_list: List of event data dictionaries
+            
+        Returns:
+            The number of events that don't exist in the database
+        """
         async with self.LocalAsyncSession() as session:
             # Convert incoming events to EventStore objects with hashes
             events = [_EventStore.from_event(**data) for data in event_data_list]
@@ -155,7 +164,7 @@ class DatabaseEventScoreRepository:
             result = await session.execute(query)
             existing_hashes = {row[0] for row in result.fetchall()}
             
-            # Check if all event hashes exist in the database
-            all_exist = all(event_hash in existing_hashes for event_hash in event_hashes)
+            # Count events that don't exist in the database
+            unmatched_count = sum(1 for event_hash in event_hashes if event_hash not in existing_hashes)
             
-            return all_exist
+            return unmatched_count
