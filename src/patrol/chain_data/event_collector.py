@@ -5,7 +5,8 @@ from typing import Any, Dict, Optional
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.validation import hooks
 from patrol.validation.config import DB_URL
-from patrol.validation.persistence.event_store_repository import DatabaseEventScoreRepository, create_event_hash
+from patrol.validation.persistence import Base
+from patrol.validation.persistence.event_store_repository import DatabaseEventScoreRepository
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
@@ -113,10 +114,17 @@ class EventCollector:
                 "delegate_hotkey_source": evidence.get("delegate_hotkey_source"),
                 "delegate_hotkey_destination": evidence.get("delegate_hotkey_destination")
             })
-
-        db_event["edge_hash"] = create_event_hash(db_event)
         
         return db_event
+    
+
+async def create_tables(engine):
+    """Create all database tables if they don't exist."""
+    logger.info("Creating database tables if they don't exist...")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables created or confirmed to exist.")
+
 
 async def main():
     logging.basicConfig(level=logging.INFO)
@@ -135,6 +143,10 @@ async def main():
     # Setup database
     engine = create_async_engine(DB_URL, pool_pre_ping=True)
     hooks.invoke(hooks.HookType.ON_CREATE_DB_ENGINE, engine)
+
+    # Create tables before using them
+    await create_tables(engine)
+
     event_repository = DatabaseEventScoreRepository(engine)
     
     # Create and start the syncer
