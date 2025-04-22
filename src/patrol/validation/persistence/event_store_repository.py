@@ -2,7 +2,7 @@ import hashlib
 import json
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
-from sqlalchemy import DateTime, or_, select
+from sqlalchemy import BigInteger, DateTime, or_, select
 from datetime import datetime, UTC
 from patrol.validation.persistence import Base
 import uuid
@@ -64,38 +64,38 @@ class _EventStore(Base, MappedAsDataclass):
     block_number: Mapped[int]
     
     # TransferEvidence specific fields
-    rao_amount: Mapped[int]
+    rao_amount: Mapped[int] = mapped_column(BigInteger)
     
     # StakeEvidence specific fields
     destination_net_uid: Mapped[Optional[int]]
     source_net_uid: Mapped[Optional[int]]
-    alpha_amount: Mapped[Optional[int]]
+    alpha_amount: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     delegate_hotkey_source: Mapped[Optional[str]]
     delegate_hotkey_destination: Mapped[Optional[str]]
     
     @classmethod
     def from_event(cls, event):
         return cls(
-            id=str(event.id) if hasattr(event, 'id') else str(uuid.uuid4()),
-            created_at=event.created_at if hasattr(event, 'created_at') else datetime.now(UTC),
-            node_id=event.node_id,
-            node_type=event.node_type,
-            node_origin=event.node_origin,
-            coldkey_source=event.coldkey_source,
-            coldkey_destination=event.coldkey_destination,
-            edge_category=event.edge_category,
-            edge_type=event.edge_type,
-            coldkey_owner=event.coldkey_owner,
-            evidence_type=event.evidence_type,
-            block_number=event.block_number,
-            rao_amount=event.rao_amount,
-            destination_net_uid=event.destination_net_uid,
-            source_net_uid=event.source_net_uid,
-            alpha_amount=event.alpha_amount,
-            delegate_hotkey_source=event.delegate_hotkey_source,
-            delegate_hotkey_destination=event.delegate_hotkey_destination,
-            edge_hash=create_event_hash(event)
-        )
+        id=str(event.get('id', uuid.uuid4())),
+        created_at=event.get('created_at', datetime.now(UTC)),
+        node_id=event['node_id'],
+        node_type=event['node_type'],
+        node_origin=event['node_origin'],
+        coldkey_source=event['coldkey_source'],
+        coldkey_destination=event['coldkey_destination'],
+        edge_category=event['edge_category'],
+        edge_type=event['edge_type'],
+        coldkey_owner=event.get('coldkey_owner'),
+        evidence_type=event['evidence_type'],
+        block_number=event['block_number'],
+        rao_amount=event['rao_amount'],
+        destination_net_uid=event.get('destination_net_uid'),
+        source_net_uid=event.get('source_net_uid'),
+        alpha_amount=event.get('alpha_amount'),
+        delegate_hotkey_source=event.get('delegate_hotkey_source'),
+        delegate_hotkey_destination=event.get('delegate_hotkey_destination'),
+        edge_hash=create_event_hash(event)
+    )
     
     @staticmethod
     def _to_utc(instant):
@@ -118,7 +118,7 @@ class DatabaseEventScoreRepository:
             event_data_list: List of dictionaries, each containing event data
         """
         async with self.LocalAsyncSession() as session:
-            events = [_EventStore.from_event(**data) for data in event_data_list]
+            events = [_EventStore.from_event(data) for data in event_data_list]
             session.add_all(events)
             await session.commit()
 
