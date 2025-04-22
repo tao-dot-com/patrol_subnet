@@ -1,14 +1,43 @@
 import hashlib
 import json
-from patrol.validation.scoring import MinerScoreRepository, MinerScore
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
-from sqlalchemy import DateTime, or_, select, func
+from sqlalchemy import DateTime, or_, select
 from datetime import datetime, UTC
 from patrol.validation.persistence import Base
 import uuid
-from typing import Any, Dict, List, Optional, Iterable
+from typing import Any, Dict, List, Optional
 
+def create_event_hash(event: Dict[str, Any]) -> str:
+    """
+    Creates a unique hash for an event based on its key properties.
+    """
+    # Select fields that make an event unique
+    hash_fields = {
+        "coldkey_source": event.get("coldkey_source"),
+        "coldkey_destination": event.get("coldkey_destination"),
+        "edge_category": event.get("edge_category") or event.get("category"),
+        "edge_type": event.get("edge_type") or event.get("type"),
+        "block_number": event.get("block_number"),
+        "evidence_type": event.get("evidence_type"),
+        "rao_amount": event.get("rao_amount")
+    }
+    
+    # Add stake-specific fields if they exist
+    if event.get("evidence_type") == "stake" or event.get("destination_net_uid") is not None:
+        hash_fields.update({
+            "destination_net_uid": event.get("destination_net_uid"),
+            "source_net_uid": event.get("source_net_uid"),
+            "delegate_hotkey_source": event.get("delegate_hotkey_source"),
+            "delegate_hotkey_destination": event.get("delegate_hotkey_destination")
+        })
+    
+    # Create a consistent string representation
+    hash_string = json.dumps(hash_fields, sort_keys=True, default=str)
+    
+    # Create SHA-256 hash
+    hash_object = hashlib.sha256(hash_string.encode())
+    return hash_object.hexdigest()
 
 class _EventStore(Base, MappedAsDataclass):
     __tablename__ = "event_store"
@@ -16,7 +45,7 @@ class _EventStore(Base, MappedAsDataclass):
     # Primary key and metadata
     id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid.uuid4()))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    edge_hash_: Mapped[str]
+    edge_hash: Mapped[str]
     
     # Node fields
     node_id: Mapped[str]
@@ -64,7 +93,8 @@ class _EventStore(Base, MappedAsDataclass):
             source_net_uid=event.source_net_uid,
             alpha_amount=event.alpha_amount,
             delegate_hotkey_source=event.delegate_hotkey_source,
-            delegate_hotkey_destination=event.delegate_hotkey_destination
+            delegate_hotkey_destination=event.delegate_hotkey_destination,
+            edge_hash=create_event_hash(event)
         )
     
     @staticmethod
@@ -112,38 +142,20 @@ class DatabaseEventScoreRepository:
             result = await session.execute(query)
             return [self._to_dict(event) for event in result.scalars().all()]
 
-    async def find_by_event_hash(self, event: Dict[str, Any]) -> List[Dict[str, Any]]:
-        # Takes in list of events, hashes on the fly, then querieis for same has in DB
-        pass
-
-
-def create_event_hash(event: Dict[str, Any]) -> str:
-    """
-    Creates a unique hash for an event based on its key properties.
-    """
-    # Select fields that make an event unique
-    hash_fields = {
-        "coldkey_source": event.get("coldkey_source"),
-        "coldkey_destination": event.get("coldkey_destination"),
-        "edge_category": event.get("edge_category") or event.get("category"),
-        "edge_type": event.get("edge_type") or event.get("type"),
-        "block_number": event.get("block_number"),
-        "evidence_type": event.get("evidence_type"),
-        "rao_amount": event.get("rao_amount")
-    }
-    
-    # Add stake-specific fields if they exist
-    if event.get("evidence_type") == "stake" or event.get("destination_net_uid") is not None:
-        hash_fields.update({
-            "destination_net_uid": event.get("destination_net_uid"),
-            "source_net_uid": event.get("source_net_uid"),
-            "delegate_hotkey_source": event.get("delegate_hotkey_source"),
-            "delegate_hotkey_destination": event.get("delegate_hotkey_destination")
-        })
-    
-    # Create a consistent string representation
-    hash_string = json.dumps(hash_fields, sort_keys=True, default=str)
-    
-    # Create SHA-256 hash
-    hash_object = hashlib.sha256(hash_string.encode())
-    return hash_object.hexdigest()
+    async def check_events_by_hash(self, event_data_list: List[Dict[str, Any]]) -> bool:
+        async with self.LocalAsyncSession() as session:
+            # Convert incoming events to EventStore objects with hashes
+            events = [_EventStore.from_event(**data) for data in event_data_list]
+            
+            # Extract hashes from incoming events
+            event_hashes = [event.edge_hash_ for event in events]
+            
+            # Query database for matching hashes
+            query = select(_EventStore.edge_hash_).where(_EventStore.edge_hash_.in_(event_hashes))
+            result = await session.execute(query)
+            existing_hashes = {row[0] for row in result.fetchall()}
+            
+            # Check if all event hashes exist in the database
+            all_exist = all(event_hash in existing_hashes for event_hash in event_hashes)
+            
+            return all_exist
