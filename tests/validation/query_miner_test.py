@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, call
 import bittensor_wallet
 import numpy
 import pytest
+
+from patrol.validation.dashboard import DashboardClient
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
@@ -80,7 +82,7 @@ async def test_persist_miner_score(mock_axon, test_wallet):
     axon = bt.axon(test_wallet, port=port, ip=ip)
 
     validator = Validator(
-        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, dendrite,
+        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, AsyncMock(DashboardClient), dendrite,
         metagraph, lambda: batch_id, AsyncMock(WeightSetter), enable_weight_setting=True
     )
     await validator.query_miner(batch_id, uid, axon.info(), ("bar", 123), max_block_number=None)
@@ -148,7 +150,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
     weight_setter.calculate_weights.return_value = weights
 
     validator = Validator(
-        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository,
+        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository, AsyncMock(DashboardClient),
         dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True,
     )
 
@@ -212,7 +214,7 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
     weight_setter.is_weight_setting_due.return_value = False
 
     validator = Validator(
-        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository,
+        validation_mechanism, target_generator, scoring_mechanism, miner_score_repository, AsyncMock(DashboardClient),
         dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True
     )
 

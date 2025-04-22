@@ -13,11 +13,12 @@ dependencies = [
     "asyncpg",
     "alembic",
     "python-json-logger",
-    "async_lru"
+    "async_lru",
+
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "flake8"]
+test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "flake8", "pytest-aiohttp"]
 
 [build-system]
 requires = ["setuptools>=57", "wheel", "setuptools-scm"]
