@@ -6,7 +6,7 @@ from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.validation import hooks
 from patrol.validation.config import DB_URL
 from patrol.validation.persistence import Base
-from patrol.validation.persistence.event_store_repository import DatabaseEventScoreRepository
+from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
@@ -23,7 +23,7 @@ class EventCollector:
         self,
         event_fetcher: EventFetcher,
         event_processor: EventProcessor,
-        event_repository: DatabaseEventScoreRepository,
+        event_repository: DatabaseEventStoreRepository,
         sync_interval: int = 12,  # Default to 12 seconds (one block time)
         batch_size: int = 25
     ):
@@ -147,7 +147,7 @@ async def main():
     # Create tables before using them
     await create_tables(engine)
 
-    event_repository = DatabaseEventScoreRepository(engine)
+    event_repository = DatabaseEventStoreRepository(engine)
     
     # Create and start the syncer
     event_collector = EventCollector(
@@ -158,7 +158,7 @@ async def main():
     )
     
     await event_collector._fetch_and_store_events(
-        start_block=_MIN_BLOCK_NUMBER+10, end_block=_MIN_BLOCK_NUMBER+12
+        start_block=_MIN_BLOCK_NUMBER+13, end_block=_MIN_BLOCK_NUMBER+16
     )
 
 
