@@ -1,0 +1,114 @@
+from patrol.validation.scoring import MinerScoreRepository, MinerScore
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
+from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
+from sqlalchemy import DateTime, or_, select, func
+from datetime import datetime, UTC
+from patrol.validation.persistence import Base
+import uuid
+from typing import Any, Dict, List, Optional, Iterable
+
+class _EventStore(Base, MappedAsDataclass):
+    __tablename__ = "event_store"
+
+    # Primary key and metadata
+    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid.uuid4()))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    edge_hash_: Mapped[str]
+    
+    # Node fields
+    node_id: Mapped[str]
+    node_type: Mapped[str]
+    node_origin: Mapped[str]
+    
+    # Edge fields
+    coldkey_source: Mapped[str]
+    coldkey_destination: Mapped[str]
+    edge_category: Mapped[str]
+    edge_type: Mapped[str]
+    coldkey_owner: Mapped[Optional[str]]
+    
+    # Evidence fields - Common
+    evidence_type: Mapped[str]  # "transfer" or "stake"
+    block_number: Mapped[int]
+    
+    # TransferEvidence specific fields
+    rao_amount: Mapped[int]
+    
+    # StakeEvidence specific fields
+    destination_net_uid: Mapped[Optional[int]]
+    source_net_uid: Mapped[Optional[int]]
+    alpha_amount: Mapped[Optional[int]]
+    delegate_hotkey_source: Mapped[Optional[str]]
+    delegate_hotkey_destination: Mapped[Optional[str]]
+    
+    @classmethod
+    def from_event(cls, event):
+        return cls(
+            id=str(event.id) if hasattr(event, 'id') else str(uuid.uuid4()),
+            created_at=event.created_at if hasattr(event, 'created_at') else datetime.now(UTC),
+            node_id=event.node_id,
+            node_type=event.node_type,
+            node_origin=event.node_origin,
+            coldkey_source=event.coldkey_source,
+            coldkey_destination=event.coldkey_destination,
+            edge_category=event.edge_category,
+            edge_type=event.edge_type,
+            coldkey_owner=event.coldkey_owner,
+            evidence_type=event.evidence_type,
+            block_number=event.block_number,
+            rao_amount=event.rao_amount,
+            destination_net_uid=event.destination_net_uid,
+            source_net_uid=event.source_net_uid,
+            alpha_amount=event.alpha_amount,
+            delegate_hotkey_source=event.delegate_hotkey_source,
+            delegate_hotkey_destination=event.delegate_hotkey_destination
+        )
+    
+    @staticmethod
+    def _to_utc(instant):
+        """
+        SQLite does not persist timezone info, so just set the timezone to UTC if the DB did not give us one.
+        """
+        return instant if instant.tzinfo is not None else instant.replace(tzinfo=UTC)
+
+
+class DatabaseEventScoreRepository:
+
+    def __init__(self, engine: AsyncEngine):
+        self.LocalAsyncSession = async_sessionmaker(bind=engine)
+
+    async def add_events(self, event_data_list: List[Dict[str, Any]]) -> List[str]:
+        """
+        Add multiple blockchain events at once.
+        
+        Args:
+            event_data_list: List of dictionaries, each containing event data
+        """
+        async with self.LocalAsyncSession() as session:
+            events = [_EventStore.from_event(**data) for data in event_data_list]
+            session.add_all(events)
+            await session.commit()
+
+    async def find_by_coldkey(self, coldkey: str) -> List[Dict[str, Any]]:
+        """
+        Find events associated with a specific coldkey.
+        
+        Args:
+            coldkey: The coldkey to search for
+            
+        Returns:
+            List of events associated with the coldkey
+        """
+        async with self.LocalAsyncSession() as session:
+            query = select(_EventStore).filter(
+                or_(
+                    _EventStore.coldkey_source == coldkey,
+                    _EventStore.coldkey_destination == coldkey,
+                )
+            )
+            result = await session.execute(query)
+            return [self._to_dict(event) for event in result.scalars().all()]
+
+    async def find_by_event_hash(self, event: Dict[str, Any]) -> List[Dict[str, Any]]:
+        # Takes in list of events, hashes on the fly, then querieis for same has in DB
+        pass
