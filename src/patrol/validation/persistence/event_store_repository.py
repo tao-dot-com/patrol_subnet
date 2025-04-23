@@ -3,6 +3,7 @@ import json
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
 from sqlalchemy import BigInteger, DateTime, or_, select
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, UTC
 from patrol.validation.persistence import Base
 import uuid
@@ -43,9 +44,8 @@ class _EventStore(Base, MappedAsDataclass):
     __tablename__ = "event_store"
 
     # Primary key and metadata
-    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid.uuid4()))
+    edge_hash: Mapped[str] = mapped_column(primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    edge_hash: Mapped[str]
     
     # Node fields
     node_id: Mapped[str]
@@ -76,26 +76,25 @@ class _EventStore(Base, MappedAsDataclass):
     @classmethod
     def from_event(cls, event):
         return cls(
-        id=str(event.get('id', uuid.uuid4())),
-        created_at=event.get('created_at', datetime.now(UTC)),
-        node_id=event['node_id'],
-        node_type=event['node_type'],
-        node_origin=event['node_origin'],
-        coldkey_source=event['coldkey_source'],
-        coldkey_destination=event['coldkey_destination'],
-        edge_category=event['edge_category'],
-        edge_type=event['edge_type'],
-        coldkey_owner=event.get('coldkey_owner'),
-        evidence_type=event['evidence_type'],
-        block_number=event['block_number'],
-        rao_amount=event['rao_amount'],
-        destination_net_uid=event.get('destination_net_uid'),
-        source_net_uid=event.get('source_net_uid'),
-        alpha_amount=event.get('alpha_amount'),
-        delegate_hotkey_source=event.get('delegate_hotkey_source'),
-        delegate_hotkey_destination=event.get('delegate_hotkey_destination'),
-        edge_hash=create_event_hash(event)
-    )
+            created_at=event.get('created_at', datetime.now(UTC)),
+            node_id=event['node_id'],
+            node_type=event['node_type'],
+            node_origin=event['node_origin'],
+            coldkey_source=event['coldkey_source'],
+            coldkey_destination=event['coldkey_destination'],
+            edge_category=event['edge_category'],
+            edge_type=event['edge_type'],
+            coldkey_owner=event.get('coldkey_owner'),
+            evidence_type=event['evidence_type'],
+            block_number=event['block_number'],
+            rao_amount=event['rao_amount'],
+            destination_net_uid=event.get('destination_net_uid'),
+            source_net_uid=event.get('source_net_uid'),
+            alpha_amount=event.get('alpha_amount'),
+            delegate_hotkey_source=event.get('delegate_hotkey_source'),
+            delegate_hotkey_destination=event.get('delegate_hotkey_destination'),
+            edge_hash=create_event_hash(event)
+        )
     
     @staticmethod
     def _to_utc(instant):
@@ -118,9 +117,18 @@ class DatabaseEventStoreRepository:
             event_data_list: List of dictionaries, each containing event data
         """
         async with self.LocalAsyncSession() as session:
-            events = [_EventStore.from_event(data) for data in event_data_list]
-            session.add_all(events)
-            await session.commit()
+            for data in event_data_list:
+                try:
+                    # Create the event object with edge_hash as primary key
+                    event = _EventStore.from_event(data)
+                    session.add(event)
+                    await session.flush()  # Flush to detect errors immediately
+                except IntegrityError:
+                    # This will catch primary key violations
+                    await session.rollback()  # Rollback this specific operation
+
+        # Commit all successful insertions
+        await session.commit()
 
     async def find_by_coldkey(self, coldkey: str) -> List[Dict[str, Any]]:
         """
