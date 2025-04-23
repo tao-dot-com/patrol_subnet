@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 from datetime import datetime, UTC
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import BigInteger, DateTime, func, or_, select
