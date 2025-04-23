@@ -26,7 +26,7 @@ class MockMinerScoreRepo:
 
     async def find_latest_overall_scores(self, miner, batch):
 
-        return 1
+        return [1]
 
     def return_scores(self):
         return self.scores
