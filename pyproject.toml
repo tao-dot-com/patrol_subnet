@@ -13,7 +13,8 @@ dependencies = [
     "asyncpg",
     "alembic",
     "python-json-logger",
-    "async_lru"
+    "async_lru",
+    "greenlet>=3.2.1"
 ]
 
 [project.optional-dependencies]
