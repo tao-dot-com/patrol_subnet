@@ -1,6 +1,4 @@
 import logging
-from collections import deque
-from typing import Tuple, Iterable, Deque
 from typing import Dict, Any, List
 import asyncio
 import time
@@ -8,21 +6,18 @@ import json
 
 from patrol import constants
 from patrol.protocol import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
+
+from patrol.validation.config import DB_URL
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.validation.scoring import ValidationResult
 from patrol.validation.graph_validation.errors import PayloadValidationError, SingleNodeResponse
-from patrol.chain_data.event_fetcher import EventFetcher
-from patrol.chain_data.event_processor import EventProcessor
 
 logger = logging.getLogger(__name__)
 
 class BittensorValidationMechanism:
 
-    def __init__(self,  event_fetcher: EventFetcher, event_processor: EventProcessor, event_store_repository: DatabaseEventStoreRepository, buffer_size: int = 500):
-        self.event_fetcher = event_fetcher
-        self.event_processor = event_processor
+    def __init__(self, event_store_repository: DatabaseEventStoreRepository):
         self.event_store_repository = event_store_repository
-        self.buffer_size = buffer_size
 
     async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None, max_block_number: int = None) -> ValidationResult:
         start_time = time.time()
@@ -240,47 +235,27 @@ class BittensorValidationMechanism:
         roots = {find(node.id) for node in graph_payload.nodes}
         if len(roots) != 1:
             raise PayloadValidationError("Graph is not fully connected.")
+
+    async def _verify_block_ranges(self, block_numbers: List[int], max_block_number: int):
+
+        min_block = constants.Constants.LOWER_BLOCK_LIMIT
+
+        invalid_blocks = [b for b in block_numbers if not (min_block <= b <= max_block_number)]
+        if invalid_blocks:
+            raise PayloadValidationError(
+                f"Found {len(invalid_blocks)} invalid block(s) outside the allowed range "
+                f"[{min_block}, {max_block_number}]: {invalid_blocks}"
+            )
+        
+    async def _verify_edge_data(self, graph_payload: GraphPayload, max_block_number: int):
+
+        block_numbers = {edge.evidence.block_number for edge in graph_payload.edges}
+        
+        await self._verify_block_ranges(block_numbers, max_block_number)
     
-        event_keys = set()
-        validation_block_numbers = set()
-        queue = asyncio.Queue()
-
-        async def process_buffered_events(buffer: Deque[Tuple[int, Any]]) -> None:
-            if not buffer:
-                return
-            to_process = dict(buffer)
-            processed_batch = await self.event_processor.process_event_data(to_process)
-            logger.info(f"Received and processed {len(processed_batch)} events.")
-            for event in processed_batch:
-                key, block_number = self._make_event_key(event)
-                event_keys.add(key)
-                validation_block_numbers.add(block_number)
-
-        async def consumer_event_queue() -> None:
-            buffer: Deque[Tuple[int, Any]] = deque()
-
-            while True:
-                events = await queue.get()
-                if events is None:
-                    break
-
-                buffer.extend(events.items())
-                while len(buffer) >= self.buffer_size:
-                    temp_buffer = deque(buffer.popleft() for _ in range(self.buffer_size))
-                    await process_buffered_events(temp_buffer)
-
-            await process_buffered_events(buffer)
-
-        producer_task = asyncio.create_task(self.event_fetcher.stream_all_events(block_numbers, queue, batch_size=25))
-        consumer_task = asyncio.create_task(consumer_event_queue())
-
-        await asyncio.gather(producer_task, consumer_task)
-        return event_keys, validation_block_numbers
-
-    async def _verify_edge_data(self, graph_payload: GraphPayload):
         events = self._convert_edges_to_event_data(graph_payload)
 
-        unmatched_count = self.check_events_by_hash(events)
+        unmatched_count = await self.event_store_repository.check_events_by_hash(events)
 
         if unmatched_count == 0:
             logger.debug("All edges matched with on-chain events.")
@@ -293,32 +268,21 @@ class BittensorValidationMechanism:
 if __name__ == "__main__":
 
     import json
-
-    from patrol.chain_data.coldkey_finder import ColdkeyFinder
-    from patrol.chain_data.substrate_client import SubstrateClient
-    from patrol.chain_data.runtime_groupings import load_versions
+    from sqlalchemy.ext.asyncio import create_async_engine
 
     async def main():
+        engine = create_async_engine(DB_URL, pool_pre_ping=True)
+        event_store_repository = DatabaseEventStoreRepository(engine)
 
-        network_url = "wss://archive.chain.opentensor.ai:443/"
-        versions = load_versions()
-        
-        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
-        await client.initialize()
-
-        fetcher = EventFetcher(client)
-        coldkey_finder = ColdkeyFinder(client)
-        event_processor = EventProcessor(coldkey_finder=coldkey_finder)
-        event_store_repository = DatabaseEventStoreRepository()
-
-        validator = BittensorValidationMechanism(fetcher, event_processor, event_store_repository)
+        validator = BittensorValidationMechanism(event_store_repository)
 
         file_path = "subgraph_output_3.json"
         with open(file_path, "r") as f:
             payload = json.load(f)
 
-        tasks = [validator.validate_payload(uid=1, payload=payload, target="5Ck5g3MaG7Ho29ZqmcTFgq8zTxmnrwxs6FR94RsCEquT6nLy", max_block_number=5352419) for _ in range(8)]
+        tasks = [validator.validate_payload(uid=1, payload=payload, target="5Ck5g3MaG7Ho29ZqmcTFgq8zTxmnrwxs6FR94RsCEquT6nLy") for _ in range(8)]
 
         await asyncio.gather(*tasks)
+
 
     asyncio.run(main())
