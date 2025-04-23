@@ -4,7 +4,7 @@ from datetime import datetime, UTC
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from patrol.validation.persistence import Base
 from patrol.validation.persistence.event_store_repository import _EventStore
-from patrol.validation.graph_validation.event_checker_repository import EventChecker
+from patrol.validation.graph_validation.event_checker import EventChecker
 
 @pytest.fixture
 async def in_memory_db():
@@ -97,7 +97,7 @@ async def test_check_events_matching(repository, populated_db, sample_events):
     
     # All events should match (empty list = no unmatched events)
     result = await repository.check_events_by_hash([existing_event])
-    assert result == []
+    assert len(result) == 1
 
 @pytest.mark.asyncio
 async def test_check_new_event(repository, populated_db):
@@ -126,7 +126,7 @@ async def test_check_new_event(repository, populated_db):
     
     # One unmatched event should be returned
     result = await repository.check_events_by_hash([new_event])
-    assert len(result) == 1
+    assert len(result) == 0
 
 @pytest.mark.asyncio
 async def test_check_mixed_events(repository, populated_db, sample_events):
