@@ -2,8 +2,8 @@ import hashlib
 import json
 import logging
 from datetime import datetime, UTC
+from sqlalchemy.exc import IntegrityError
 from typing import Any, Dict, List, Optional
-import uuid
 
 from sqlalchemy import BigInteger, DateTime, func, or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
@@ -51,9 +51,8 @@ class _EventStore(Base, MappedAsDataclass):
     __tablename__ = "event_store"
 
     # Primary key and metadata
-    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid.uuid4()))
+    edge_hash: Mapped[str] = mapped_column(primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    edge_hash: Mapped[str]
     
     # Node fields
     node_id: Mapped[str]
@@ -84,7 +83,6 @@ class _EventStore(Base, MappedAsDataclass):
     @classmethod
     def from_event(cls, event):
         return cls(
-        id=str(event.get('id', uuid.uuid4())),
         created_at=event.get('created_at', datetime.now(UTC)),
         node_id=event['node_id'],
         node_type=event['node_type'],
@@ -112,7 +110,6 @@ class _EventStore(Base, MappedAsDataclass):
         """
         return instant if instant.tzinfo is not None else instant.replace(tzinfo=UTC)
 
-
 class DatabaseEventStoreRepository:
 
     def __init__(self, engine: AsyncEngine):
@@ -125,12 +122,27 @@ class DatabaseEventStoreRepository:
         Args:
             event_data_list: List of dictionaries, each containing event data
         """
+        duplicate_count = 0
         async with self.LocalAsyncSession() as session:
             for data in event_data_list:
-                # Create the event object with edge_hash as primary key
-                event = _EventStore.from_event(data)
-                session.add(event)
-                await session.commit()
+                try:
+                    # Create the event object with edge_hash as primary key
+                    event = _EventStore.from_event(data)
+                    session.add(event)
+                    await session.commit()
+                except IntegrityError:
+                     # Needed to catch duplicate primary key (edge_hash) violations
+                    await session.rollback()
+                    duplicate_count += 1
+                    continue
+                except Exception as e:
+                    # Handle other errors
+                    await session.rollback()
+                    logger.error(f"Error adding event: {e}")
+                    continue
+
+        if duplicate_count > 0:
+            logger.debug(f"Skipped writing {duplicate_count} duplicate events!")
 
     async def find_by_coldkey(self, coldkey: str) -> List[Dict[str, Any]]:
         """
