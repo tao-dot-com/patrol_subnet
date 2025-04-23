@@ -1,18 +1,17 @@
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy import select
-from typing import Any, Dict, List
+from typing import Any, List, Dict
 
 from patrol.validation.persistence.event_store_repository import _EventStore
 
 
-
-class EventCheckerRepository:
+class EventChecker:
 
     def __init__(self, engine: AsyncEngine):
         self.LocalAsyncSession = async_sessionmaker(bind=engine)
 
-    async def check_events_by_hash(self, event_data_list: List[Dict[str, Any]]) -> int:
+    async def check_events_by_hash(self, event_data_list: List[Dict[str, Any]]) -> List[Dict]:
         """
         Check if events exist in the database by their hash.
         
@@ -34,7 +33,7 @@ class EventCheckerRepository:
             result = await session.execute(query)
             existing_hashes = {row[0] for row in result.fetchall()}
             
-            # Count events that don't exist in the database
-            unmatched_count = sum(1 for event_hash in event_hashes if event_hash not in existing_hashes)
+            # Find events that do exist in the database
+            matched_events = [event for event in events if event.edge_hash in existing_hashes]
             
-            return unmatched_count
+            return matched_events
