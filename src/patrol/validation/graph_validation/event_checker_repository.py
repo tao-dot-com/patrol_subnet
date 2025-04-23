@@ -1,6 +1,5 @@
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
-from sqlalchemy.orm import mapped_column
 from sqlalchemy import select
 from typing import Any, Dict, List
 

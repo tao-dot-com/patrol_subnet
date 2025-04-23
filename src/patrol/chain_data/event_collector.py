@@ -1,19 +1,21 @@
 import asyncio
-from datetime import datetime
 import logging
-from typing import Any, Dict, Optional
+import time
+from typing import Any, Dict
+from datetime import datetime
+
+from sqlalchemy.ext.asyncio import create_async_engine
+
 from patrol.chain_data.event_fetcher import EventFetcher
+from patrol.chain_data.event_processor import EventProcessor
+from patrol.chain_data.substrate_client import SubstrateClient
+from patrol.chain_data.runtime_groupings import load_versions
+from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation import hooks
 from patrol.validation.config import DB_URL
 from patrol.validation.persistence import Base
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
-from patrol.chain_data.substrate_client import SubstrateClient
-from patrol.chain_data.runtime_groupings import load_versions
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
-from patrol.chain_data.event_processor import EventProcessor
-from sqlalchemy.ext.asyncio import create_async_engine
-
-_MIN_BLOCK_NUMBER = 3_014_342 
+from patrol.constants import Constants
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +27,15 @@ class EventCollector:
         event_processor: EventProcessor,
         event_repository: DatabaseEventStoreRepository,
         sync_interval: int = 12,  # Default to 12 seconds (one block time)
-        batch_size: int = 25
+        batch_size: int = 25      # Current best batch size for querying without errors
     ):
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
         self.event_repository = event_repository
-        self.min_block_number = _MIN_BLOCK_NUMBER
         self.batch_size = batch_size
+        self.running = False
+        self.last_synced_block = None
+        self.sync_interval = sync_interval
 
     async def _fetch_and_store_events(self, start_block: int, end_block: int) -> None:
         """
@@ -71,7 +75,7 @@ class EventCollector:
                 logger.error(f"Error converting event to database format: {e}")
                 continue
         
-        # Store events in the database
+        # Store events to DB
         if event_data_list:
             try:
                 await self.event_repository.add_events(event_data_list)
@@ -84,10 +88,8 @@ class EventCollector:
         """
         Convert an event from the processor format to the database format.
         """
-        # Extract evidence details
         evidence = event.get('evidence', {})
         
-        # Determine evidence type
         evidence_type = "transfer" if "destination_net_uid" not in evidence else "stake"
         
         db_event = {
@@ -105,7 +107,6 @@ class EventCollector:
             "rao_amount": evidence.get("rao_amount")
         }
         
-        # Add stake-specific fields if this is a stake event
         if evidence_type == "stake":
             db_event.update({
                 "destination_net_uid": evidence.get("destination_net_uid"),
@@ -116,6 +117,81 @@ class EventCollector:
             })
         
         return db_event
+    
+    async def _sync_loop(self) -> None:
+        """
+        Main synchronization loop that runs continuously.
+        """
+        try:
+            while self.running:
+                start_time = time.time()
+                
+                # Get the current block number
+                current_block = await self.event_fetcher.get_current_block()
+                
+                # Determine the start block for this sync
+                if self.last_synced_block is None:
+                    # Retrieve min block number from DB
+                    start_block = await self.event_repository.get_highest_block_from_db()
+                    # If no blocks in DB, default to configured min block number 
+                    if start_block is None: 
+                        start_block = current_block - 5000
+                else:
+                    start_block = self.last_synced_block + 1
+                
+                # Determine the end block for this sync (limit to reasonable batch size)
+                max_blocks_per_sync = 100
+                end_block = min(current_block, start_block + max_blocks_per_sync - 1)
+                
+                try:
+                    # Fetch and store events for this range
+                    await self._fetch_and_store_events(start_block, end_block)
+                    self.last_synced_block = end_block
+                    logger.info(f"Synced blocks {start_block} to {end_block}. Last synced block: {self.last_synced_block}")
+                except Exception as e:
+                    logger.error(f"Error during sync: {e}")
+                
+                # Calculate how long to wait before the next sync - adjusts dynamically based on 
+                # num blocks left to ingest
+                elapsed = time.time() - start_time
+                wait_time = max(0, self.sync_interval - elapsed)
+                
+                logger.info(f"Sync completed in {elapsed:.2f}s. Waiting {wait_time:.2f}s before next sync...")
+                await asyncio.sleep(wait_time)
+        except Exception as e:
+            logger.error(f"Unexpected error in sync loop: {e}")
+            self.running = False
+    
+    async def start(self) -> None:
+        """
+        Start the event collector.
+        """
+        if self.running:
+            logger.warning("BlockchainEventSyncer is already running")
+            return
+        
+        self.running = True
+        self._task = asyncio.create_task(self._sync_loop())
+        logger.info(f"Started blockchain event collector.")
+
+
+    async def stop(self) -> None:
+        """
+        Stop the blockchain event collector.
+        """
+        if not self.running:
+            return
+        
+        self.running = False
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
+        
+        logger.info("Stopped blockchain event collector.")
     
 
 async def create_tables(engine):
@@ -157,9 +233,13 @@ async def main():
         sync_interval=12 
     )
     
-    await event_collector._fetch_and_store_events(
-        start_block=_MIN_BLOCK_NUMBER+13, end_block=_MIN_BLOCK_NUMBER+16
-    )
+    await event_collector.start()
+    
+    # Run for a while
+    try:
+        await asyncio.sleep(600)  # Run for 10 minutes
+    finally:
+        await event_collector.stop()
 
 
 if __name__ == "__main__":
