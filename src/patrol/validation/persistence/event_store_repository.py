@@ -2,8 +2,8 @@ import hashlib
 import json
 import logging
 from datetime import datetime, UTC
+from sqlite3 import IntegrityError
 from typing import Any, Dict, List, Optional
-import uuid
 
 from sqlalchemy import BigInteger, DateTime, func, or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
@@ -51,9 +51,8 @@ class _EventStore(Base, MappedAsDataclass):
     __tablename__ = "event_store"
 
     # Primary key and metadata
-    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid.uuid4()))
+    edge_hash: Mapped[str] = mapped_column(primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    edge_hash: Mapped[str]
     
     # Node fields
     node_id: Mapped[str]
@@ -84,7 +83,6 @@ class _EventStore(Base, MappedAsDataclass):
     @classmethod
     def from_event(cls, event):
         return cls(
-        id=str(event.get('id', uuid.uuid4())),
         created_at=event.get('created_at', datetime.now(UTC)),
         node_id=event['node_id'],
         node_type=event['node_type'],
@@ -111,7 +109,6 @@ class _EventStore(Base, MappedAsDataclass):
         SQLite does not persist timezone info, so just set the timezone to UTC if the DB did not give us one.
         """
         return instant if instant.tzinfo is not None else instant.replace(tzinfo=UTC)
-
 
 class DatabaseEventStoreRepository:
 
