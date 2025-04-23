@@ -46,7 +46,7 @@ def create_event_hash(event: Dict[str, Any]) -> str:
     hash_object = hashlib.sha256(hash_string.encode())
     return hash_object.hexdigest()
 
-class _EventStore(Base, MappedAsDataclass):
+class _ChainEvent(Base, MappedAsDataclass):
     __tablename__ = "event_store"
 
     # Primary key and metadata
@@ -116,7 +116,7 @@ class DatabaseEventStoreRepository:
             for data in event_data_list:
                 try:
                     # Create the event object with edge_hash as primary key
-                    event = _EventStore.from_event(data)
+                    event = _ChainEvent.from_event(data)
                     session.add(event)
                     await session.commit()
                 except IntegrityError:
@@ -144,10 +144,10 @@ class DatabaseEventStoreRepository:
             List of events associated with the coldkey
         """
         async with self.LocalAsyncSession() as session:
-            query = select(_EventStore).filter(
+            query = select(_ChainEvent).filter(
                 or_(
-                    _EventStore.coldkey_source == coldkey,
-                    _EventStore.coldkey_destination == coldkey,
+                    _ChainEvent.coldkey_source == coldkey,
+                    _ChainEvent.coldkey_destination == coldkey,
                 )
             )
             result = await session.execute(query)
@@ -162,7 +162,7 @@ class DatabaseEventStoreRepository:
         """
         try:
             async with self.LocalAsyncSession() as session:                
-                query = select(func.max(_EventStore.block_number))
+                query = select(func.max(_ChainEvent.block_number))
                 result = await session.execute(query)
                 max_block = result.scalar()
                 

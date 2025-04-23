@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, UTC
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from patrol.validation.persistence import Base
-from patrol.validation.persistence.event_store_repository import _EventStore
+from patrol.validation.persistence.event_store_repository import _ChainEvent
 from patrol.validation.graph_validation.event_checker import EventChecker
 
 @pytest.fixture
@@ -34,7 +34,7 @@ async def populated_db(in_memory_db, sample_events):
     
     async with session_maker() as session:
         # Convert sample events to _EventStore objects
-        event_objs = [_EventStore.from_event(event) for event in sample_events]
+        event_objs = [_ChainEvent.from_event(event) for event in sample_events]
         
         # Add to database
         session.add_all(event_objs)
