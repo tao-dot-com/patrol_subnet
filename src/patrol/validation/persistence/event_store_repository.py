@@ -121,12 +121,27 @@ class DatabaseEventStoreRepository:
         Args:
             event_data_list: List of dictionaries, each containing event data
         """
+        duplicate_count = 0
         async with self.LocalAsyncSession() as session:
             for data in event_data_list:
-                # Create the event object with edge_hash as primary key
-                event = _EventStore.from_event(data)
-                session.add(event)
-                await session.commit()
+                try:
+                    # Create the event object with edge_hash as primary key
+                    event = _EventStore.from_event(data)
+                    session.add(event)
+                    await session.commit()
+                except IntegrityError:
+                     # Needed to catch duplicate primary key (edge_hash) violations
+                    await session.rollback()
+                    duplicate_count += 1
+                    continue
+                except Exception as e:
+                    # Handle other errors
+                    await session.rollback()
+                    logger.error(f"Error adding event: {e}")
+                    continue
+
+        if duplicate_count > 0:
+            logger.debug(f"Skipped writing {duplicate_count} duplicate events!")
 
     async def find_by_coldkey(self, coldkey: str) -> List[Dict[str, Any]]:
         """

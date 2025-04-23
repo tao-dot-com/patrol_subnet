@@ -174,7 +174,6 @@ class EventCollector:
         self._task = asyncio.create_task(self._sync_loop())
         logger.info(f"Started blockchain event collector.")
 
-
     async def stop(self) -> None:
         """
         Stop the blockchain event collector.
@@ -237,7 +236,7 @@ async def main():
     
     # Run for a while
     try:
-        await asyncio.sleep(600)  # Run for 10 minutes
+        await asyncio.sleep(1800)
     finally:
         await event_collector.stop()
 
