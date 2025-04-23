@@ -2,14 +2,11 @@ import logging
 from typing import Dict, Any, List
 import asyncio
 import time
-import json
 
 from patrol import constants
 from patrol.protocol import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
 
-from patrol.validation.config import DB_URL
-from patrol.validation.graph_validation.event_checker_repository import EventChecker
-from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
+from patrol.validation.graph_validation.event_checker import EventChecker
 from patrol.validation.scoring import ValidationResult
 from patrol.validation.graph_validation.errors import PayloadValidationError, SingleNodeResponse
 
@@ -17,37 +14,45 @@ logger = logging.getLogger(__name__)
 
 class BittensorValidationMechanism:
 
-    def __init__(self, event_store_repository: DatabaseEventStoreRepository, event_checker: EventChecker):
-        self.event_store_repository = event_store_repository
+    def __init__(self, event_checker: EventChecker):
         self.event_checker = event_checker
 
     async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None, max_block_number: int = None) -> ValidationResult:
         start_time = time.time()
-        logger.info(f"Starting validation process for uid: {uid}")
+        logger.info(f"{uid}: Starting validation")
 
         if not payload:
             return ValidationResult(validated=False, message="Empty/Null Payload received.", volume=0)
+                
+        original_volume = 0
 
         try:
             graph_payload = self._parse_graph_payload(payload)
-            volume = len(graph_payload.nodes) + len(graph_payload.edges)
+            original_volume = len(graph_payload.nodes) + len(graph_payload.edges)
             self._verify_target_in_graph(target, graph_payload)
             self._verify_graph_connected(graph_payload)
 
-            await self._verify_edge_data(graph_payload, max_block_number)
+            verified_edges = await self._verify_edge_data(graph_payload, max_block_number)
+
+            validated_volume = self._calculate_validated_volume(verified_edges, target)
+
+            if validated_volume < original_volume:
+                message = f"Validation passed with some edges unverifiable: Original Volume:{original_volume}, Validated Volume: {validated_volume}"
+            else:
+                message = "Validation passed."
 
         except SingleNodeResponse as e:
-            logger.info(f"Validation skipped for uid {uid}: {e}")
-            return ValidationResult(validated=False, message=f"Validation skipped for uid {uid}: {e}", volume=volume)
+            logger.info(f"{uid}: Validation skipped - {e}")
+            return ValidationResult(validated=False, message=f"Validation skipped for uid {uid}: {e}", volume=original_volume)
 
         except Exception as e: 
-            logger.info(f"Validation error for uid {uid}: {e}")
-            return ValidationResult(validated=False, message=f"Validation error for uid {uid}: {e}", volume=volume)
+            logger.info(f"{uid}: Validation error - {e}")
+            return ValidationResult(validated=False, message=f"Validation error for uid {uid}: {e}", volume=original_volume)
 
         validation_time = time.time() - start_time
-        logger.info(f"Validation finished for {uid}. Completed in {validation_time:.2f} seconds")
+        logger.info(f"{uid}: Validation finished - {message}. Completed in {validation_time:.2f} seconds")
 
-        return ValidationResult(validated=True, message="Validation Passed", volume=volume)
+        return ValidationResult(validated=True, message=message, volume=validated_volume)
 
     def _parse_graph_payload(self, payload: dict) -> GraphPayload:
         """
@@ -112,59 +117,6 @@ class BittensorValidationMechanism:
         
         return GraphPayload(nodes=nodes, edges=edges)
     
-    @staticmethod
-    def _convert_edges_to_event_data(graph_payload: GraphPayload) -> List[Dict[str, Any]]:
-        """
-        Convert edges from GraphPayload to event data format required by check_events_by_hash
-        
-        Args:
-            graph_payload: The graph payload containing edges
-            node_info: Dictionary with node_id, node_type, and node_origin
-        
-        Returns:
-            List of event data dictionaries
-        """
-        event_data_list = []
-        
-        for edge in graph_payload.edges:
-            # Common fields for all edges
-            event_data = {
-                "node_id": f"node_{edge.coldkey_source}",
-                "node_type": "account",
-                "node_origin": "bittensor",
-                "coldkey_source": edge.coldkey_source,
-                "coldkey_destination": edge.coldkey_destination,
-                "edge_category": edge.category,
-                "edge_type": edge.type,
-                "coldkey_owner": edge.coldkey_owner,
-                "block_number": edge.evidence.block_number,
-            }
-            
-            # Handle different evidence types
-            if edge.category == "balance":
-                event_data.update({
-                    "evidence_type": "transfer",
-                    "rao_amount": edge.evidence.rao_amount,
-                    "destination_net_uid": None,
-                    "source_net_uid": None,
-                    "alpha_amount": None,
-                    "delegate_hotkey_source": None,
-                    "delegate_hotkey_destination": None,
-                })
-            elif edge.category == "staking":
-                event_data.update({
-                    "evidence_type": "stake",
-                    "rao_amount": edge.evidence.rao_amount,
-                    "destination_net_uid": edge.evidence.destination_net_uid,
-                    "source_net_uid": edge.evidence.source_net_uid,
-                    "alpha_amount": edge.evidence.alpha_amount,
-                    "delegate_hotkey_source": edge.evidence.delegate_hotkey_source,
-                    "delegate_hotkey_destination": edge.evidence.delegate_hotkey_destination,
-                })
-            
-            event_data_list.append(event_data)
-        
-        return event_data_list
 
     def _verify_target_in_graph(self, target: str, graph_payload: GraphPayload) -> None:
 
@@ -249,7 +201,52 @@ class BittensorValidationMechanism:
                 f"[{min_block}, {max_block_number}]: {invalid_blocks}"
             )
         
-    async def _verify_edge_data(self, graph_payload: GraphPayload, max_block_number: int):
+    @staticmethod
+    def _convert_edges_to_event_data(graph_payload: GraphPayload) -> List[Dict[str, Any]]:
+        """
+        Convert edges from GraphPayload to event data format required by check_events_by_hash
+        """
+        event_data_list = []
+        
+        for edge in graph_payload.edges:
+            # Common fields for all edges
+            event_data = {
+                "node_id": f"node_{edge.coldkey_source}",
+                "node_type": "account",
+                "node_origin": "bittensor",
+                "coldkey_source": edge.coldkey_source,
+                "coldkey_destination": edge.coldkey_destination,
+                "edge_category": edge.category,
+                "edge_type": edge.type,
+                "coldkey_owner": edge.coldkey_owner,
+                "block_number": edge.evidence.block_number,
+            }
+            
+            # Handle different evidence types
+            if edge.category == "balance":
+                event_data.update({
+                    "rao_amount": edge.evidence.rao_amount,
+                    "destination_net_uid": None,
+                    "source_net_uid": None,
+                    "alpha_amount": None,
+                    "delegate_hotkey_source": None,
+                    "delegate_hotkey_destination": None,
+                })
+            elif edge.category == "staking":
+                event_data.update({
+                    "rao_amount": edge.evidence.rao_amount,
+                    "destination_net_uid": edge.evidence.destination_net_uid,
+                    "source_net_uid": edge.evidence.source_net_uid,
+                    "alpha_amount": edge.evidence.alpha_amount,
+                    "delegate_hotkey_source": edge.evidence.delegate_hotkey_source,
+                    "delegate_hotkey_destination": edge.evidence.delegate_hotkey_destination,
+                })
+            
+            event_data_list.append(event_data)
+        
+        return event_data_list
+    
+    async def _verify_edge_data(self, graph_payload: GraphPayload, max_block_number: int) -> List[dict]:
 
         block_numbers = {edge.evidence.block_number for edge in graph_payload.edges}
         
@@ -257,34 +254,101 @@ class BittensorValidationMechanism:
     
         events = self._convert_edges_to_event_data(graph_payload)
 
-        unmatched_edges = await self.event_checker.check_events_by_hash(events)
+        validated_edges = await self.event_checker.check_events_by_hash(events)
 
-        if len(unmatched_edges) == 0:
-            logger.debug("All edges matched with on-chain events.")
+        if len(validated_edges) == 0:
+            raise PayloadValidationError("No matching edges found in payload.")
         else:
-            logger.error(f"{len(unmatched_edges)} edges unmatched with on-chain events.")
-            raise PayloadValidationError("Unmatched edges in payload.")
+            return validated_edges
+        
+    def _generate_adjacency_graph_from_events(self, events: List[Dict]) -> Dict:
 
+        graph = {}
+
+        for event in events:
+            src = event.get("coldkey_source")
+            dst = event.get("coldkey_destination")
+            ownr = event.get("coldkey_owner")
+
+            connections = []
+            if src and dst:
+                connections.append((src, dst))
+                connections.append((dst, src))
+            if src and ownr:
+                connections.append((src, ownr))
+                connections.append((ownr, src))
+            if dst and ownr:
+                connections.append((dst, ownr))
+                connections.append((ownr, dst))
+
+            for a, b in connections:
+                if a not in graph:
+                    graph[a] = []
+                graph[a].append({"neighbor": b, "event": event})
+
+        return graph
+    
+    def _generate_subgraph_volume_from_adjacency_graph(self, adjacency_graph: dict, target_address: str) -> Dict:
+
+        seen_nodes = set()
+        seen_edges = set()
+        queue = [target_address]
+
+        while queue:
+            current = queue.pop(0)
+
+            if current not in seen_nodes:
+                seen_nodes.add(current)
+
+            for conn in adjacency_graph.get(current, []):
+                neighbor = conn["neighbor"]
+                event = conn["event"]
+                edge_key = (
+                    event.get('coldkey_source'),
+                    event.get('coldkey_destination'),
+                    event.get('edge_category'),
+                    event.get('edge_type'),
+                    event.get('rao_amount'),
+                    event.get('block_number')
+                )
+
+                if edge_key not in seen_edges:
+                    seen_edges.add(edge_key)
+
+                if neighbor not in seen_nodes and neighbor not in queue:
+                    queue.append(neighbor)
+
+        return len(seen_nodes) + len(seen_edges)
+
+    def _calculate_validated_volume(self, validated_edges: List[dict], target_address: str) -> int:
+
+        adjacency_graph = self._generate_adjacency_graph_from_events(validated_edges)
+
+        volume = self._generate_subgraph_volume_from_adjacency_graph(adjacency_graph, target_address)
+
+        return volume
 
 # Example usage:
 if __name__ == "__main__":
 
     import json
-    from sqlalchemy.ext.asyncio import create_async_engine
 
     async def main():
-        engine = create_async_engine(DB_URL, pool_pre_ping=True)
-        event_store_repository = DatabaseEventStoreRepository(engine)
 
-        validator = BittensorValidationMechanism(event_store_repository)
+        class MockEventChecker:
 
-        file_path = "subgraph_output_3.json"
+            async def check_events_by_hash(self, event_data_list: List[Dict[str, Any]]) -> List[Dict]:
+
+                return event_data_list
+        
+        event_checker = MockEventChecker()
+
+        validator = BittensorValidationMechanism(event_checker=event_checker)
+
+        file_path = "subgraph_output.json"
         with open(file_path, "r") as f:
             payload = json.load(f)
 
-        tasks = [validator.validate_payload(uid=1, payload=payload, target="5Ck5g3MaG7Ho29ZqmcTFgq8zTxmnrwxs6FR94RsCEquT6nLy") for _ in range(8)]
-
-        await asyncio.gather(*tasks)
-
+        await validator.validate_payload(uid=1, payload=payload, target="5FyCncAf9EBU8Nkcm5gL1DQu3hVmY7aphiqRn3CxwoTmB1cZ", max_block_number=4179351)
 
     asyncio.run(main())
