@@ -8,6 +8,7 @@ from patrol import constants
 from patrol.protocol import GraphPayload, Edge, Node, StakeEvidence, TransferEvidence
 
 from patrol.validation.config import DB_URL
+from patrol.validation.graph_validation.event_checker_repository import EventChecker
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.validation.scoring import ValidationResult
 from patrol.validation.graph_validation.errors import PayloadValidationError, SingleNodeResponse
@@ -16,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 class BittensorValidationMechanism:
 
-    def __init__(self, event_store_repository: DatabaseEventStoreRepository):
+    def __init__(self, event_store_repository: DatabaseEventStoreRepository, event_checker: EventChecker):
         self.event_store_repository = event_store_repository
+        self.event_checker = event_checker
 
     async def validate_payload(self, uid: int, payload: Dict[str, Any] = None, target: str = None, max_block_number: int = None) -> ValidationResult:
         start_time = time.time()
@@ -255,12 +257,12 @@ class BittensorValidationMechanism:
     
         events = self._convert_edges_to_event_data(graph_payload)
 
-        unmatched_count = await self.event_store_repository.check_events_by_hash(events)
+        unmatched_edges = await self.event_checker.check_events_by_hash(events)
 
-        if unmatched_count == 0:
+        if len(unmatched_edges) == 0:
             logger.debug("All edges matched with on-chain events.")
         else:
-            logger.error(f"{unmatched_count} edges unmatched with on-chain events.")
+            logger.error(f"{len(unmatched_edges)} edges unmatched with on-chain events.")
             raise PayloadValidationError("Unmatched edges in payload.")
 
 
