@@ -135,7 +135,7 @@ class EventCollector:
                     start_block = await self.event_repository.get_highest_block_from_db()
                     # If no blocks in DB, default to configured min block number 
                     if start_block is None: 
-                        start_block = current_block - 5000
+                        start_block = current_block - 20000
                 else:
                     start_block = self.last_synced_block + 1
                 
@@ -173,7 +173,6 @@ class EventCollector:
         self.running = True
         self._task = asyncio.create_task(self._sync_loop())
         logger.info(f"Started blockchain event collector.")
-
 
     async def stop(self) -> None:
         """
@@ -237,7 +236,7 @@ async def main():
     
     # Run for a while
     try:
-        await asyncio.sleep(600)  # Run for 10 minutes
+        await asyncio.sleep(1800)
     finally:
         await event_collector.stop()
 
