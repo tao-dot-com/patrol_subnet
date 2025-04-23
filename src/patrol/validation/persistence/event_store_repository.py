@@ -175,7 +175,7 @@ class DatabaseEventStoreRepository:
             The highest block number in the database, or None if no blocks are stored
         """
         try:
-            async with self.event_repository.LocalAsyncSession() as session:                
+            async with self.LocalAsyncSession() as session:                
                 query = select(func.max(_EventStore.block_number))
                 result = await session.execute(query)
                 max_block = result.scalar()
