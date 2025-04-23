@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy import select
 from typing import Any, List, Dict
 
-from patrol.validation.persistence.event_store_repository import _EventStore
+from patrol.validation.persistence.event_store_repository import _ChainEvent
 
 
 class EventChecker:
@@ -23,13 +23,13 @@ class EventChecker:
         """
         async with self.LocalAsyncSession() as session:
             # Convert incoming events to EventStore objects with hashes
-            events = [_EventStore.from_event(data) for data in event_data_list]
+            events = [_ChainEvent.from_event(data) for data in event_data_list]
             
             # Extract hashes from incoming events
             event_hashes = [event.edge_hash for event in events]
             
             # Query database for matching hashes
-            query = select(_EventStore.edge_hash).where(_EventStore.edge_hash.in_(event_hashes))
+            query = select(_ChainEvent.edge_hash).where(_ChainEvent.edge_hash.in_(event_hashes))
             result = await session.execute(query)
             existing_hashes = {row[0] for row in result.fetchall()}
             

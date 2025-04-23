@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 from patrol.validation.persistence.event_store_repository import (
     DatabaseEventStoreRepository,
-    _EventStore,
+    _ChainEvent,
     create_event_hash
 )
 
@@ -79,7 +79,7 @@ async def test_add_single_transfer_event(event_repository):
     
     # Verify the event was added using a direct query
     async with event_repository.LocalAsyncSession() as session:
-        query = select(_EventStore)
+        query = select(_ChainEvent)
         result = await session.execute(query)
         events = result.scalars().all()
         
@@ -114,7 +114,7 @@ async def test_add_single_stake_event(event_repository):
     
     # Verify the event was added with all its fields
     async with event_repository.LocalAsyncSession() as session:
-        query = select(_EventStore)
+        query = select(_ChainEvent)
         result = await session.execute(query)
         events = result.scalars().all()
         

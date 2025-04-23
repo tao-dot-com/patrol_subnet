@@ -3,7 +3,7 @@ import os
 import tempfile
 import pytest
 from typing import Dict, Any, List
-from patrol.validation.persistence.event_store_repository import _EventStore, create_event_hash
+from patrol.validation.persistence.event_store_repository import _ChainEvent, create_event_hash
 
 class MockEventCheckerRepository:
     """
@@ -37,13 +37,13 @@ class MockEventCheckerRepository:
             The number of events that don't exist in the mock database
         """
         # Convert incoming events to EventStore objects with hashes
-        incoming_events = [_EventStore.from_event(data) for data in event_data_list]
+        incoming_events = [_ChainEvent.from_event(data) for data in event_data_list]
         
         # Extract hashes from incoming events
         incoming_hashes = [event.edge_hash for event in incoming_events]
         
         # Convert stored events to EventStore objects and extract their hashes
-        stored_events = [_EventStore.from_event(data) for data in self.events]
+        stored_events = [_ChainEvent.from_event(data) for data in self.events]
         existing_hashes = {event.edge_hash for event in stored_events}
         
         # Count events that don't exist in the mock database
