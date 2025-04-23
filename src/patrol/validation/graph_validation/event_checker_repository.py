@@ -6,8 +6,7 @@ from typing import Any, Dict, List
 from patrol.validation.persistence.event_store_repository import _EventStore
 
 
-
-class EventCheckerRepository:
+class EventChecker:
 
     def __init__(self, engine: AsyncEngine):
         self.LocalAsyncSession = async_sessionmaker(bind=engine)
@@ -34,7 +33,7 @@ class EventCheckerRepository:
             result = await session.execute(query)
             existing_hashes = {row[0] for row in result.fetchall()}
             
-            # Count events that don't exist in the database
-            unmatched_count = sum(1 for event_hash in event_hashes if event_hash not in existing_hashes)
+            # Find events that don't exist in the database
+            unmatched_events = [event for event in events if event.edge_hash not in existing_hashes]
             
-            return unmatched_count
+            return unmatched_events
