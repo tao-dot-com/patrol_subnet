@@ -266,7 +266,13 @@
     "258": {
         "block_number_min": 5280452,
         "block_hash_min": "0xcf2ad5566b49e32717545868a511502b951d400cc8e0089b22440009484abf58",
-        "block_number_max": 5301340,
-        "block_hash_max": "0x2c73f4fdcf85b522a0763c7fcc263d4577dc46f9c39e3474afd0069d196a9eb0"
+        "block_number_max": 5328895,
+        "block_hash_max": "0x96fa1b9bad81f7767fc67eb62dfdf327826cc57f3b9614b01b2536a046fb8d76"
+    },
+    "261": {
+        "block_number_min": 5328896,
+        "block_hash_min": "0xd68c6fdc8bfbaf374f38200c93f3ad581606919e6ee208410ffb3e6b911ca9ef",
+        "block_number_max": 5413452,
+        "block_hash_max": "0x063e166ea94adf9d9267bf6a902864f6196a96ad1d085f0df87a012c73e85b48"
     }
 }
