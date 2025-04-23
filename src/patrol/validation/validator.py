@@ -6,12 +6,15 @@ import bittensor as bt
 from aiohttp import TCPConnector
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from patrol.chain_data.event_collector import EventCollector
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 from patrol.validation import auto_update, hooks
+from patrol.validation.graph_validation.event_checker import EventChecker
 from patrol.validation.hooks import HookType
 from patrol.validation.persistence import migrate_db
+from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 from patrol.validation.scoring import MinerScoreRepository
 import asyncio
@@ -187,6 +190,36 @@ class Validator:
         await self.weight_setter.set_weights(weights)
 
 
+async def sync_event_store(collector: EventCollector):
+    # Start the event collector
+    await collector.start()
+    logger.info("Started Event Collector service in background")
+    
+    check_interval_minutes = 10
+    max_acceptable_block_gap = 10
+    
+    # Periodically check if we have enough blockchain data
+    while True:
+        # Check current gap between chain and database
+        highest_block = await collector.event_repository.get_highest_block_from_db()
+        current_block = await collector.event_fetcher.get_current_block()
+        
+        if highest_block is None:
+            block_gap = float('inf')  # No blocks in DB yet
+        else:
+            block_gap = current_block - highest_block
+        
+        logger.info(f"Database sync status: highest_block={highest_block}, current_block={current_block}, gap={block_gap} blocks")
+        
+        # If we're synced up enough, break out of the loop
+        if block_gap <= max_acceptable_block_gap:
+            logger.info(f"Database is sufficiently synced (gap: {block_gap} blocks). Proceeding with validation.")
+            break
+        
+        logger.info(f"Waiting {check_interval_minutes} more minutes for database to sync (current gap: {block_gap} blocks)")
+        await asyncio.sleep(check_interval_minutes * 60)  # Wait for the specified interval
+
+
 async def start():
 
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
@@ -219,12 +252,24 @@ async def start():
 
     event_fetcher = EventFetcher(my_substrate_client)
     event_processor = EventProcessor(coldkey_finder)
+    event_checker = EventChecker(engine)
+
+    event_repository = DatabaseEventStoreRepository(engine)
+    
+    event_collector = EventCollector(
+        event_fetcher=event_fetcher,
+        event_processor=event_processor,
+        event_repository=event_repository,
+        sync_interval=12  # Default block time in seconds
+    )
+
+    await sync_event_store(event_collector)
 
     dendrite = bt.Dendrite(wallet)
 
     metagraph = await subtensor.metagraph(NET_UID)
     miner_validator = Validator(
-        validation_mechanism=BittensorValidationMechanism(event_fetcher, event_processor),
+        validation_mechanism=BittensorValidationMechanism(event_checker),
         target_generator=TargetGenerator(event_fetcher, event_processor),
         scoring_mechanism=MinerScoring(miner_score_repository, moving_average_denominator=8),
         miner_score_repository=miner_score_repository,
