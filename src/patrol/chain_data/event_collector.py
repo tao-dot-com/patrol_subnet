@@ -89,25 +89,19 @@ class EventCollector:
         Convert an event from the processor format to the database format.
         """
         evidence = event.get('evidence', {})
-        
-        evidence_type = "transfer" if "destination_net_uid" not in evidence else "stake"
-        
+                
         db_event = {
             "created_at": datetime.now(),
-            "node_id": event.get("node_id", f"node_{event.get('coldkey_source')}"),
-            "node_type": event.get("node_type", "account"),
-            "node_origin": event.get("node_origin", "bittensor"),
             "coldkey_source": event.get("coldkey_source"),
             "coldkey_destination": event.get("coldkey_destination"),
             "edge_category": event.get("category"),
             "edge_type": event.get("type"),
             "coldkey_owner": event.get("coldkey_owner"),
-            "evidence_type": evidence_type,
             "block_number": evidence.get("block_number"),
             "rao_amount": evidence.get("rao_amount")
         }
         
-        if evidence_type == "stake":
+        if db_event["edge_category"] == "staking":
             db_event.update({
                 "destination_net_uid": evidence.get("destination_net_uid"),
                 "source_net_uid": evidence.get("source_net_uid"),
@@ -135,13 +129,16 @@ class EventCollector:
                     start_block = await self.event_repository.get_highest_block_from_db()
                     # If no blocks in DB, default to configured min block number 
                     if start_block is None: 
-                        start_block = current_block - 20000
+                        # start_block = Constants.LOWER_BLOCK_LIMIT
+                        start_block = current_block - 5000
+                    else:
+                        start_block += 1
                 else:
                     start_block = self.last_synced_block + 1
                 
                 # Determine the end block for this sync (limit to reasonable batch size)
                 max_blocks_per_sync = 100
-                end_block = min(current_block, start_block + max_blocks_per_sync - 1)
+                end_block = min(current_block, start_block + max_blocks_per_sync)
                 
                 try:
                     # Fetch and store events for this range
