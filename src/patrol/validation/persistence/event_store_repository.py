@@ -1,12 +1,20 @@
 import hashlib
 import json
+import logging
+from datetime import datetime, UTC
+from typing import Any, Dict, List, Optional
+import uuid
+
+from sqlalchemy import BigInteger, DateTime, func, or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
 from sqlalchemy import BigInteger, DateTime, or_, select
 from datetime import datetime, UTC
+
 from patrol.validation.persistence import Base
-import uuid
-from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
 
 def create_event_hash(event: Dict[str, Any]) -> str:
     """
@@ -118,9 +126,11 @@ class DatabaseEventStoreRepository:
             event_data_list: List of dictionaries, each containing event data
         """
         async with self.LocalAsyncSession() as session:
-            events = [_EventStore.from_event(data) for data in event_data_list]
-            session.add_all(events)
-            await session.commit()
+            for data in event_data_list:
+                # Create the event object with edge_hash as primary key
+                event = _EventStore.from_event(data)
+                session.add(event)
+                await session.commit()
 
     async def find_by_coldkey(self, coldkey: str) -> List[Dict[str, Any]]:
         """
@@ -141,3 +151,25 @@ class DatabaseEventStoreRepository:
             )
             result = await session.execute(query)
             return [self._to_dict(event) for event in result.scalars().all()]
+        
+    async def get_highest_block_from_db(self) -> Optional[int]:
+        """
+        Query the database to find the highest block number that has been stored.
+        
+        Returns:
+            The highest block number in the database, or None if no blocks are stored
+        """
+        try:
+            async with self.LocalAsyncSession() as session:                
+                query = select(func.max(_EventStore.block_number))
+                result = await session.execute(query)
+                max_block = result.scalar()
+                
+                if max_block is not None:
+                    logger.info(f"Highest block in database: {max_block}")
+                else:
+                    logger.info("No blocks found in database")
+                    
+                return max_block
+        except Exception as e:
+            return None
