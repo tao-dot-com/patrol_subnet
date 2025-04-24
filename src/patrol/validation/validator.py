@@ -1,3 +1,4 @@
+import dataclasses
 import json
 from typing import Callable, Tuple, Any
 
@@ -119,11 +120,11 @@ class Validator:
         await self.miner_score_repository.add(miner_score)
         try:
             await self.dashboard_client.send_score(miner_score)
-            logger.info("Sent scores to dashboard", extra=miner_score)
-        except Exception:
-            logger.exception("Failed to send scores to dashboard", extra=miner_score)
+            logger.info("Sent scores to dashboard", extra=dataclasses.asdict(miner_score))
+        except Exception as ex:
+            logger.exception("Failed to send scores to dashboard", extra=dataclasses.asdict(miner_score))
 
-        logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}.")
+        logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}")
 
         return miner_score
 
