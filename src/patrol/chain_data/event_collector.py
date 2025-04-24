@@ -139,9 +139,7 @@ class EventCollector:
                     start_block = await self.event_repository.get_highest_block_from_db()
                     # If no blocks in DB, default to configured min block number 
                     if start_block is None:
-                        # start_block = Constants.LOWER_BLOCK_LIMIT
-                        # start_block = 5400981
-                        start_block = 4199700
+                        start_block = Constants.LOWER_BLOCK_LIMIT
                     else:
                         start_block += 1
                 else:
