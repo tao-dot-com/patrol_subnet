@@ -230,7 +230,7 @@ async def test_sync_loop_with_existing_blocks(event_collector, mock_dependencies
 
 @pytest.mark.asyncio
 async def test_sync_loop_with_no_blocks(event_collector, mock_dependencies, monkeypatch):
-    """When the DB is empty, we should start at the hard‐coded 5,400,981."""
+    """When the DB is empty, we should start at the lower block number limit."""
     current_block = 5_000_000
     mock_dependencies["event_fetcher"].get_current_block.return_value = current_block
     mock_dependencies["event_repository"].get_highest_block_from_db.return_value = None
@@ -243,7 +243,7 @@ async def test_sync_loop_with_no_blocks(event_collector, mock_dependencies, monk
     await event_collector.stop()
 
     fake_fetch_store.assert_awaited_once()
-    start_block = 5_400_981
+    start_block = Constants.LOWER_BLOCK_LIMIT
     end_block = min(current_block, start_block + 5000)
     assert fake_fetch_store.call_args[0] == (start_block, end_block)
     assert event_collector.last_synced_block == end_block
