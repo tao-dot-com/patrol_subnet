@@ -67,7 +67,7 @@ class HttpDashboardClient(DashboardClient):
 
         async with aiohttp.ClientSession() as session:
             async with session.put(
-                    url=f"{self._dashboard_score_base_url}/patrol/dashboard/miner-scores/{score.id}",
+                    url=f"{self._dashboard_score_base_url}/patrol/dashboard/api/miner-scores/{score.id}",
                     data=_MinerScore.from_score(score).model_dump_json(exclude_none=False),
                     headers={"Content-Type": "application/json", "authorization": f"Bearer {token}"}
             ) as response:
