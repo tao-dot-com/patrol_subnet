@@ -72,6 +72,8 @@ services:
     environment:
       POSTGRES_USER: patrol
       POSTGRES_PASSWORD: password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
 
   validator:
     init: true
@@ -87,7 +89,6 @@ services:
       # HOTKEY_NAME: my_hotkey
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
-      - pg_data:/var/lib/postgresql/data
 
 ```
 #### 3.3 Embedded SQLite database (Quick & dirty)
