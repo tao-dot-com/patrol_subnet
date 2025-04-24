@@ -20,4 +20,4 @@ ENABLE_AUTO_UPDATE = os.getenv('ENABLE_AUTO_UPDATE', "0") == "1"
 MAX_RESPONSE_SIZE_BYTES = 1024 * 1024 * int(os.getenv('MAX_RESPONSE_SIZE_MB', "64"))
 BATCH_CONCURRENCY = int(os.getenv('BATCH_CONCURRENCY', "1"))
 
-DASHBOARD_BASE_URL = os.getenv('DASHBOARD_BASE_URL', "https://")
+DASHBOARD_BASE_URL = os.getenv('DASHBOARD_BASE_URL', "https://patrol.tao.com")

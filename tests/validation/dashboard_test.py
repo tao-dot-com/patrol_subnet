@@ -30,7 +30,7 @@ async def mock_dashboard(aiohttp_client):
         return web.Response(body=None, status=204)
 
     app = web.Application()
-    app.router.add_put("/patrol/dashboard/miner-scores/{id}", handler)
+    app.router.add_put("/patrol/dashboard/api/miner-scores/{id}", handler)
     client = await aiohttp_client(app)
     return client, captured_requests
 
@@ -69,7 +69,7 @@ async def test_send_score(mock_dashboard, mock_wallet):
 
     assert len(captured_requests) == 1
     assert captured_requests[0]["method"] == "PUT"
-    assert captured_requests[0]["path"] == f"/patrol/dashboard/miner-scores/{miner_score.id}"
+    assert captured_requests[0]["path"] == f"/patrol/dashboard/api/miner-scores/{miner_score.id}"
     assert captured_requests[0]["headers"]["content-type"] == "application/json"
 
     token = captured_requests[0]["headers"]["authorization"].rsplit("Bearer ", 1)[-1].split(":")
