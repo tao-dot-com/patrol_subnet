@@ -136,7 +136,7 @@ class EventCollector:
                     start_block = self.last_synced_block + 1
                 
                 # Determine the end block for this sync (limit to reasonable batch size)
-                max_blocks_per_sync = 100
+                max_blocks_per_sync = 5000
                 end_block = min(current_block, start_block + max_blocks_per_sync)
                 
                 try:
@@ -232,7 +232,7 @@ async def main():
     
     # Run for a while
     try:
-        await asyncio.sleep(1800)
+        await asyncio.sleep(1200)
     finally:
         await event_collector.stop()
 
