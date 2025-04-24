@@ -59,8 +59,9 @@ class Validator:
         uuid_generator: Callable[[], UUID],
         weight_setter: WeightSetter,
         enable_weight_setting: bool,
+        enable_dashboard_syndication: bool,
         concurrency: int = 10,
-        max_response_size_bytes = 64E9
+        max_response_size_bytes = 64E9,
     ):
         self.validation_mechanism = validation_mechanism
         self.scoring_mechanism = scoring_mechanism
@@ -75,6 +76,7 @@ class Validator:
         self.enable_weight_setting = enable_weight_setting
         self.concurrency = concurrency
         self.max_response_size_bytes = max_response_size_bytes
+        self.enable_dashboard_syndication = enable_dashboard_syndication
 
     async def query_miner(self,
         batch_id: UUID,
@@ -121,11 +123,12 @@ class Validator:
             )
 
         await self.miner_score_repository.add(miner_score)
-        try:
-            await self.dashboard_client.send_score(miner_score)
-            logger.info("Sent scores to dashboard", extra=dataclasses.asdict(miner_score))
-        except Exception as ex:
-            logger.exception("Failed to send scores to dashboard", extra=dataclasses.asdict(miner_score))
+        if self.enable_dashboard_syndication:
+            try:
+                await self.dashboard_client.send_score(miner_score)
+                logger.info("Sent scores to dashboard", extra=dataclasses.asdict(miner_score))
+            except Exception as ex:
+                logger.exception("Failed to send scores to dashboard", extra=dataclasses.asdict(miner_score))
 
         logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}")
 
@@ -235,7 +238,7 @@ async def start():
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
                                           ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS,
                                           ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES, BATCH_CONCURRENCY,
-                                          DASHBOARD_BASE_URL)
+                                          DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION)
 
     if ENABLE_AUTO_UPDATE:
         logger.info("Auto update is enabled")
@@ -290,6 +293,7 @@ async def start():
         uuid_generator=lambda: uuid.uuid4(),
         weight_setter=weight_setter,
         enable_weight_setting=ENABLE_WEIGHT_SETTING,
+        enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION,
         max_response_size_bytes=MAX_RESPONSE_SIZE_BYTES,
         concurrency=BATCH_CONCURRENCY
     )
