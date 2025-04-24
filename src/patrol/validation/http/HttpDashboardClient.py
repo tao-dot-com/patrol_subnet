@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import logging
 import time
 from dataclasses import asdict
