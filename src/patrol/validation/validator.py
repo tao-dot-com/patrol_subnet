@@ -1,9 +1,9 @@
+import dataclasses
 import json
 from typing import Callable, Tuple, Any
 
 import uuid
 import bittensor as bt
-from aiohttp import TCPConnector
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from patrol.chain_data.event_collector import EventCollector
@@ -12,7 +12,9 @@ from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 from patrol.validation import auto_update, hooks
 from patrol.validation.graph_validation.event_checker import EventChecker
+from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hooks import HookType
+from patrol.validation.http.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
@@ -51,6 +53,7 @@ class Validator:
         target_generator: TargetGenerator,
         scoring_mechanism: MinerScoring,
         miner_score_repository: MinerScoreRepository,
+        dashboard_client: DashboardClient,
         dendrite: bt.Dendrite,
         metagraph: AsyncMetagraph,
         uuid_generator: Callable[[], UUID],
@@ -63,6 +66,7 @@ class Validator:
         self.scoring_mechanism = scoring_mechanism
         self.target_generator = target_generator
         self.miner_score_repository = miner_score_repository
+        self.dashboard_client = dashboard_client
         self.dendrite = dendrite
         self.metagraph = metagraph
         self.uuid_generator = uuid_generator
@@ -117,8 +121,14 @@ class Validator:
             )
 
         await self.miner_score_repository.add(miner_score)
+        try:
+            await self.dashboard_client.send_score(miner_score)
+            logger.info("Sent scores to dashboard", extra=dataclasses.asdict(miner_score))
+        except Exception as ex:
+            logger.exception("Failed to send scores to dashboard", extra=dataclasses.asdict(miner_score))
 
-        logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}. Response Time: {response_time}")
+        logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}")
+
         return miner_score
 
     async def _invoke_miner(self, url, processed_synapse) -> tuple[dict[str, Any], float]:
@@ -224,7 +234,8 @@ async def start():
 
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
                                           ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS,
-                                          ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES, BATCH_CONCURRENCY)
+                                          ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES, BATCH_CONCURRENCY,
+                                          DASHBOARD_BASE_URL)
 
     if ENABLE_AUTO_UPDATE:
         logger.info("Auto update is enabled")
@@ -273,6 +284,7 @@ async def start():
         target_generator=TargetGenerator(event_fetcher, event_processor),
         scoring_mechanism=MinerScoring(miner_score_repository, moving_average_denominator=8),
         miner_score_repository=miner_score_repository,
+        dashboard_client=HttpDashboardClient(wallet, DASHBOARD_BASE_URL),
         dendrite=dendrite,
         metagraph=metagraph,
         uuid_generator=lambda: uuid.uuid4(),
@@ -281,7 +293,6 @@ async def start():
         max_response_size_bytes=MAX_RESPONSE_SIZE_BYTES,
         concurrency=BATCH_CONCURRENCY
     )
-
 
     #await asyncio.wait_for(miner_validator.query_miner_batch(), timeout=60*60)
     
