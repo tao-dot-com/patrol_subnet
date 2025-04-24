@@ -27,7 +27,7 @@ class EventCollector:
         event_processor: EventProcessor,
         event_repository: DatabaseEventStoreRepository,
         sync_interval: int = 12,  # Default to 12 seconds (one block time)
-        batch_size: int = 25      # Current best batch size for querying without errors
+        batch_size: int = 50      # Current best batch size for querying without errors
     ):
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
@@ -128,8 +128,10 @@ class EventCollector:
                     # Retrieve min block number from DB
                     start_block = await self.event_repository.get_highest_block_from_db()
                     # If no blocks in DB, default to configured min block number 
-                    if start_block is None: 
-                        start_block = Constants.LOWER_BLOCK_LIMIT
+                    if start_block is None:
+                        # start_block = Constants.LOWER_BLOCK_LIMIT
+                        start_block = 5400981
+                        # start_block = 4199700
                     else:
                         start_block += 1
                 else:
