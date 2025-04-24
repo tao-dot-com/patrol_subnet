@@ -31,9 +31,10 @@ class EventChecker:
             # Query database for matching hashes
             query = select(_ChainEvent.edge_hash).where(_ChainEvent.edge_hash.in_(event_hashes))
             result = await session.execute(query)
-            existing_hashes = {row[0] for row in result.fetchall()}
+            fetched_rows = result.fetchall()
+            existing_hashes = {row[0] for row in fetched_rows}
             
             # Find events that do exist in the database
-            matched_events = [event for event in events if event.edge_hash in existing_hashes]
+            matched_events = [event_data_list[i] for i, event in enumerate(events) if event.edge_hash in existing_hashes]
             
             return matched_events
