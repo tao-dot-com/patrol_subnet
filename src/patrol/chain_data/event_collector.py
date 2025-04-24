@@ -140,15 +140,15 @@ class EventCollector:
                     # If no blocks in DB, default to configured min block number 
                     if start_block is None:
                         # start_block = Constants.LOWER_BLOCK_LIMIT
-                        start_block = 5400981
-                        # start_block = 4199700
+                        # start_block = 5400981
+                        start_block = 4199700
                     else:
                         start_block += 1
                 else:
                     start_block = self.last_synced_block + 1
                 
                 # Determine the end block for this sync (limit to reasonable batch size)
-                max_blocks_per_sync = 5000
+                max_blocks_per_sync = 100
                 end_block = min(current_block, start_block + max_blocks_per_sync)
                 
                 try:
