@@ -27,7 +27,6 @@ class EventFetcher:
         """
         Fetch events for a batch of blocks for a specific runtime_version using the substrate client's query method.
         """
-        # Extract block hashes for processing.
         block_hashes = [block_hash for (_, block_hash) in block_info]
         semaphore = asyncio.Semaphore(max_concurrent)
 
@@ -66,10 +65,9 @@ class EventFetcher:
                 preprocessed_lst[0].value_scale_type,
                 preprocessed_lst[0].storage_item
             ),
-            timeout=3
+            timeout=5
         )
 
-        # Build a mapping from block_number to event response.
         return {
             block_number: responses[block_hash][0]
             for (block_number, block_hash) in block_info

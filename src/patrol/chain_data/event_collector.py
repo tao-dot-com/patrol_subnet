@@ -1,7 +1,8 @@
 import asyncio
+from collections import deque
 import logging
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Deque, Tuple
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -27,12 +28,14 @@ class EventCollector:
         event_processor: EventProcessor,
         event_repository: DatabaseEventStoreRepository,
         sync_interval: int = 12,  # Default to 12 seconds (one block time)
-        batch_size: int = 50      # Current best batch size for querying without errors
+        batch_size: int = 50,     # Current best batch size for querying without errors
+        buffer_size: int = 1000   # Number of events to store in buffer before processing
     ):
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
         self.event_repository = event_repository
         self.batch_size = batch_size
+        self.buffer_size = buffer_size
         self.running = False
         self.last_synced_block = None
         self.sync_interval = sync_interval
@@ -41,48 +44,55 @@ class EventCollector:
         """
         Fetch events for a range of blocks and store them in the database.
         """
+
         logger.info(f"Fetching events from block {start_block} to {end_block}")
         
-        # Get the block numbers we need to fetch
         block_numbers = list(range(start_block, end_block + 1))
-        
-        # Fetch events using the EventFetcher
-        events_by_block = await self.event_fetcher.fetch_all_events(
-            block_numbers, 
-            batch_size=self.batch_size
-        )
-        
-        if not events_by_block:
-            logger.info(f"No events found in blocks {start_block} to {end_block}")
-            return
 
-        # Process events using the EventProcessor
-        processed_events = []
-        for block_num, events in events_by_block.items():
-            # Process this block's events
-            block_events = await self.event_processor.process_event_data({block_num: events})
-            if block_events:
-                processed_events.extend(block_events)
-        
-        # Convert processed events to database format
-        event_data_list = []
-        for event in processed_events:
-            try:
-                # Convert from the event processor format to database format
+        queue = asyncio.Queue()
+
+        async def process_buffered_events(buffer: Deque[Tuple[int, Any]]) -> None:
+
+            if not buffer:
+                return
+            
+            to_process = dict(buffer)
+            processed_batch = await self.event_processor.process_event_data(to_process)
+            logger.info(f"Received and processed {len(processed_batch)} events.")
+            
+            event_data_list = []
+
+            for event in processed_batch:
                 event_data = self._convert_to_db_format(event)
                 event_data_list.append(event_data)
-            except Exception as e:
-                logger.error(f"Error converting event to database format: {e}")
-                continue
-        
-        # Store events to DB
-        if event_data_list:
-            try:
-                await self.event_repository.add_events(event_data_list)
-                logger.info(f"Stored {len(event_data_list)} events from blocks {start_block} to {end_block}")
-            except Exception as e:
-                logger.error(f"Error storing events in database: {e}")
+            
+            # Store events to DB
+            if event_data_list:
+                try:
+                    await self.event_repository.add_events(event_data_list)
+                    logger.info(f"Stored {len(event_data_list)} events from blocks {start_block} to {end_block}")
+                except Exception as e:
+                    logger.error(f"Error storing events in database: {e}")
 
+        async def consumer_event_queue() -> None:
+            buffer: Deque[Tuple[int, Any]] = deque()
+
+            while True:
+                events = await queue.get()
+                if events is None:
+                    break
+
+                buffer.extend(events.items())
+                while len(buffer) >= self.buffer_size:
+                    temp_buffer = deque(buffer.popleft() for _ in range(self.buffer_size))
+                    await process_buffered_events(temp_buffer)
+
+            await process_buffered_events(buffer)
+
+        producer_task = asyncio.create_task(self.event_fetcher.stream_all_events(block_numbers, queue, batch_size=50))
+        consumer_task = asyncio.create_task(consumer_event_queue())
+
+        await asyncio.gather(producer_task, consumer_task)
 
     def _convert_to_db_format(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
