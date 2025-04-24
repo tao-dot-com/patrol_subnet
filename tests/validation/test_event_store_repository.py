@@ -208,3 +208,105 @@ async def test_find_by_coldkey(event_repository):
     # Find events for nonexistent coldkey
     events_for_nonexistent = await event_repository.find_by_coldkey("nonexistent")
     assert len(events_for_nonexistent) == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_write_success_path(event_repository):
+    """Test that events are written using the batch operation when possible."""
+    # Create multiple events
+    events = [
+        {
+            "coldkey_source": f"source{i}",
+            "coldkey_destination": f"dest{i}",
+            "edge_category": "balance",
+            "edge_type": "transfer",
+            "coldkey_owner": None,
+            "block_number": 100 + i,
+            "rao_amount": 1000000 + i
+        }
+        for i in range(10)  # Create 10 unique events
+    ]
+    
+    # Use patching to monitor which code paths are executed
+    with patch('patrol.validation.persistence.event_store_repository.logger.debug') as mock_debug:
+        # Add all events at once
+        await event_repository.add_events(events)
+        
+        # Verify the batch operation succeeded and didn't fall back
+        fallback_calls = [
+            call for call in mock_debug.call_args_list 
+            if "falling back to individual inserts" in str(call)
+        ]
+        assert len(fallback_calls) == 0, "Batch operation fell back to individual inserts"
+    
+    # Verify all events were added
+    async with event_repository.LocalAsyncSession() as session:
+        query = select(_ChainEvent)
+        result = await session.execute(query)
+        stored_events = result.scalars().all()
+        assert len(stored_events) == 10
+
+
+@pytest.mark.asyncio
+async def test_batch_write_fallback_path(event_repository):
+    """Test that individual writes are used as fallback when batch fails."""
+    # First add some initial events
+    initial_events = [
+        {
+            "coldkey_source": f"source{i}",
+            "coldkey_destination": f"dest{i}",
+            "edge_category": "balance",
+            "edge_type": "transfer",
+            "coldkey_owner": None,
+            "block_number": 100 + i,
+            "rao_amount": 1000000 + i
+        }
+        for i in range(5)
+    ]
+    
+    await event_repository.add_events(initial_events)
+    
+    # Now create a batch with 5 duplicates and 5 new events to force fallback
+    mixed_batch = [
+        {
+            "coldkey_source": f"source{i}",
+            "coldkey_destination": f"dest{i}",
+            "edge_category": "balance",
+            "edge_type": "transfer",
+            "coldkey_owner": None,
+            "block_number": 100 + i,
+            "rao_amount": 1000000 + i
+        }
+        for i in range(5)
+    ] + [
+        {
+            "coldkey_source": f"source{i+5}",
+            "coldkey_destination": f"dest{i+5}",
+            "edge_category": "balance",
+            "edge_type": "transfer",
+            "coldkey_owner": None,
+            "block_number": 100 + i + 5,
+            "rao_amount": 1000000 + i + 5
+        }
+        for i in range(5)
+    ]
+    
+    # Use patching to monitor which code paths are executed
+    with patch('patrol.validation.persistence.event_store_repository.logger.debug') as mock_debug:
+        # Add the mixed batch
+        await event_repository.add_events(mixed_batch)
+        
+        # Verify the fallback path was taken
+        fallback_calls = [
+            call for call in mock_debug.call_args_list 
+            if "falling back to individual inserts" in str(call)
+        ]
+        assert len(fallback_calls) > 0, "Batch operation didn't fall back to individual inserts"
+    
+    # Verify the end result
+    async with event_repository.LocalAsyncSession() as session:
+        query = select(_ChainEvent)
+        result = await session.execute(query)
+        stored_events = result.scalars().all()
+        assert len(stored_events) == 10
+        

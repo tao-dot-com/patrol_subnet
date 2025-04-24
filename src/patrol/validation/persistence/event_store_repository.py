@@ -112,21 +112,39 @@ class DatabaseEventStoreRepository:
             event_data_list: List of dictionaries, each containing event data
         """
         duplicate_count = 0
-        async with self.LocalAsyncSession() as session:
-            for data in event_data_list:
+        
+        # Convert all events to _ChainEvent objects first
+        events = [_ChainEvent.from_event(data) for data in event_data_list]
+        
+        # First attempt: try to add all events at once
+        async with self.LocalAsyncSession() as batch_session:
+            try:
+                batch_session.add_all(events)
+                await batch_session.commit()
+                return  # Return early if batch operation succeeded
+            except IntegrityError:
+                # Catch duplicates
+                await batch_session.rollback()
+                logger.debug("Batch insert failed with IntegrityError, falling back to individual inserts")
+            except Exception as e:
+                # Handle other errors with the batch operation
+                await batch_session.rollback()
+                logger.error(f"Error in batch add operation: {e}")
+        
+        # Fall back to adding events one by one with new sessions for each event
+        for event in events:
+            async with self.LocalAsyncSession() as individual_session:
                 try:
-                    # Create the event object with edge_hash as primary key
-                    event = _ChainEvent.from_event(data)
-                    session.add(event)
-                    await session.commit()
+                    individual_session.add(event)
+                    await individual_session.commit()
                 except IntegrityError:
-                     # Needed to catch duplicate primary key (edge_hash) violations
-                    await session.rollback()
+                    # Needed to catch duplicate primary key (edge_hash) violations
+                    await individual_session.rollback()
                     duplicate_count += 1
                     continue
                 except Exception as e:
                     # Handle other errors
-                    await session.rollback()
+                    await individual_session.rollback()
                     logger.error(f"Error adding event: {e}")
                     continue
 
