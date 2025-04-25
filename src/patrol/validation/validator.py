@@ -33,6 +33,8 @@ from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScore
+from patrol.chain_data.missed_block_retry_task import MissedBlocksRetryTask
+from patrol.validation.persistence.missed_blocks_repository import MissedBlocksRepository
 
 from bittensor.core.metagraph import AsyncMetagraph
 import bittensor_wallet as btw
@@ -203,10 +205,13 @@ class Validator:
         await self.weight_setter.set_weights(weights)
 
 
-async def sync_event_store(collector: EventCollector):
+async def sync_event_store(collector: EventCollector, block_retry_task: MissedBlocksRetryTask):
     # Start the event collector
     await collector.start()
-    logger.info("Started Event Collector service in background")
+    logger.info("Started Event Collector task in background")
+
+    await block_retry_task.start()
+    logger.info("Started Missed Block Retry task in background")
     
     check_interval_minutes = 10
     max_acceptable_block_gap = 10
@@ -269,6 +274,7 @@ async def start():
     event_checker = EventChecker(engine)
 
     event_repository = DatabaseEventStoreRepository(engine)
+    missed_blocks_repository = MissedBlocksRepository(engine)
     
     event_collector = EventCollector(
         event_fetcher=event_fetcher,
@@ -276,8 +282,15 @@ async def start():
         event_repository=event_repository,
         sync_interval=12  # Default block time in seconds
     )
+    missed_blocks_retry_task = MissedBlocksRetryTask(
+        event_fetcher=event_fetcher,
+        event_processor=event_processor,
+        event_repository=event_repository,
+        missed_blocks_repository=missed_blocks_repository,
+        retry_interval_seconds=300 # Retry every 5 minutes
+    )
 
-    await sync_event_store(event_collector)
+    await sync_event_store(event_collector, missed_blocks_retry_task)
 
     dendrite = bt.Dendrite(wallet)
 
