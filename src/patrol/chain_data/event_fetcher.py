@@ -124,6 +124,7 @@ class EventFetcher:
         self,
         block_numbers: Iterable[int],
         queue: asyncio.Queue,
+        missed_blocks: List[int] = None,
         batch_size: int = 25,
     ) -> None:
         """
@@ -148,6 +149,9 @@ class EventFetcher:
                     return await self.substrate_client.query("get_block_hash", None, n)
             except Exception as e:
                 logger.warning(f"Failed to retrieve block hash for block {n}: {e}")
+                # Track block hash retrieval failures
+                if missed_blocks is not None:
+                    missed_blocks.append(n)
                 return None
 
         block_hashes = await asyncio.gather(*[safe_get_block_hash(n) for n in block_numbers])
@@ -168,8 +172,20 @@ class EventFetcher:
                         await queue.put(events)
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout while fetching events for runtime version {runtime_version}, batch of size {len(batch)}")
+                    blocks_in_batch =  [block_number for (block_number, block_hash) in batch]
+                    logger.warning(f"Blocks in batch: {blocks_in_batch}")
+
+                     # Track timeout failures
+                    if missed_blocks is not None:
+                        missed_blocks.extend(blocks_in_batch)
                 except Exception as e:
                     logger.warning(f"Skipping failed batch due to error: {e}")
+                    blocks_in_batch = [block_number for (block_number, block_hash) in batch]
+                    logger.warning(f"Blocks in batch: {blocks_in_batch}")
+
+                    # Track other failures
+                    if missed_blocks is not None:
+                        missed_blocks.extend(blocks_in_batch)
 
         # Launch all batch tasks
         tasks = [

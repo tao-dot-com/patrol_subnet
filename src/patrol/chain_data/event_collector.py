@@ -17,6 +17,7 @@ from patrol.validation.config import DB_URL
 from patrol.validation.persistence import Base
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.constants import Constants
+from patrol.validation.persistence.missed_blocks_repository import MissedBlocksRepository
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class EventCollector:
         event_fetcher: EventFetcher,
         event_processor: EventProcessor,
         event_repository: DatabaseEventStoreRepository,
+        missed_blocks_repository: MissedBlocksRepository,
         sync_interval: int = 12,  # Default to 12 seconds (one block time)
         batch_size: int = 50,     # Current best batch size for querying without errors
         buffer_size: int = 1000   # Number of events to store in buffer before processing
@@ -34,6 +36,7 @@ class EventCollector:
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
         self.event_repository = event_repository
+        self.missed_blocks_repository = missed_blocks_repository
         self.batch_size = batch_size
         self.buffer_size = buffer_size
         self.running = False
@@ -50,6 +53,7 @@ class EventCollector:
         block_numbers = list(range(start_block, end_block + 1))
 
         queue = asyncio.Queue()
+        missed_blocks = []
 
         async def process_buffered_events(buffer: Deque[Tuple[int, Any]]) -> None:
 
@@ -89,10 +93,21 @@ class EventCollector:
 
             await process_buffered_events(buffer)
 
-        producer_task = asyncio.create_task(self.event_fetcher.stream_all_events(block_numbers, queue, batch_size=50))
-        consumer_task = asyncio.create_task(consumer_event_queue())
+        try:
+            producer_task = asyncio.create_task(self.event_fetcher.stream_all_events(block_numbers, queue, missed_blocks, batch_size=self.batch_size))
+            consumer_task = asyncio.create_task(consumer_event_queue())
 
-        await asyncio.gather(producer_task, consumer_task)
+            await asyncio.gather(producer_task, consumer_task)
+        except Exception as e:
+            logger.error(f"Error during event fetching/storing: {e}")
+        finally:
+            # Record any missed blocks
+            if missed_blocks:
+                logger.warning(f"Recording {len(missed_blocks)} missed blocks in range {start_block}-{end_block}")
+                await self.missed_blocks_repository.add_missed_blocks(
+                    missed_blocks,
+                    error_message=f"Failed fetching blocks!"
+                )
 
     def _convert_to_db_format(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -167,7 +182,7 @@ class EventCollector:
         except Exception as e:
             logger.error(f"Unexpected error in sync loop: {e}")
             self.running = False
-    
+
     async def start(self) -> None:
         """
         Start the event collector.
@@ -229,12 +244,14 @@ async def main():
     await create_tables(engine)
 
     event_repository = DatabaseEventStoreRepository(engine)
+    missed_blocks_repository = MissedBlocksRepository(engine)
     
     # Create and start the syncer
     event_collector = EventCollector(
         event_fetcher=fetcher,
         event_processor=processor,
         event_repository=event_repository,
+        missed_blocks_repository=missed_blocks_repository,
         sync_interval=12 
     )
     
@@ -242,7 +259,7 @@ async def main():
     
     # Run for a while
     try:
-        await asyncio.sleep(1200)
+        await asyncio.sleep(300)
     finally:
         await event_collector.stop()
 
