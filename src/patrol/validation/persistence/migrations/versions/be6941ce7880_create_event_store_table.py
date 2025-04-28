@@ -37,10 +37,7 @@ def upgrade() -> None:
             sa.Column('delegate_hotkey_destination', sa.String, nullable=True),
     )
 
-    op.create_index("idx_event_store_block_number", "event_store", ["block_number"])
-
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index("idx_event_store_block_number", "event_store")
     op.drop_table("event_store")
