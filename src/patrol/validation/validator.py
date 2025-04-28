@@ -280,6 +280,7 @@ async def start():
         event_fetcher=event_fetcher,
         event_processor=event_processor,
         event_repository=event_repository,
+        missed_blocks_repository=missed_blocks_repository,
         sync_interval=12  # Default block time in seconds
     )
     missed_blocks_retry_task = MissedBlocksRetryTask(
