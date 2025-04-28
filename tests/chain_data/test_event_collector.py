@@ -13,11 +13,13 @@ def mock_dependencies():
     event_fetcher = AsyncMock()
     event_processor = AsyncMock()
     event_repository = AsyncMock()
+    missed_block_repository = AsyncMock()
 
     return {
         "event_fetcher": event_fetcher,
         "event_processor": event_processor,
-        "event_repository": event_repository
+        "event_repository": event_repository,
+        "missed_block_repository": missed_block_repository
     }
 
 
@@ -28,6 +30,7 @@ def event_collector(mock_dependencies):
         event_fetcher=mock_dependencies["event_fetcher"],
         event_processor=mock_dependencies["event_processor"],
         event_repository=mock_dependencies["event_repository"],
+        missed_blocks_repository=mock_dependencies["missed_block_repository"],
         sync_interval=0.1  # Short interval for testing
     )
     return collector
@@ -153,10 +156,13 @@ async def test_fetch_and_store_events_streaming(event_collector, mock_dependenci
     ]
 
     # Fake out the streaming: push each block's raw events into the queue, then None to end
-    async def fake_stream(block_numbers, queue, batch_size):
+    async def fake_stream(block_numbers, queue, missed_blocks, batch_size=None):
         # should receive full range and honor our batch_size default
         assert block_numbers == list(range(start_block, end_block + 1))
         assert batch_size == event_collector.batch_size
+
+        # Simulate some missed blocks (101, 102, 104, 105)
+        missed_blocks.extend([101, 102, 104, 105])
 
         for blk, ev in mock_raw.items():
             await queue.put({blk: ev})
@@ -194,6 +200,12 @@ async def test_fetch_and_store_events_streaming(event_collector, mock_dependenci
     assert stored[0]["edge_category"] == "balance"
     assert stored[1]["coldkey_source"] == "coldkey2"
     assert stored[1]["edge_category"] == "staking"
+
+    # Should have recorded missed blocks
+    mock_dependencies["missed_block_repository"].add_missed_blocks.assert_awaited_once()
+    missed_blocks_arg = mock_dependencies["missed_block_repository"].add_missed_blocks.call_args[0][0]
+    assert sorted(missed_blocks_arg) == [101, 102, 104, 105]
+    assert "Failed fetching blocks!" in mock_dependencies["missed_block_repository"].add_missed_blocks.call_args[1].get("error_message", "")
 
 
 @pytest.mark.asyncio
