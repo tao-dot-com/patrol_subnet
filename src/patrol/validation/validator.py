@@ -218,9 +218,15 @@ async def sync_event_store(collector: EventCollector, block_retry_task: MissedBl
     
     # Periodically check if we have enough blockchain data
     while True:
-        # Check current gap between chain and database
-        highest_block = await collector.event_repository.get_highest_block_from_db()
+        # Get current block directly from the event fetcher
         current_block = await collector.event_fetcher.get_current_block()
+
+        # Get highest block from collector's in-memory state instead of a database query
+        highest_block = collector.last_synced_block
+
+        # Still need to query db once, since collector won't have last synced block initially
+        if highest_block is None:
+            highest_block = await collector.event_repository.get_highest_block_from_db()
         
         if highest_block is None:
             block_gap = float('inf')  # No blocks in DB yet
