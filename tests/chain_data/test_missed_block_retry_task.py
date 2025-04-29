@@ -44,7 +44,7 @@ async def test_retry_task_initialization(retry_task, mock_dependencies):
     assert retry_task.missed_blocks_repository is mock_dependencies["missed_blocks_repository"]
     assert retry_task.retry_interval_seconds == 0.1
     assert retry_task.batch_size == 25
-    assert retry_task.buffer_size == 1000
+    assert retry_task.buffer_size == 5000
     assert retry_task.running is False
 
 
