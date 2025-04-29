@@ -68,18 +68,14 @@ class MissedBlocksRetryTask:
         
         return db_event
             
-    async def _retry_missed_blocks(self) -> None:
+    async def _retry_missed_blocks(self, blocks_to_retry: list) -> None:
         """
         Attempt to fetch and process missed blocks using producer-consumer pattern.
         """
-        # Get all missed blocks
-        missed_blocks = await self.missed_blocks_repository.get_all_missed_blocks()
-        
-        if not missed_blocks:
+        if not blocks_to_retry:
             logger.info("No missed blocks to retry")
             return
             
-        blocks_to_retry = list(missed_blocks)
         logger.info(f"Attempting to retry {len(blocks_to_retry)} missed blocks")
         
         # Create a queue for communication between producer and consumer
@@ -169,8 +165,23 @@ class MissedBlocksRetryTask:
         try:
             while self.running:
                 start_time = time.time()
+                    
+                # Get all missed blocks
+                all_missed_blocks = await self.missed_blocks_repository.get_all_missed_blocks()
                 
-                await self._retry_missed_blocks()
+                if not all_missed_blocks:
+                    logger.info("No missed blocks to retry")
+                else:
+                    # Convert set to sorted list for predictable processing
+                    all_missed_blocks = sorted(list(all_missed_blocks))
+                    logger.info(f"Found {len(all_missed_blocks)} missed blocks to retry")
+                    
+                    block_retry_batch_size = 1000
+                    # Process missed blocks in batches
+                    for i in range(0, len(all_missed_blocks), block_retry_batch_size):
+                        batch = all_missed_blocks[i:i + block_retry_batch_size]
+                        logger.info(f"Processing batch of {len(batch)} missed blocks ({i+1}-{i+len(batch)} of {len(all_missed_blocks)})")
+                        await self._retry_missed_blocks(batch)
                 
                 # Calculate time to wait before next retry
                 elapsed = time.time() - start_time
@@ -178,7 +189,7 @@ class MissedBlocksRetryTask:
                 
                 logger.info(f"Retry task completed in {elapsed:.2f}s. Waiting {wait_time:.2f}s before next retry...")
                 await asyncio.sleep(wait_time)
-                
+            
         except Exception as e:
             logger.error(f"Unexpected error in retry loop: {e}")
             self.running = False
