@@ -24,12 +24,11 @@ def test_get_version_for_block(block_number: int, current_block: int, expected: 
     assert result == expected
 
 def test_group_blocks_basic():
-    block_numbers = [110, 220, 230, 310, 320]
-    block_hashes = [f"hash_{b}" for b in block_numbers]
+    block_hashes = {b: f"hash_{b}" for b in [110, 220, 230, 310, 320]}
     current_block = 500
     batch_size = 2
 
-    result = group_blocks(block_numbers, block_hashes, current_block, TEST_VERSIONS, batch_size)
+    result = group_blocks(block_hashes, current_block, TEST_VERSIONS, batch_size)
 
     # Group 1 should have 1 block
     assert 1 in result
@@ -47,10 +46,10 @@ def test_group_blocks_basic():
 @patch("patrol.chain_data.runtime_groupings.logger.warning")
 def test_group_blocks_with_out_of_range_blocks(mock_warning):
     block_numbers = [90, 150, 999]
-    block_hashes = [f"hash_{b}" for b in block_numbers]
+    block_hashes = {b: f"hash_{b}" for b in block_numbers}
     current_block = 800
 
-    result = group_blocks(block_numbers, block_hashes, current_block, TEST_VERSIONS, batch_size=10)
+    result = group_blocks(block_hashes, current_block, TEST_VERSIONS, batch_size=10)
 
     # Only 150 should be grouped
     assert result == {1: [[(150, "hash_150")]]}

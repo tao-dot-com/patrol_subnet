@@ -55,9 +55,50 @@ def get_version_for_block(
 
     return None  # Should not reach here
 
+# def group_blocks(
+#     block_numbers: List[int],
+#     block_hashes: List[str],
+#     current_block: int,
+#     versions: VersionData,
+#     batch_size: int = 25,
+#     min_batch_size: int = 10
+# ) -> Dict[int, List[List[Tuple[int, str]]]]:
+#     """
+#     Groups blocks by version and splits each group into batches.
+#
+#     Args:
+#         block_numbers: List of block numbers.
+#         current_block: Current latest block.
+#         versions: Version boundaries for blocks.
+#         batch_size: Maximum number of blocks per batch (default 25).
+#
+#     Returns:
+#         Dictionary mapping version number to list of block batches (each a list of ints).
+#     """
+#     grouped: Dict[int, List[int]] = {}
+#     for block_number, block_hash in zip(block_numbers, block_hashes):
+#         group = get_version_for_block(block_number, current_block, versions)
+#         if group is not None:
+#             grouped.setdefault(group, []).append((block_number, block_hash))
+#         else:
+#             logger.warning(f"Block {block_number} is outside current groupings.")
+#
+#     batched: Dict[int, List[List[Tuple[int, str]]]] = {}
+#     for group_id, block_list in grouped.items():
+#         batches: List[List[Tuple[int, str]]] = [
+#             block_list[i:i + batch_size] for i in range(0, len(block_list), batch_size)
+#         ]
+#
+#         # Merge the final batch if it's too small
+#         if len(batches) > 1 and len(batches[-1]) < min_batch_size:
+#             batches[-2].extend(batches.pop())  # Merge last into second-last
+#
+#         batched[group_id] = batches
+#
+#     return batched
+
 def group_blocks(
-    block_numbers: List[int],
-    block_hashes: List[str],
+    block_hashes: dict[int, str],
     current_block: int,
     versions: VersionData,
     batch_size: int = 25,
@@ -76,7 +117,7 @@ def group_blocks(
         Dictionary mapping version number to list of block batches (each a list of ints).
     """
     grouped: Dict[int, List[int]] = {}
-    for block_number, block_hash in zip(block_numbers, block_hashes):
+    for block_number, block_hash in block_hashes.items():
         group = get_version_for_block(block_number, current_block, versions)
         if group is not None:
             grouped.setdefault(group, []).append((block_number, block_hash))
@@ -101,8 +142,7 @@ def group_blocks(
 if __name__ == "__main__":
     versions = load_versions()  # Replace with your actual file name
     print(versions)
-    block_numbers = [5400000]
-    block_hashes = ["test"]
+    block_hashes = {5400000: "test"}
     current_block = 5400001
-    groupings = group_blocks(block_numbers, block_hashes, current_block, versions)
+    groupings = group_blocks(block_hashes, current_block, versions)
     print(groupings)
