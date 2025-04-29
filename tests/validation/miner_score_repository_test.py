@@ -175,6 +175,24 @@ async def test_find_sum_of_limited_previous_overall_scores(clean_pgsql_engine):
     overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
     assert overall_scores == [10.0, 10.0]
 
+async def test_find_latest_overall_scores_when_only_one_present(clean_pgsql_engine):
+    batch_ids = [uuid.uuid4()]
+    now = datetime.now(UTC)
+    # add 1 score for batch
+    repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+    for b in batch_ids:
+        miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
+        await repository.add(miner_score_1)
+
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
+    assert overall_scores == [10.0]
+
+async def test_find_latest_overall_scores_when_none_present(clean_pgsql_engine):
+    repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
+    assert overall_scores == []
+
 async def test_find_sum_of_limited_previous_overall_scores_sqlite(sqlite_engine):
     batch_ids = [uuid.uuid4(), uuid.uuid4()]
     now = datetime.now(UTC)
