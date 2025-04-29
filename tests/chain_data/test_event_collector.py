@@ -46,7 +46,7 @@ async def test_event_collector_initialization(event_collector, mock_dependencies
 
     # new defaults
     assert event_collector.batch_size == 50
-    assert event_collector.buffer_size == 10000
+    assert event_collector.buffer_size == 5000
 
     assert event_collector.running is False
     assert event_collector.last_synced_block is None
