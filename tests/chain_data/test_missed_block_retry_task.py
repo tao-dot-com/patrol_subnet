@@ -105,14 +105,10 @@ async def test_convert_to_db_format_stake_event(retry_task):
 @pytest.mark.asyncio
 async def test_retry_missed_blocks_no_blocks(retry_task, mock_dependencies):
     """Test retry when there are no missed blocks."""
-    # Set up the repository to return no missed blocks
-    mock_dependencies["missed_blocks_repository"].get_all_missed_blocks.return_value = set()
+    # Call the function with an empty list
+    await retry_task._retry_missed_blocks(blocks_to_retry=[])
     
-    # Run the retry method
-    await retry_task._retry_missed_blocks()
-    
-    # Verify the repository was queried but no further processing happened
-    mock_dependencies["missed_blocks_repository"].get_all_missed_blocks.assert_awaited_once()
+    # Verify no further processing happened
     mock_dependencies["event_fetcher"].stream_all_events.assert_not_awaited()
     mock_dependencies["event_processor"].process_event_data.assert_not_awaited()
     mock_dependencies["event_repository"].add_events.assert_not_awaited()
@@ -122,9 +118,8 @@ async def test_retry_missed_blocks_no_blocks(retry_task, mock_dependencies):
 @pytest.mark.asyncio
 async def test_retry_missed_blocks_with_blocks(retry_task, mock_dependencies):
     """Test retrying missed blocks that are successfully processed."""
-    # Set up the repository to return some missed blocks
-    missed_blocks = {4267256, 4267356, 4267456}
-    mock_dependencies["missed_blocks_repository"].get_all_missed_blocks.return_value = missed_blocks
+    # List of blocks to retry
+    blocks_to_retry = [4267256, 4267356, 4267456]
     
     # Setup the event fetcher to return some events
     mock_events = {
@@ -134,7 +129,7 @@ async def test_retry_missed_blocks_with_blocks(retry_task, mock_dependencies):
     
     # Create a function to simulate the stream_all_events behavior
     async def fake_stream(block_numbers, queue, missed_blocks_list, batch_size):
-        assert set(block_numbers) == missed_blocks
+        assert set(block_numbers) == set(blocks_to_retry)
         assert batch_size == retry_task.batch_size
         
         for blk, ev in mock_events.items():
@@ -170,10 +165,9 @@ async def test_retry_missed_blocks_with_blocks(retry_task, mock_dependencies):
     mock_dependencies["event_processor"].process_event_data.return_value = processed_events
     
     # Run the retry method
-    await retry_task._retry_missed_blocks()
+    await retry_task._retry_missed_blocks(blocks_to_retry)
     
     # Verify all the steps were called correctly
-    mock_dependencies["missed_blocks_repository"].get_all_missed_blocks.assert_awaited_once()
     mock_dependencies["event_fetcher"].stream_all_events.assert_awaited_once()
     mock_dependencies["event_processor"].process_event_data.assert_awaited_once()
     mock_dependencies["event_repository"].add_events.assert_awaited_once()

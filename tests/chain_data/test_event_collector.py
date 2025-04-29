@@ -232,7 +232,7 @@ async def test_sync_loop_with_existing_blocks(event_collector, mock_dependencies
     # Assert it was awaited
     fake_fetch_store.assert_awaited_once()
     start_block = highest_block_in_db + 1
-    end_block = min(current_block, start_block + 5000)
+    end_block = min(current_block, start_block + 1000)
     called_args = fake_fetch_store.call_args[0]
     assert called_args == (start_block, end_block)
 
@@ -256,6 +256,6 @@ async def test_sync_loop_with_no_blocks(event_collector, mock_dependencies, monk
 
     fake_fetch_store.assert_awaited_once()
     start_block = Constants.LOWER_BLOCK_LIMIT
-    end_block = min(current_block, start_block + 5000)
+    end_block = min(current_block, start_block + 1000)
     assert fake_fetch_store.call_args[0] == (start_block, end_block)
     assert event_collector.last_synced_block == end_block
