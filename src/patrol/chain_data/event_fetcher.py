@@ -84,26 +84,26 @@ class EventFetcher:
         if not block_numbers:
             logger.warning("No block numbers provided. Returning empty event dictionary.")
             return {}
-        
+
+        block_numbers = set(block_numbers)
+
         if any(not isinstance(b, int) for b in block_numbers):
             logger.warning("Non-integer value found in block_numbers. Returning empty event dictionary.")
             return {}
-
-        block_numbers = set(block_numbers)
 
         async with self.event_semaphore:
             logger.info(f"Attempting to fetch event data for {len(block_numbers)} blocks...")
 
             block_hash_tasks = [
-                self.substrate_client.query("get_block_hash", None, n)
+                self._get_block_hash(n)
                 for n in block_numbers
             ]
-            block_hashes = await asyncio.gather(*block_hash_tasks)
+            block_hashes = {k: v for k, v in await asyncio.gather(*block_hash_tasks)}
 
             current_block = await self.get_current_block()
 
             versions = self.substrate_client.return_runtime_versions()
-            grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
+            grouped = group_blocks(block_hashes, current_block, versions, batch_size)
 
             all_events: Dict[int, Any] = {}
             for runtime_version, batches in grouped.items():
@@ -144,18 +144,20 @@ class EventFetcher:
         block_numbers = set(block_numbers)
         logger.info(f"Attempting to stream event data for {len(block_numbers)} blocks...")
 
-        async def safe_get_block_hash(n: int) -> str | None:
+        async def safe_get_block_hash(n: int) -> tuple[int, str] | None:
             try:
                 async with self.hash_semaphore:
-                    return await self.substrate_client.query("get_block_hash", None, n)
+                    return await self._get_block_hash(n)
             except Exception as e:
                 logger.warning(f"Failed to retrieve block hash for block {n}: {e}")
                 return None
 
-        block_hashes = await asyncio.gather(*[safe_get_block_hash(n) for n in block_numbers])
+        tasks = [safe_get_block_hash(n) for n in block_numbers]
+        block_hashes = {it[0]: it[1] for it in await asyncio.gather(*tasks) if it is not None}
+
         current_block = await self.get_current_block()
         versions = self.substrate_client.return_runtime_versions()
-        grouped = group_blocks(block_numbers, block_hashes, current_block, versions, batch_size)
+        grouped = group_blocks(block_hashes, current_block, versions, batch_size)
 
         async def fetch_and_return_events(runtime_version, batch, timeout=2):
             async with self.event_semaphore:
@@ -182,7 +184,11 @@ class EventFetcher:
         await asyncio.gather(*tasks)
 
         await queue.put(None)
-            
+
+    async def _get_block_hash(self, block_number: int) -> tuple[int, str]:
+        return block_number, await self.substrate_client.query("get_block_hash", None, block_number)
+
+
 async def example():
 
     from patrol.chain_data.substrate_client import SubstrateClient
