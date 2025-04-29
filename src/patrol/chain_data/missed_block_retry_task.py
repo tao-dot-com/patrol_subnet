@@ -29,7 +29,7 @@ class MissedBlocksRetryTask:
         missed_blocks_repository: MissedBlocksRepository,
         retry_interval_seconds: int = 300,
         batch_size: int = 25,
-        buffer_size: int = 1000  # Number of events to store in buffer before processing
+        buffer_size: int = 5000  # Number of events to store in buffer before processing
     ):
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor

@@ -31,7 +31,7 @@ class EventCollector:
         missed_blocks_repository: MissedBlocksRepository,
         sync_interval: int = 12,  # Default to 12 seconds (one block time)
         batch_size: int = 50,     # Current best batch size for querying without errors
-        buffer_size: int = 1000   # Number of events to store in buffer before processing
+        buffer_size: int = 10000   # Number of events to store in buffer before processing
     ):
         self.event_fetcher = event_fetcher
         self.event_processor = event_processor
