@@ -107,5 +107,5 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             ).subquery()
 
             results = await session.execute(select(ranked).filter(ranked.c.rnk == 1))
-            foo = results.mappings().all()
-            return {(r['hotkey'], r['uid']): r['overall_score_moving_average']for r in foo}
+            scores = results.mappings().all()
+            return {(it['hotkey'], it['uid']): it['overall_score_moving_average'] for it in scores}
