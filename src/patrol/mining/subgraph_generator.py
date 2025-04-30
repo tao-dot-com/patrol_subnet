@@ -48,12 +48,15 @@ class SubgraphGenerator:
             ownr = event.get("coldkey_owner")
 
             connections = []
-            if src and dst and src != dst:
+            if src and dst:
                 connections.append((src, dst))
                 connections.append((dst, src))
-            if src and ownr and src != ownr:
+            if src and ownr:
                 connections.append((src, ownr))
                 connections.append((ownr, src))
+            if dst and ownr:
+                connections.append((dst, ownr))
+                connections.append((ownr, dst))
 
             for a, b in connections:
                 if a not in graph:

@@ -27,7 +27,6 @@ class EventFetcher:
         """
         Fetch events for a batch of blocks for a specific runtime_version using the substrate client's query method.
         """
-        # Extract block hashes for processing.
         block_hashes = [block_hash for (_, block_hash) in block_info]
         semaphore = asyncio.Semaphore(max_concurrent)
 
@@ -66,10 +65,9 @@ class EventFetcher:
                 preprocessed_lst[0].value_scale_type,
                 preprocessed_lst[0].storage_item
             ),
-            timeout=3
+            timeout=5
         )
 
-        # Build a mapping from block_number to event response.
         return {
             block_number: responses[block_hash][0]
             for (block_number, block_hash) in block_info
@@ -126,6 +124,7 @@ class EventFetcher:
         self,
         block_numbers: Iterable[int],
         queue: asyncio.Queue,
+        missed_blocks: List[int] = None,
         batch_size: int = 25,
     ) -> None:
         """
@@ -150,6 +149,9 @@ class EventFetcher:
                     return await self._get_block_hash(n)
             except Exception as e:
                 logger.warning(f"Failed to retrieve block hash for block {n}: {e}")
+                # Track block hash retrieval failures
+                if missed_blocks is not None:
+                    missed_blocks.append(n)
                 return None
 
         tasks = [safe_get_block_hash(n) for n in block_numbers]
@@ -172,8 +174,20 @@ class EventFetcher:
                         await queue.put(events)
                 except asyncio.TimeoutError:
                     logger.warning(f"Timeout while fetching events for runtime version {runtime_version}, batch of size {len(batch)}")
+                    blocks_in_batch =  [block_number for (block_number, block_hash) in batch]
+                    logger.warning(f"Blocks in batch: {blocks_in_batch}")
+
+                     # Track timeout failures
+                    if missed_blocks is not None:
+                        missed_blocks.extend(blocks_in_batch)
                 except Exception as e:
                     logger.warning(f"Skipping failed batch due to error: {e}")
+                    blocks_in_batch = [block_number for (block_number, block_hash) in batch]
+                    logger.warning(f"Blocks in batch: {blocks_in_batch}")
+
+                    # Track other failures
+                    if missed_blocks is not None:
+                        missed_blocks.extend(blocks_in_batch)
 
         # Launch all batch tasks
         tasks = [
