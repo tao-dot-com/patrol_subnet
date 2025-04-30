@@ -6,27 +6,32 @@ from patrol.protocol import Node, Edge, TransferEvidence, GraphPayload
 from patrol.validation.miner_scoring import ValidationResult
 from patrol.validation.graph_validation.errors import PayloadValidationError, SingleNodeResponse
 
+@pytest.fixture
+def validator():
+    # By default we don’t need an event_checker for most helper tests
+    return BittensorValidationMechanism(event_checker=None)
+
 @pytest.mark.asyncio
-async def test_validate_payload_empty():
-    validator = BittensorValidationMechanism(MagicMock(), MagicMock())
+async def test_validate_payload_empty(validator):
+    # payload=None should short‐circuit before using event_checker
     result = await validator.validate_payload(uid=1, payload=None)
     assert not result.validated
     assert "Empty/Null" in result.message
 
 @pytest.mark.asyncio
-async def test_validate_payload_single_node():
-    validator = BittensorValidationMechanism(MagicMock(), MagicMock())
+async def test_validate_payload_single_node(validator):
     payload = {
         "nodes": [{"id": "a", "type": "neuron", "origin": "user"}],
         "edges": []
     }
-
+    # only one node → early return
     result = await validator.validate_payload(uid=1, payload=payload, target="a")
     assert not result.validated
     assert "Only single node" in result.message
 
 @pytest.mark.asyncio
-async def test_validate_payload_valid(monkeypatch):
+async def test_validate_payload_valid(validator):
+    # two nodes + one edge → validated
     payload = {
         "nodes": [
             {"id": "a", "type": "neuron", "origin": "user"},
@@ -46,145 +51,94 @@ async def test_validate_payload_valid(monkeypatch):
         ]
     }
 
-    fake_fetcher = MagicMock()
-    fake_processor = MagicMock()
-    validator = BittensorValidationMechanism(fake_fetcher, fake_processor)
+    class MockEventChecker:
+        async def check_events_by_hash(self, event_data_list):
+            return event_data_list
 
-    # Mock internal calls
-    validator._verify_edge_data = AsyncMock()
-    fake_processor.process_event_data = AsyncMock(return_value=[{}])
-    fake_fetcher.stream_all_events = AsyncMock(return_value=None)
+    # swap in our checker
+    validator.event_checker = MockEventChecker()
 
-    result = await validator.validate_payload(uid=1, payload=payload, target="a", max_block_number=6000000)
+    result = await validator.validate_payload(
+        uid=1,
+        payload=payload,
+        target="a",
+        max_block_number=5000001
+    )
     assert result.validated
     assert result.volume == 3  # 2 nodes + 1 edge
 
-def test_parse_graph_payload_duplicate_nodes():
-    validator = BittensorValidationMechanism(MagicMock(), MagicMock())
+def test_parse_graph_payload_duplicate_nodes(validator):
     payload = {
-        "nodes": [{"id": "a", "type": "neuron", "origin": "user"}, {"id": "a", "type": "neuron", "origin": "user"}],
+        "nodes": [
+            {"id": "a", "type": "neuron", "origin": "user"},
+            {"id": "a", "type": "neuron", "origin": "user"}
+        ],
         "edges": []
     }
     with pytest.raises(PayloadValidationError, match="Duplicate node"):
         validator._parse_graph_payload(payload)
 
-def test_parse_graph_payload_duplicate_edges():
-    validator = BittensorValidationMechanism(MagicMock(), MagicMock())
+def test_parse_graph_payload_duplicate_edges(validator):
     edge = {
         "coldkey_source": "a",
         "coldkey_destination": "b",
         "category": "balance",
         "type": "transfer",
-        "evidence": {
-            "rao_amount": 10,
-            "block_number": 1000
-        }
+        "evidence": {"rao_amount": 10, "block_number": 1000}
     }
     payload = {
-        "nodes": [{"id": "a", "type": "neuron", "origin": "user"}, {"id": "b", "type": "neuron", "origin": "user"}],
+        "nodes": [
+            {"id": "a", "type": "neuron", "origin": "user"},
+            {"id": "b", "type": "neuron", "origin": "user"}
+        ],
         "edges": [edge, edge]
     }
     with pytest.raises(PayloadValidationError, match="Duplicate edge"):
         validator._parse_graph_payload(payload)
 
-def test_graph_not_connected():
-    validator = BittensorValidationMechanism(MagicMock(), MagicMock())
+def test_graph_not_connected(validator):
     graph = GraphPayload(
         nodes=[Node("a", "neuron", "origin"), Node("b", "neuron", "origin")],
-        edges=[]  # no connecting edge
+        edges=[]  # no edge to connect them
     )
     with pytest.raises(PayloadValidationError, match="not fully connected"):
         validator._verify_graph_connected(graph)
 
-def test_make_event_key():
-    validator = BittensorValidationMechanism(MagicMock(), MagicMock())
-    event = {
-        "coldkey_source": "a",
-        "coldkey_destination": "b",
-        "coldkey_owner": "a",
-        "category": "staking",
-        "type": "delegate",
-        "evidence": {
-            "rao_amount": 50,
-            "block_number": 123,
-            "source_net_uid": 5,
-            "destination_net_uid": 7
-        }
-    }
-    key, block = validator._make_event_key(event)
-    assert isinstance(key, tuple)
-    assert block == 123
-
 @pytest.mark.asyncio
-async def test_verify_block_ranges_valid(monkeypatch):
+async def test_verify_block_ranges_valid(monkeypatch, validator):
+    # patch the constant so our ranges pass
+    monkeypatch.setattr(
+        "patrol.validation.graph_validation.bittensor_validation_mechanism.constants.Constants.LOWER_BLOCK_LIMIT",
+        1_000_000
+    )
 
-    monkeypatch.setattr("patrol.validation.graph_validation.bittensor_validation_mechanism.constants.Constants.LOWER_BLOCK_LIMIT", 1000000)
-    validator = BittensorValidationMechanism(event_fetcher=None, event_processor=None)
-    block_numbers = [1000000, 2000000, 3000000]
-    max_block = 4000000
-
+    block_numbers = [1_000_000, 2_000_000, 3_000_000]
+    max_block = 4_000_000
+    # should not raise
     await validator._verify_block_ranges(block_numbers, max_block)
 
 @pytest.mark.asyncio
-def test_verify_block_ranges_with_invalid_blocks(monkeypatch):
-    monkeypatch.setattr("patrol.validation.graph_validation.bittensor_validation_mechanism.constants.Constants.LOWER_BLOCK_LIMIT", 1000000)
+async def test_verify_block_ranges_with_invalid_blocks(monkeypatch, validator):
+    monkeypatch.setattr(
+        "patrol.validation.graph_validation.bittensor_validation_mechanism.constants.Constants.LOWER_BLOCK_LIMIT",
+        1_000_000
+    )
 
-    validator = BittensorValidationMechanism(event_fetcher=None, event_processor=None)
-    block_numbers = [999999, 1500000, 5000000]  # 999999 too low, 5000000 too high
-    max_block = 4000000
+    block_numbers = [999_999, 1_500_000, 5_000_000]  # first too low, last too high
+    max_block = 4_000_000
 
     with pytest.raises(PayloadValidationError) as excinfo:
-        asyncio.run(validator._verify_block_ranges(block_numbers, max_block))
+        await validator._verify_block_ranges(block_numbers, max_block)
 
-    message = str(excinfo.value)
-    assert "invalid block" in message
-    assert "999999" in message
-    assert "5000000" in message
-
-@pytest.mark.asyncio
-async def test_fetch_event_keys(monkeypatch):
-    # Create a fake event that matches the expected format
-    event = {
-        "coldkey_source": "a",
-        "coldkey_destination": "b",
-        "coldkey_owner": "a",
-        "category": "balance",
-        "type": "transfer",
-        "evidence": {
-            "rao_amount": 100,
-            "block_number": 5000000,
-            "destination_net_uid": 1,
-            "source_net_uid": 2,
-            "alpha_amount": 3,
-            "delegate_hotkey_source": "h1",
-            "delegate_hotkey_destination": "h2"
-        }
-    }
-
-    # Mock the event processor to just return our fake event
-    mock_event_processor = MagicMock()
-    mock_event_processor.process_event_data = AsyncMock(return_value=[event])
-
-    # Mock stream_all_events to put the event in the queue and then a sentinel
-    async def fake_stream_all_events(block_numbers, queue, batch_size):
-        await queue.put({5000000: event})
-        await queue.put(None)
-
-    mock_event_fetcher = MagicMock()
-    mock_event_fetcher.stream_all_events = fake_stream_all_events
-
-    validator = BittensorValidationMechanism(mock_event_fetcher, mock_event_processor, buffer_size=1)
-
-    event_keys, block_numbers = await validator._fetch_event_keys([5000000])
-
-    assert len(event_keys) == 1
-    assert 5000000 in block_numbers
-    assert isinstance(next(iter(event_keys)), tuple)
+    msg = str(excinfo.value)
+    assert "invalid block" in msg
+    assert "999999" in msg
+    assert "5000000" in msg
 
 @pytest.mark.asyncio
-async def test_verify_edge_data_success(monkeypatch):
-    # Create a graph payload with one node and one matching edge
-    evidence = TransferEvidence(rao_amount=100, block_number=5000000)
+async def test_verify_edge_data_success(monkeypatch, validator):
+    # one edge, owner‐checker returns it, block check passes
+    evidence = TransferEvidence(rao_amount=100, block_number=5_000_000)
     edge = Edge(
         coldkey_source="a",
         coldkey_destination="b",
@@ -197,37 +151,84 @@ async def test_verify_edge_data_success(monkeypatch):
         edges=[edge]
     )
 
-    # Create a matching event
-    matching_event = {
-        "coldkey_source": "a",
-        "coldkey_destination": "b",
-        "coldkey_owner": None,
-        "category": "balance",
-        "type": "transfer",
-        "evidence": {
-            "rao_amount": 100,
-            "block_number": 5000000,
-            "destination_net_uid": None,
-            "source_net_uid": None,
-            "alpha_amount": None,
-            "delegate_hotkey_source": None,
-            "delegate_hotkey_destination": None,
-        }
+    class MockEventChecker:
+        async def check_events_by_hash(self, event_data_list):
+            return event_data_list
+
+    # swap in event_checker and stub out block‐range check
+    validator.event_checker = MockEventChecker()
+    validator._verify_block_ranges = AsyncMock()
+
+    # should return a list of length 1 (one edge)
+    result = await validator._verify_edge_data(graph_payload, max_block_number=6_000_000)
+    assert len(result) == 1
+
+def test_generate_adjacency_graph_basic(validator):
+    evt = {"coldkey_source": "A", "coldkey_destination": "B"}
+    graph = validator._generate_adjacency_graph_from_events([evt])
+
+    assert set(graph.keys()) == {"A", "B"}
+    assert {"neighbor": "B", "event": evt} in graph["A"]
+    assert {"neighbor": "A", "event": evt} in graph["B"]
+
+def test_generate_adjacency_graph_with_owner(validator):
+    evt = {
+        "coldkey_source": "A",
+        "coldkey_destination": "B",
+        "coldkey_owner": "C"
     }
+    graph = validator._generate_adjacency_graph_from_events([evt])
 
-    # Mock event processor and fetcher
-    mock_event_processor = MagicMock()
-    mock_event_processor.process_event_data = AsyncMock(return_value=[matching_event])
+    # A, B, C fully interconnected
+    assert set(graph.keys()) == {"A", "B", "C"}
+    assert {c["neighbor"] for c in graph["A"]} == {"B", "C"}
+    assert {c["neighbor"] for c in graph["B"]} == {"A", "C"}
+    assert {c["neighbor"] for c in graph["C"]} == {"A", "B"}
 
-    async def fake_stream_all_events(block_numbers, queue, batch_size):
-        await queue.put({5000000: matching_event})
-        await queue.put(None)
+def test_generate_adjacency_graph_missing_fields(validator):
+    evt = {"coldkey_owner": "X"}  # no src/dst → no edges
+    graph = validator._generate_adjacency_graph_from_events([evt])
+    assert graph == {}
 
-    mock_event_fetcher = MagicMock()
-    mock_event_fetcher.stream_all_events = fake_stream_all_events
+def test_generate_subgraph_volume_simple(validator):
+    evt1 = {
+        "coldkey_source": "A", "coldkey_destination": "B",
+        "edge_category": "cat1", "edge_type": "t1",
+        "rao_amount": 10, "block_number": 1,
+    }
+    evt2 = {
+        "coldkey_source": "B", "coldkey_destination": "C",
+        "edge_category": "cat2", "edge_type": "t2",
+        "rao_amount": 20, "block_number": 2,
+    }
+    adj = {
+        "A": [{"neighbor": "B", "event": evt1}],
+        "B": [{"neighbor": "A", "event": evt1}, {"neighbor": "C", "event": evt2}],
+        "C": [{"neighbor": "B", "event": evt2}],
+    }
+    vol = validator._generate_subgraph_volume_from_adjacency_graph(adj, "A")
+    assert vol == 5  # 3 nodes + 2 unique edges
 
-    validator = BittensorValidationMechanism(mock_event_fetcher, mock_event_processor, buffer_size=1)
-    validator._verify_block_ranges = AsyncMock()  # assume block range check passes
+def test_generate_subgraph_volume_isolated_node(validator):
+    vol = validator._generate_subgraph_volume_from_adjacency_graph({}, "Z")
+    assert vol == 1  # just the start node
 
-    # Should not raise
-    await validator._verify_edge_data(graph_payload, max_block_number=6000000)
+def test_calculate_validated_volume_simple(validator):
+    evt = {
+        "coldkey_source": "A", "coldkey_destination": "B", "coldkey_owner": None,
+        "edge_category": "cat", "edge_type": "t", "rao_amount": 5, "block_number": 10,
+    }
+    vol = validator._calculate_validated_volume([evt], "A")
+    assert vol == 3  # A, B, plus one edge
+
+def test_calculate_validated_volume_no_events(validator):
+    vol = validator._calculate_validated_volume([], "X")
+    assert vol == 1  # only X
+
+def test_calculate_validated_volume_with_owner(validator):
+    evt = {
+        "coldkey_source": "A", "coldkey_destination": "B", "coldkey_owner": "C",
+        "edge_category": "cat", "edge_type": "t", "rao_amount": 1, "block_number": 100,
+    }
+    vol = validator._calculate_validated_volume([evt], "A")
+    assert vol == 4  # nodes A,B,C + single event

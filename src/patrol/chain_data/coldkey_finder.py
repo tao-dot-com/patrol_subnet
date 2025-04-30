@@ -11,7 +11,7 @@ class ColdkeyFinder:
 
     def _create_cached_lookup(self):
 
-        @alru_cache(maxsize=2000)
+        @alru_cache(maxsize=10000)
         async def lookup(hotkey: str) -> str:
             logger.debug("Cache miss for hotkey: %s", hotkey)
             result = await self.substrate_client.query(

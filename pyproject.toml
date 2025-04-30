@@ -14,7 +14,7 @@ dependencies = [
     "alembic",
     "python-json-logger",
     "async_lru",
-
+    "greenlet>=3.2.1"
 ]
 
 [project.optional-dependencies]

@@ -6,14 +6,17 @@ import uuid
 import bittensor as bt
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from patrol.chain_data.event_collector import EventCollector
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 from patrol.validation import auto_update, hooks
+from patrol.validation.graph_validation.event_checker import EventChecker
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hooks import HookType
 from patrol.validation.http.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence import migrate_db
+from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 from patrol.validation.scoring import MinerScoreRepository
 import asyncio
@@ -30,6 +33,8 @@ from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScore
+from patrol.chain_data.missed_block_retry_task import MissedBlocksRetryTask
+from patrol.validation.persistence.missed_blocks_repository import MissedBlocksRepository
 
 from bittensor.core.metagraph import AsyncMetagraph
 import bittensor_wallet as btw
@@ -56,8 +61,9 @@ class Validator:
         uuid_generator: Callable[[], UUID],
         weight_setter: WeightSetter,
         enable_weight_setting: bool,
+        enable_dashboard_syndication: bool,
         concurrency: int = 10,
-        max_response_size_bytes = 64E9
+        max_response_size_bytes = 64E9,
     ):
         self.validation_mechanism = validation_mechanism
         self.scoring_mechanism = scoring_mechanism
@@ -72,6 +78,7 @@ class Validator:
         self.enable_weight_setting = enable_weight_setting
         self.concurrency = concurrency
         self.max_response_size_bytes = max_response_size_bytes
+        self.enable_dashboard_syndication = enable_dashboard_syndication
 
     async def query_miner(self,
         batch_id: UUID,
@@ -118,11 +125,12 @@ class Validator:
             )
 
         await self.miner_score_repository.add(miner_score)
-        try:
-            await self.dashboard_client.send_score(miner_score)
-            logger.info("Sent scores to dashboard", extra=dataclasses.asdict(miner_score))
-        except Exception as ex:
-            logger.exception("Failed to send scores to dashboard", extra=dataclasses.asdict(miner_score))
+        if self.enable_dashboard_syndication:
+            try:
+                await self.dashboard_client.send_score(miner_score)
+                logger.info("Sent scores to dashboard", extra=dataclasses.asdict(miner_score))
+            except Exception as ex:
+                logger.exception("Failed to send scores to dashboard", extra=dataclasses.asdict(miner_score))
 
         logger.info(f"Finished processing {uid}. Final Score: {miner_score.overall_score}")
 
@@ -197,12 +205,51 @@ class Validator:
         await self.weight_setter.set_weights(weights)
 
 
+async def sync_event_store(collector: EventCollector, block_retry_task: MissedBlocksRetryTask):
+    # Start the event collector
+    await collector.start()
+    logger.info("Started Event Collector task in background")
+
+    await block_retry_task.start()
+    logger.info("Started Missed Block Retry task in background")
+    
+    check_interval_minutes = 10
+    max_acceptable_block_gap = 10
+    
+    # Periodically check if we have enough blockchain data
+    while True:
+        # Get current block directly from the event fetcher
+        current_block = await collector.event_fetcher.get_current_block()
+
+        # Get highest block from collector's in-memory state instead of a database query
+        highest_block = collector.last_synced_block
+
+        # Still need to query db once, since collector won't have last synced block initially
+        if highest_block is None:
+            highest_block = await collector.event_repository.get_highest_block_from_db()
+        
+        if highest_block is None:
+            block_gap = float('inf')  # No blocks in DB yet
+        else:
+            block_gap = current_block - highest_block
+        
+        logger.info(f"Database sync status: highest_block={highest_block}, current_block={current_block}, gap={block_gap} blocks")
+        
+        # If we're synced up enough, break out of the loop
+        if block_gap <= max_acceptable_block_gap:
+            logger.info(f"Database is sufficiently synced (gap: {block_gap} blocks). Proceeding with validation.")
+            break
+        
+        logger.info(f"Waiting {check_interval_minutes} more minutes for database to sync (current gap: {block_gap} blocks)")
+        await asyncio.sleep(check_interval_minutes * 60)  # Wait for the specified interval
+
+
 async def start():
 
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
                                           ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS,
                                           ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES, BATCH_CONCURRENCY,
-                                          DASHBOARD_BASE_URL)
+                                          DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION)
 
     if ENABLE_AUTO_UPDATE:
         logger.info("Auto update is enabled")
@@ -230,12 +277,33 @@ async def start():
 
     event_fetcher = EventFetcher(my_substrate_client)
     event_processor = EventProcessor(coldkey_finder)
+    event_checker = EventChecker(engine)
+
+    event_repository = DatabaseEventStoreRepository(engine)
+    missed_blocks_repository = MissedBlocksRepository(engine)
+    
+    event_collector = EventCollector(
+        event_fetcher=event_fetcher,
+        event_processor=event_processor,
+        event_repository=event_repository,
+        missed_blocks_repository=missed_blocks_repository,
+        sync_interval=12  # Default block time in seconds
+    )
+    missed_blocks_retry_task = MissedBlocksRetryTask(
+        event_fetcher=event_fetcher,
+        event_processor=event_processor,
+        event_repository=event_repository,
+        missed_blocks_repository=missed_blocks_repository,
+        retry_interval_seconds=300 # Retry every 5 minutes
+    )
+
+    await sync_event_store(event_collector, missed_blocks_retry_task)
 
     dendrite = bt.Dendrite(wallet)
 
     metagraph = await subtensor.metagraph(NET_UID)
     miner_validator = Validator(
-        validation_mechanism=BittensorValidationMechanism(event_fetcher, event_processor),
+        validation_mechanism=BittensorValidationMechanism(event_checker),
         target_generator=TargetGenerator(event_fetcher, event_processor),
         scoring_mechanism=MinerScoring(miner_score_repository, moving_average_denominator=8),
         miner_score_repository=miner_score_repository,
@@ -245,6 +313,7 @@ async def start():
         uuid_generator=lambda: uuid.uuid4(),
         weight_setter=weight_setter,
         enable_weight_setting=ENABLE_WEIGHT_SETTING,
+        enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION,
         max_response_size_bytes=MAX_RESPONSE_SIZE_BYTES,
         concurrency=BATCH_CONCURRENCY
     )
