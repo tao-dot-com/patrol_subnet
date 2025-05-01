@@ -116,7 +116,7 @@ class MissedBlocksRetryTask:
                 except Exception as e:
                     logger.error(f"Error storing events in database: {e}")
 
-            if len(to_process.keys()) != blocks_with_events:
+            if len(to_process.keys()) != len(blocks_with_events):
                 blocks_without_events.extend(
                     set(to_process.keys()) - blocks_with_events
                 )
