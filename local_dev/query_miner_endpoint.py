@@ -97,9 +97,7 @@ async def populate_event_store(
             'delegate_hotkey_destination': event.get('evidence', {}).get('delegate_hotkey_destination')
         }
         
-        # Validate that we have required fields
-        if db_event['coldkey_source'] and db_event['block_number'] is not None:
-            db_events.append(db_event)
+        db_events.append(db_event)
     
     # Store in repository
     if db_events:
