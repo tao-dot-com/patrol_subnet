@@ -327,7 +327,7 @@ async def start():
             if update_available:
                 break
             
-            # await miner_validator.query_miner_batch()
+            await asyncio.sleep(10)
             logger.info("Continuing to run collection tasks WITHOUT querying miners!")
         except Exception as ex:
             logger.exception("Error!")
