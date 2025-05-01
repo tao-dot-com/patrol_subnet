@@ -54,7 +54,7 @@ class EventCollector:
 
         queue = asyncio.Queue()
         missed_blocks = []
-
+        blocks_without_events = []
         async def process_buffered_events(buffer: Deque[Tuple[int, Any]]) -> None:
 
             if not buffer:
@@ -65,10 +65,16 @@ class EventCollector:
             logger.info(f"Received and processed {len(processed_batch)} events.")
             
             event_data_list = []
+            blocks_with_events = set()
 
             for event in processed_batch:
                 event_data = self._convert_to_db_format(event)
                 event_data_list.append(event_data)
+
+                # Add the block number to blocks_with_events. Once its gone through the event processor we
+                # can be sure it has at least 1 transfer or staking event.
+                if 'block_number' in event_data:
+                    blocks_with_events.add(event_data['block_number'])
             
             # Store events to DB
             if event_data_list:
@@ -77,6 +83,11 @@ class EventCollector:
                     logger.info(f"Stored {len(event_data_list)} events from blocks {start_block} to {end_block}")
                 except Exception as e:
                     logger.error(f"Error storing events in database: {e}")
+
+            if len(to_process.keys()) != blocks_with_events:
+                blocks_without_events.extend(
+                    set(to_process.keys()) - blocks_with_events
+                )
 
         async def consumer_event_queue() -> None:
             buffer: Deque[Tuple[int, Any]] = deque()
@@ -108,6 +119,13 @@ class EventCollector:
                     missed_blocks,
                     error_message=f"Failed fetching blocks!"
                 )
+            if blocks_without_events:
+                logger.warning(f"Recording {len(blocks_without_events)} blocks which don't have events.")
+                await self.missed_blocks_repository.add_missed_blocks(
+                    blocks_without_events,
+                    error_message=f"Block does not contain transfer/staking events."
+                )
+
 
     def _convert_to_db_format(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """
