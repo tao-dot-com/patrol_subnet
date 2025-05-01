@@ -213,8 +213,8 @@ async def sync_event_store(collector: EventCollector, block_retry_task: MissedBl
     await block_retry_task.start()
     logger.info("Started Missed Block Retry task in background")
     
-    check_interval_minutes = 10
-    max_acceptable_block_gap = 10
+    check_interval_minutes = 0.5
+    max_acceptable_block_gap = 1270003
     
     # Periodically check if we have enough blockchain data
     while True:
@@ -326,8 +326,9 @@ async def start():
             update_available = ENABLE_AUTO_UPDATE and await auto_update.is_update_available()
             if update_available:
                 break
-
-            await miner_validator.query_miner_batch()
+            
+            # await miner_validator.query_miner_batch()
+            logger.info("Continuing to run collection tasks WITHOUT querying miners!")
         except Exception as ex:
             logger.exception("Error!")
 
