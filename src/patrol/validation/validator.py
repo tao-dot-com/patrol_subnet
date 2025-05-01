@@ -213,8 +213,8 @@ async def sync_event_store(collector: EventCollector, block_retry_task: MissedBl
     await block_retry_task.start()
     logger.info("Started Missed Block Retry task in background")
     
-    check_interval_minutes = 0.5
-    max_acceptable_block_gap = 1270003
+    check_interval_minutes = 10
+    max_acceptable_block_gap = 10
     
     # Periodically check if we have enough blockchain data
     while True:
