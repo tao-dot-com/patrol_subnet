@@ -7,20 +7,18 @@ import json
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from patrol.chain_data.event_collector import EventCollector, create_tables
+from patrol.chain_data.event_collector import create_tables
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.chain_data.event_processor import EventProcessor
-from patrol.chain_data.missed_block_retry_task import MissedBlocksRetryTask
 from patrol.validation.config import DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.graph_validation.event_checker import EventChecker
 from patrol.validation.http.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
-from patrol.validation.persistence.missed_blocks_repository import MissedBlocksRepository
 from patrol.validation.target_generation import TargetGenerator
 from patrol.validation.miner_scoring import MinerScoring
-from patrol.validation.validator import Validator, sync_event_store
+from patrol.validation.validator import Validator
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 
@@ -80,7 +78,7 @@ async def populate_event_store(
     events = await event_fetcher.fetch_all_events(list(all_block_numbers))
     processed_events = await event_processor.process_event_data(events)
     
-    # Format events for storing in the database using event_collector's method
+    # Format events for storing in the database
     db_events = []
     for event in processed_events:
         # Convert to format expected by event_store_repository
@@ -99,6 +97,10 @@ async def populate_event_store(
             'delegate_hotkey_destination': event.get('evidence', {}).get('delegate_hotkey_destination')
         }
         
+        # Validate that we have required fields
+        if db_event['coldkey_source'] and db_event['block_number'] is not None:
+            db_events.append(db_event)
+    
     # Store in repository
     if db_events:
         await event_repository.add_events(db_events)
