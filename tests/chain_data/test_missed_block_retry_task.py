@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 from datetime import datetime
 
 from patrol.chain_data.missed_block_retry_task import MissedBlocksRetryTask
+from patrol.validation.persistence.missed_blocks_repository import MissedBlockReason
 
 
 @pytest.fixture
@@ -195,9 +196,9 @@ async def test_retry_missed_blocks_with_blocks_without_events(retry_task, mock_d
     # Track calls to add_missed_blocks
     blocks_without_events_call_args = []
     
-    def side_effect_add_missed_blocks(blocks, error_message=None):
+    def side_effect_add_missed_blocks(blocks, error_message=None, reason=None):
         if "Block does not contain transfer/staking events" in error_message:
-            blocks_without_events_call_args.append((blocks, error_message))
+            blocks_without_events_call_args.append((blocks, error_message, reason))
         return AsyncMock()()
     
     mock_dependencies["missed_blocks_repository"].add_missed_blocks = AsyncMock(side_effect=side_effect_add_missed_blocks)
@@ -256,3 +257,5 @@ async def test_retry_missed_blocks_with_blocks_without_events(retry_task, mock_d
     recorded_blocks = blocks_without_events_call_args[0][0]
     assert set(recorded_blocks) == {4267456, 4267556}
     assert "Block does not contain transfer/staking events" in blocks_without_events_call_args[0][1]
+
+    assert blocks_without_events_call_args[0][2] == MissedBlockReason.NO_EVENTS

@@ -5,6 +5,7 @@ from datetime import datetime
 
 from patrol.chain_data.event_collector import EventCollector
 from patrol.constants import Constants
+from patrol.validation.persistence.missed_blocks_repository import MissedBlockReason
 
 
 @pytest.fixture
@@ -303,11 +304,11 @@ async def test_fetch_and_store_events_with_blocks_without_events(event_collector
     missed_blocks_call_args = []
     blocks_without_events_call_args = []
     
-    def side_effect_add_missed_blocks(blocks, error_message=None):
+    def side_effect_add_missed_blocks(blocks, error_message=None, reason=None):
         if "Failed fetching blocks!" in error_message:
-            missed_blocks_call_args.append((blocks, error_message))
+            missed_blocks_call_args.append((blocks, error_message, reason))
         elif "Block does not contain transfer/staking events" in error_message:
-            blocks_without_events_call_args.append((blocks, error_message))
+            blocks_without_events_call_args.append((blocks, error_message, reason))
         return AsyncMock()()
     
     mock_dependencies["missed_block_repository"].add_missed_blocks = AsyncMock(side_effect=side_effect_add_missed_blocks)
@@ -345,3 +346,7 @@ async def test_fetch_and_store_events_with_blocks_without_events(event_collector
     assert len(blocks_without_events_call_args) == 1
     assert 4267202 in blocks_without_events_call_args[0][0]
     assert "Block does not contain transfer/staking events" in blocks_without_events_call_args[0][1]
+
+    # Check correct Enum used when writing missed blocks
+    assert blocks_without_events_call_args[0][2] == MissedBlockReason.NO_EVENTS
+    assert missed_blocks_call_args[0][2] == MissedBlockReason.FETCH_FAILURE

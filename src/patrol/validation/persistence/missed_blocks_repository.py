@@ -38,7 +38,7 @@ class MissedBlock(Base, MappedAsDataclass):
             block_number=block_number,
             created_at=datetime.now(UTC),
             error_message=error_message,
-            reason=reason.value
+            reason=reason.value if reason else None
         )
 
 class MissedBlocksRepository:
