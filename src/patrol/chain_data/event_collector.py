@@ -17,7 +17,7 @@ from patrol.validation.config import DB_URL
 from patrol.validation.persistence import Base
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.constants import Constants
-from patrol.validation.persistence.missed_blocks_repository import MissedBlocksRepository
+from patrol.validation.persistence.missed_blocks_repository import MissedBlockReason, MissedBlocksRepository
 
 logger = logging.getLogger(__name__)
 
@@ -117,13 +117,15 @@ class EventCollector:
                 logger.warning(f"Recording {len(missed_blocks)} missed blocks in range {start_block}-{end_block}")
                 await self.missed_blocks_repository.add_missed_blocks(
                     missed_blocks,
-                    error_message=f"Failed fetching blocks!"
+                    error_message=f"Failed fetching blocks!",
+                    reason=MissedBlockReason.FETCH_FAILURE
                 )
             if blocks_without_events:
                 logger.warning(f"Recording {len(blocks_without_events)} blocks which don't have events.")
                 await self.missed_blocks_repository.add_missed_blocks(
                     blocks_without_events,
-                    error_message=f"Block does not contain transfer/staking events."
+                    error_message=f"Block does not contain transfer/staking events.",
+                    reason=MissedBlockReason.NO_EVENTS
                 )
 
 
