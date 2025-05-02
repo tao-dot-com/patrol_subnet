@@ -67,8 +67,19 @@ class MissedBlocksRepository:
             Set of all unique missed block numbers
         """
         async with self.LocalAsyncSession() as session:
-            query = select(distinct(MissedBlock.block_number))
-            result = await session.execute(query)
+            # First, get all block numbers that have the specific error message to filter out
+            blocks_to_exclude_query = select(distinct(MissedBlock.block_number)).where(
+                MissedBlock.error_message == "Block does not contain transfer/staking events."
+            )
+            blocks_to_exclude_result = await session.execute(blocks_to_exclude_query)
+            blocks_to_exclude = set(row[0] for row in blocks_to_exclude_result.all())
+            
+            # Then, get all block numbers that are not in the excluded set
+            all_blocks_query = select(distinct(MissedBlock.block_number)).where(
+                ~MissedBlock.block_number.in_(blocks_to_exclude)
+            )
+            
+            result = await session.execute(all_blocks_query)
             return set(row[0] for row in result.all())
         
     async def remove_blocks(self, block_numbers: List[int]) -> None:
