@@ -18,7 +18,7 @@ NOTE: You may see some cases of partial validation, saying that some edges were 
 
 `Validation finished - Validation passed with some edges unverifiable: Original Volume:2000, Validated Volume: 1998`
 
-This is due to certain block numbers not being fetched, when the in memory event store is pre-populated with the events required during validation.
+This is due to certain block numbers not being fetched, when the in memory event store is pre-populated with the events required during validation e.g. from the subtrate client timing out when querying for many blocks at a time.
 
 ## Testing the validator code
 
