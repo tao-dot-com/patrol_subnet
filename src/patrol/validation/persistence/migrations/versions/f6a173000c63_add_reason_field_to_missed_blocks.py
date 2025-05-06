@@ -26,10 +26,7 @@ def upgrade() -> None:
         sa.Column('reason', sa.String(), nullable=True)
     )
 
-    op.create_index("idx_missed_blocks_reason", "missed_blocks", columns=["reason"])
-
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index("idx_missed_blocks_reason", "missed_blocks")
     op.drop_column("missed_blocks", "reason")
