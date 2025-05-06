@@ -1,4 +1,4 @@
-"""add_error_message_index_to_missed_blocks_table
+"""add_reason_field_to_missed_blocks_table
 
 Revision ID: f6a173000c63
 Revises: 1bd98dce73f4
