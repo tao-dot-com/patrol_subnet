@@ -26,28 +26,10 @@ def upgrade() -> None:
         sa.Column('reason', sa.String(), nullable=True)
     )
 
-    # Add index for error message (before populating reason column)
-    op.create_index("idx_missed_blocks_error_message", "missed_blocks", columns=["error_message"])
-    
-    # Populate reason column based on existing error_message values
-    op.execute("""
-        UPDATE missed_blocks 
-        SET reason = 'no_events' 
-        WHERE error_message = 'Block does not contain transfer/staking events.'
-    """)
-    
-    op.execute("""
-        UPDATE missed_blocks 
-        SET reason = 'fetch_failure' 
-        WHERE error_message = 'Failed fetching blocks during missed block retry!' 
-           OR error_message = 'Failed fetching blocks!'
-    """)
-    
     op.create_index("idx_missed_blocks_reason", "missed_blocks", columns=["reason"])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index("idx_missed_blocks_error_message", "missed_blocks")
     op.drop_index("idx_missed_blocks_reason", "missed_blocks")
     op.drop_column("missed_blocks", "reason")
