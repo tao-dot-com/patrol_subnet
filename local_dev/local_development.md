@@ -12,7 +12,13 @@ Next, you can run
 
 "python query_miner_endpoint.py" 
 
-Which will send a request to your locally running miner. You can change the number of requests by updating the number of REQUESTS on line 79. 
+Which will send a request to your locally running miner. You can change the number of requests by updating the number of REQUESTS at the bottom of the script.
+
+NOTE: You may see some cases of partial validation, saying that some edges were unverifiable. For example:
+
+`Validation finished - Validation passed with some edges unverifiable: Original Volume:2000, Validated Volume: 1998`
+
+This is due to certain block numbers not being fetched, when the in memory event store is pre-populated with the events required during validation.
 
 ## Testing the validator code
 
