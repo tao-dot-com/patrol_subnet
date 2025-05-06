@@ -191,9 +191,6 @@ async def test_miner(requests):
     
     await create_tables(engine)
     targets = await target_generator.generate_targets(REQUESTS)
-    targets.extend(
-        [("5CFi7LePvBDSK6RXJ1TyHY1j8ha2WXvypmH4EBqnDjVT7QZ2", 4199740), ("5ECgV72HLnDjT1hX4zP2joFNbajgAyK94oeL9pwAF6JxP46e", 4199740)]
-    )
     targets = list(set(targets))
 
     current_block = await target_generator.get_current_block()
