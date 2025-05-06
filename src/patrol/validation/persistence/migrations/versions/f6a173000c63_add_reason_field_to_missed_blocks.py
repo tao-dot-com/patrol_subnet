@@ -25,6 +25,9 @@ def upgrade() -> None:
         'missed_blocks',
         sa.Column('reason', sa.String(), nullable=True)
     )
+
+    # Add index for error message (before populating reason column)
+    op.create_index("idx_missed_blocks_error_message", "missed_blocks", columns=["error_message"])
     
     # Populate reason column based on existing error_message values
     op.execute("""
@@ -45,5 +48,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
+    op.drop_index("idx_missed_blocks_error_message", "missed_blocks")
     op.drop_index("idx_missed_blocks_reason", "missed_blocks")
     op.drop_column("missed_blocks", "reason")
