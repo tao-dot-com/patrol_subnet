@@ -4,6 +4,7 @@ from typing import Callable, Tuple, Any
 
 import uuid
 import bittensor as bt
+import orjson
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from patrol.chain_data.event_collector import EventCollector
@@ -168,7 +169,7 @@ class Validator:
                     raise Exception("Bad response status %s", response.status)
 
                 response_time = time.perf_counter() - timings["request_start"]
-                json_response = json.loads(buffer.decode('utf-8'))
+                json_response = orjson.loads(buffer.decode('utf-8'))
 
                 return json_response, response_time
 

@@ -14,11 +14,19 @@ dependencies = [
     "alembic",
     "python-json-logger",
     "async_lru",
-    "greenlet>=3.2.1"
+    "greenlet>=3.2.1",
+    "orjson>=3.10.18",
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "flake8", "pytest-aiohttp"]
+test = [
+    "pytest",
+    "pytest_asyncio",
+    "pytest-mock",
+    "httpx",
+    "flake8",
+    "pytest-aiohttp",
+]
 
 [build-system]
 requires = ["setuptools>=57", "wheel", "setuptools-scm"]
@@ -26,7 +34,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope="function"
+asyncio_default_fixture_loop_scope = "function"
 addopts = "--capture=no"
 log_cli = false
 #log_cli_level = "DEBUG"
