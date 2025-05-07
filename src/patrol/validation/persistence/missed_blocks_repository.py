@@ -87,16 +87,20 @@ class MissedBlocksRepository:
             )
             blocks_to_exclude_result = await session.execute(blocks_to_exclude_query)
             blocks_to_exclude = set(row[0] for row in blocks_to_exclude_result.all())
+
+            # If there are no blocks to exclude, get all missed blocks
+            if not blocks_to_exclude:
+                all_blocks_query = select(distinct(MissedBlock.block_number))
+                result = await session.execute(all_blocks_query)
+                return set(row[0] for row in result.all())
             
-            # Then, get all block numbers that are not in the excluded set
+            # Get all block numbers that are not in the excluded set
             # Accounts for cases where we fail to fetch the first time, and succeed on a subsequent
             # retry, but then find that no relevant events exist in the block.
-            all_blocks_query = select(distinct(MissedBlock.block_number)).where(
-                ~MissedBlock.block_number.in_(blocks_to_exclude)
-            )
-            
+            all_blocks_query = select(distinct(MissedBlock.block_number))
             result = await session.execute(all_blocks_query)
-            return set(row[0] for row in result.all())
+            all_blocks = set(row[0] for row in result.all())
+            return all_blocks - blocks_to_exclude
         
     async def remove_blocks(self, block_numbers: List[int]) -> None:
         """
