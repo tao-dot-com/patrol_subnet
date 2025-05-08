@@ -6,7 +6,7 @@ class MinerTaskException(Exception):
     pass
 
 
-class HotkeyOwnershipTask:
+class HotkeyOwnershipMinerClient:
 
     def __init__(self, dendrite: Dendrite):
         self._dendrite = dendrite

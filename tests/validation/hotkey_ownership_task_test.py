@@ -5,7 +5,7 @@ from bittensor import Axon, Dendrite
 from bittensor_wallet import Wallet
 
 from patrol.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
-from patrol.validation.hotkey_ownership_task import HotkeyOwnershipTask, MinerTaskException
+from patrol.validation.hotkey_ownership.hotkey_ownership_task import HotkeyOwnershipTask, MinerTaskException
 
 
 @pytest.fixture
