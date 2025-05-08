@@ -9,6 +9,7 @@ from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.chain_data.substrate_client import SubstrateClient
 from bittensor.core.async_subtensor import AsyncSubstrateInterface
 
+from patrol.validation.chain.runtime_versions import RuntimeVersions
 from patrol.validation.event_store_repository import ChainEvent
 
 import logging
@@ -19,9 +20,9 @@ PreprocessedTuple = namedtuple("PreprocessedTuple", ["block_number", "block_hash
 
 
 class ChainReader:
-    def __init__(self, substrate_client: SubstrateClient, coldkey_finder: ColdkeyFinder):
+    def __init__(self, substrate_client: SubstrateClient, runtime_versions: RuntimeVersions):
         self._substrate_client = substrate_client
-        self._coldkey_finder = coldkey_finder
+        self._runtime_versions = runtime_versions
 
     async def _preprocess_system_events(self, runtime_version: int, block_number: int) -> PreprocessedTuple:
         _, block_hash = await self._get_block_hash(block_number, runtime_version)
@@ -99,6 +100,8 @@ class ChainReader:
         if "SubtensorModule" in event:
             if "NeuronRegistered" in event["SubtensorModule"][0]:
                 return await self._make_neuron_registered_event(event, block_number)
+            elif "ColdkeySwapScheduled" in event["SubtensorModule"][0]:
+                return await self._make_coldkey_swap_scheduled_event(event, block_number)
             else:
                 return None
         else:
@@ -107,7 +110,7 @@ class ChainReader:
     async def _make_neuron_registered_event(self, event, block_number: int):
         neuron_registered = event["SubtensorModule"][0]["NeuronRegistered"]
         hotkey = bittensor.core.chain_data.decode_account_id(neuron_registered[2])
-        coldkey = await self._coldkey_finder.find(hotkey)
+        coldkey = await self.get_hotkey_owner(hotkey, block_number)
 
         return ChainEvent(
             created_at=datetime.now(UTC),
@@ -115,4 +118,40 @@ class ChainReader:
             edge_type="NeuronRegistered",
             block_number=block_number,
             coldkey_destination=coldkey,
+        )
+
+    @staticmethod
+    async def _make_coldkey_swap_scheduled_event(event, block_number: int):
+        swap = event["SubtensorModule"][0]["ColdkeySwapScheduled"]
+        execution_block = swap['execution_block']
+        old_coldkey = bittensor.core.chain_data.decode_account_id(swap['old_coldkey'])
+        new_coldkey = bittensor.core.chain_data.decode_account_id(swap['new_coldkey'])
+
+        return ChainEvent(
+            created_at=datetime.now(UTC),
+            edge_category="SubtensorModule",
+            edge_type="ColdkeySwapScheduled",
+            block_number=block_number,
+            coldkey_source=old_coldkey,
+            coldkey_destination=new_coldkey,
+            #delegate_hotkey_source=
+        )
+
+    async def get_hotkey_owner(self, hotkey: str, block_number: int = None) -> str:
+        """
+        Helper to fetch owner at exactly `block_number`.
+        """
+        if block_number is None:
+            block_number = self.get_current_block()
+
+        runtime_version = self._runtime_versions.runtime_version_for_block(block_number)
+        _, block_hash = await self._get_block_hash(block_number, runtime_version)
+
+        return await self._substrate_client.query(
+            "query",
+            runtime_version,
+            "SubtensorModule",
+            "Owner",
+            [hotkey],
+            block_hash=block_hash
         )
