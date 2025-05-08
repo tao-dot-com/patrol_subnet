@@ -26,12 +26,18 @@ class StakeEvidence:
             raise ValueError("Either delegate_hotkey_source or delegate_hotkey_destination must be provided.")
 
 @dataclass(slots=True)
+class HotkeyOwnershipEvidence:
+    effective_block_number: int
+    swap_scheduled_block_number: Optional[int] = None
+    swap_execution_block_number: Optional[int] = None
+
+@dataclass(slots=True)
 class Edge:
     coldkey_source: str
     coldkey_destination: str
     category: str
     type: str
-    evidence: Union[TransferEvidence, StakeEvidence]
+    evidence: Union[TransferEvidence, StakeEvidence, HotkeyOwnershipEvidence]
     coldkey_owner: Optional[str] = field(default=None)
 
 @dataclass(slots=True)
@@ -57,3 +63,8 @@ class PatrolSynapse(bt.Synapse):
     max_block_number: typing.Optional[int] = field(default=None)
 
     subgraph_output: typing.Optional[GraphPayload] = field(default=None)
+
+
+class HotkeyOwnershipSynapse(bt.Synapse):
+    hotkey_ss58: str
+    subgraph_output: Optional[GraphPayload] = None
