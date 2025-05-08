@@ -6,4 +6,5 @@ class Constants:
     U64_MAX = 2**64 - 1
     LOWER_BLOCK_LIMIT: int = 3014341
     MAX_RESPONSE_TIME: int = 12
+    DTAO_RELEASE_BLOCK: int = 4920351
 
