@@ -326,7 +326,7 @@ async def start():
             update_available = ENABLE_AUTO_UPDATE and await auto_update.is_update_available()
             if update_available:
                 break
-            
+
             await miner_validator.query_miner_batch()
         except Exception as ex:
             logger.exception("Error!")
