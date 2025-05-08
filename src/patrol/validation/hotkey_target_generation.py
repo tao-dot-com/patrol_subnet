@@ -37,15 +37,20 @@ class HotkeyTargetGenerator:
             return DynamicInfo.list_from_dicts(raw.decode())
         else:
 
-            # What is the query here?
+            # TODO: Add this in here.
 
             return None
     
     async def query_metagraph_at_block(self, block_number: int, netuid: int):
 
+        # TODO: Add this in here.
+
         return None
 
     async def generate_targets(self, num_targets: int = 5) -> list[str]:
+        """
+        This function aims to generate target hotkeys from active participants in the ecosystem.
+        """
 
         current_block = await self.get_current_block()
         block_numbers = await self.generate_random_block_numbers(num_targets, current_block)
@@ -62,6 +67,7 @@ class HotkeyTargetGenerator:
         for subnet in subnet_list:
             metagraph = await self.query_metagraph_at_block(block_number=subnet[0], netuid=subnet[1])
             print(metagraph)
+            # TODO: Parse our just the hotkeys from the metagraph?
 
         print(subnet_list)
 
