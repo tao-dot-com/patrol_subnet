@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, UTC
 from typing import Dict, List, Optional, Set
 import uuid
+import enum
 
 from sqlalchemy import BigInteger, DateTime, String, distinct, func, select, delete
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +13,12 @@ from patrol.validation.persistence import Base
 
 logger = logging.getLogger(__name__)
 
+
+class MissedBlockReason(enum.Enum):
+    NO_EVENTS = "no_events"
+    FETCH_FAILURE = "fetch_failure"
+
+
 class MissedBlock(Base, MappedAsDataclass):
     __tablename__ = "missed_blocks"
 
@@ -19,9 +26,10 @@ class MissedBlock(Base, MappedAsDataclass):
     block_number: Mapped[int] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     error_message: Mapped[Optional[str]]
+    reason: Mapped[Optional[str]]
 
     @classmethod
-    def from_block(cls, block_number: int, error_message: Optional[str] = None, retry_count: int = 0):
+    def from_block(cls, block_number: int, error_message: Optional[str] = None, reason: Optional[MissedBlockReason] = None):
         """
         Create a MissedBlock object from a block number and optional error information.
         """
@@ -29,14 +37,20 @@ class MissedBlock(Base, MappedAsDataclass):
             id=str(uuid.uuid4()),
             block_number=block_number,
             created_at=datetime.now(UTC),
-            error_message=error_message
+            error_message=error_message,
+            reason=reason.value if reason else None
         )
 
 class MissedBlocksRepository:
     def __init__(self, engine: AsyncEngine):
         self.LocalAsyncSession = async_sessionmaker(bind=engine)
 
-    async def add_missed_blocks(self, block_numbers: List[int], error_message: Optional[str] = None) -> None:
+    async def add_missed_blocks(
+            self, 
+            block_numbers: List[int], 
+            error_message: Optional[str] = None, 
+            reason: Optional[MissedBlockReason] = None
+        ) -> None:
         """
         Add multiple missed block records. Each call creates new entries.
         
@@ -45,7 +59,7 @@ class MissedBlocksRepository:
             error_message: Optional error context about why the blocks were missed
         """
         missed_blocks = [
-            MissedBlock.from_block(block_num, error_message)
+            MissedBlock.from_block(block_num, error_message, reason)
             for block_num in block_numbers
         ]
         
@@ -67,9 +81,26 @@ class MissedBlocksRepository:
             Set of all unique missed block numbers
         """
         async with self.LocalAsyncSession() as session:
-            query = select(distinct(MissedBlock.block_number))
-            result = await session.execute(query)
-            return set(row[0] for row in result.all())
+            # First, get all block numbers that have the specific error message to filter out
+            blocks_to_exclude_query = select(distinct(MissedBlock.block_number)).where(
+                MissedBlock.reason == MissedBlockReason.NO_EVENTS.value
+            )
+            blocks_to_exclude_result = await session.execute(blocks_to_exclude_query)
+            blocks_to_exclude = set(row[0] for row in blocks_to_exclude_result.all())
+
+            # If there are no blocks to exclude, get all missed blocks
+            if not blocks_to_exclude:
+                all_blocks_query = select(distinct(MissedBlock.block_number))
+                result = await session.execute(all_blocks_query)
+                return set(row[0] for row in result.all())
+            
+            # Get all block numbers that are not in the excluded set
+            # Accounts for cases where we fail to fetch the first time, and succeed on a subsequent
+            # retry, but then find that no relevant events exist in the block.
+            all_blocks_query = select(distinct(MissedBlock.block_number))
+            result = await session.execute(all_blocks_query)
+            all_blocks = set(row[0] for row in result.all())
+            return all_blocks - blocks_to_exclude
         
     async def remove_blocks(self, block_numbers: List[int]) -> None:
         """

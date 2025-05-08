@@ -5,6 +5,7 @@ from datetime import datetime
 
 from patrol.chain_data.event_collector import EventCollector
 from patrol.constants import Constants
+from patrol.validation.persistence.missed_blocks_repository import MissedBlockReason
 
 
 @pytest.fixture
@@ -61,7 +62,7 @@ async def test_convert_to_db_format_transfer_event(event_collector):
         "category": "balance",
         "type": "transfer",
         "evidence": {
-            "block_number": 123456,
+            "block_number": 4267456,
             "rao_amount": 1000000
         }
     }
@@ -72,7 +73,7 @@ async def test_convert_to_db_format_transfer_event(event_collector):
     assert result["coldkey_destination"] == "dest_key"
     assert result["edge_category"] == "balance"
     assert result["edge_type"] == "transfer"
-    assert result["block_number"] == 123456
+    assert result["block_number"] == 4267456
     assert result["rao_amount"] == 1000000
 
     # staking-only fields should not be present
@@ -90,7 +91,7 @@ async def test_convert_to_db_format_stake_event(event_collector):
         "category": "staking",
         "type": "add",
         "evidence": {
-            "block_number": 123456,
+            "block_number": 4267856,
             "rao_amount": 2000000,
             "destination_net_uid": 1,
             "alpha_amount": 1000,
@@ -104,7 +105,7 @@ async def test_convert_to_db_format_stake_event(event_collector):
     assert result["coldkey_destination"] == "dest_key"
     assert result["edge_category"] == "staking"
     assert result["edge_type"] == "add"
-    assert result["block_number"] == 123456
+    assert result["block_number"] == 4267856
     assert result["rao_amount"] == 2000000
 
     # staking-specific
@@ -120,33 +121,33 @@ async def test_convert_to_db_format_stake_event(event_collector):
 @pytest.mark.asyncio
 async def test_fetch_and_store_events_streaming(event_collector, mock_dependencies):
     """Test that _fetch_and_store_events drives stream_all_events → processing → storing."""
-    start_block = 100
-    end_block = 105
+    start_block = 4267200
+    end_block = 4267205
 
     # Raw events as they would come from the substrate
     mock_raw = {
-        100: [{"event": {"Balances": [{"Transfer": {"from": ["source1"], "to": ["dest1"], "amount": 1000}}]}}],
-        103: [{"event": {"SubtensorModule": [{"StakeAdded": [["coldkey2"], ["hotkey2"], 2000, 500, 1]}]}}]
+        4267200: [{"event": {"Balances": [{"Transfer": {"from": ["source1"], "to": ["dest1"], "amount": 1000}}]}}],
+        4267203: [{"event": {"SubtensorModule": [{"StakeAdded": [["coldkey2"], ["hotkey2"], 2000, 500, 1]}]}}]
     }
 
     # What the processor should return
-    block_100_processed = [
+    block_4267200_processed = [
         {
             "coldkey_source": "source1",
             "coldkey_destination": "dest1",
             "category": "balance",
             "type": "transfer",
-            "evidence": {"block_number": 100, "rao_amount": 1000}
+            "evidence": {"block_number": 4267200, "rao_amount": 1000}
         }
     ]
-    block_103_processed = [
+    block_4267203_processed = [
         {
             "coldkey_source": "coldkey2",
             "coldkey_destination": "dest_coldkey2",
             "category": "staking",
             "type": "add",
             "evidence": {
-                "block_number": 103,
+                "block_number": 4267203,
                 "rao_amount": 2000,
                 "delegate_hotkey_destination": "hotkey2",
                 "alpha_amount": 500,
@@ -161,8 +162,8 @@ async def test_fetch_and_store_events_streaming(event_collector, mock_dependenci
         assert block_numbers == list(range(start_block, end_block + 1))
         assert batch_size == event_collector.batch_size
 
-        # Simulate some missed blocks (101, 102, 104, 105)
-        missed_blocks.extend([101, 102, 104, 105])
+        # Simulate some missed blocks (4267201, 4267202, 4267204, 4267205)
+        missed_blocks.extend([4267201, 4267202, 4267204, 4267205])
 
         for blk, ev in mock_raw.items():
             await queue.put({blk: ev})
@@ -173,8 +174,8 @@ async def test_fetch_and_store_events_streaming(event_collector, mock_dependenci
     # Processor now sees the combined dict of both blocks → return both processed lists
     async def fake_process(buffered_dict):
         # ensure both keys are present
-        assert set(buffered_dict.keys()) == {100, 103}
-        return block_100_processed + block_103_processed
+        assert set(buffered_dict.keys()) == {4267200, 4267203}
+        return block_4267200_processed + block_4267203_processed
 
     mock_dependencies["event_processor"].process_event_data = AsyncMock(side_effect=fake_process)
 
@@ -204,14 +205,14 @@ async def test_fetch_and_store_events_streaming(event_collector, mock_dependenci
     # Should have recorded missed blocks
     mock_dependencies["missed_block_repository"].add_missed_blocks.assert_awaited_once()
     missed_blocks_arg = mock_dependencies["missed_block_repository"].add_missed_blocks.call_args[0][0]
-    assert sorted(missed_blocks_arg) == [101, 102, 104, 105]
+    assert sorted(missed_blocks_arg) == [4267201, 4267202, 4267204, 4267205]
     assert "Failed fetching blocks!" in mock_dependencies["missed_block_repository"].add_missed_blocks.call_args[1].get("error_message", "")
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("highest_block_in_db,current_block", [
-    (400000, 5_000_000),
-    (499950,   500_000),
+    (4000000, 5000000),
+    (4999950, 5000000),
 ])
 async def test_sync_loop_with_existing_blocks(event_collector, mock_dependencies, monkeypatch,
                                              highest_block_in_db, current_block):
@@ -243,7 +244,7 @@ async def test_sync_loop_with_existing_blocks(event_collector, mock_dependencies
 @pytest.mark.asyncio
 async def test_sync_loop_with_no_blocks(event_collector, mock_dependencies, monkeypatch):
     """When the DB is empty, we should start at the lower block number limit."""
-    current_block = 5_000_000
+    current_block = 5000000
     mock_dependencies["event_fetcher"].get_current_block.return_value = current_block
     mock_dependencies["event_repository"].get_highest_block_from_db.return_value = None
 
@@ -259,3 +260,93 @@ async def test_sync_loop_with_no_blocks(event_collector, mock_dependencies, monk
     end_block = min(current_block, start_block + 1000)
     assert fake_fetch_store.call_args[0] == (start_block, end_block)
     assert event_collector.last_synced_block == end_block
+
+
+@pytest.mark.asyncio
+async def test_fetch_and_store_events_with_blocks_without_events(event_collector, mock_dependencies):
+    """Test that _fetch_and_store_events correctly identifies blocks without events."""
+    start_block = 4267200
+    end_block = 4267205
+
+    # Raw events as they would come from the substrate
+    # Block 4267200 and 4267203 have events, blocks 4267201, 4267202, 4267204, 4267205 will be handled differently
+    mock_raw = {
+        4267200: [{"event": {"Balances": [{"Transfer": {"from": ["source1"], "to": ["dest1"], "amount": 1000}}]}}],
+        4267202: [{"event": {"System": [{"NewAccount": ["some_account"]}]}}],  # Not a transfer/staking event
+        4267203: [{"event": {"SubtensorModule": [{"StakeAdded": [["coldkey2"], ["hotkey2"], 2000, 500, 1]}]}}]
+    }
+
+    # What the processor should return - only blocks 4267200 and 4267203 have transfer/staking events
+    processed_events = [
+        {
+            "coldkey_source": "source1",
+            "coldkey_destination": "dest1",
+            "category": "balance",
+            "type": "transfer",
+            "evidence": {"block_number": 4267200, "rao_amount": 1000}
+        },
+        {
+            "coldkey_source": "coldkey2",
+            "coldkey_destination": "dest_coldkey2",
+            "category": "staking",
+            "type": "add",
+            "evidence": {
+                "block_number": 4267203,
+                "rao_amount": 2000,
+                "delegate_hotkey_destination": "hotkey2",
+                "alpha_amount": 500,
+                "destination_net_uid": 1
+            }
+        }
+    ]
+
+    # Mock missed_blocks and blocks_without_events tracking
+    missed_blocks_call_args = []
+    blocks_without_events_call_args = []
+    
+    def side_effect_add_missed_blocks(blocks, error_message=None, reason=None):
+        if "Failed fetching blocks!" in error_message:
+            missed_blocks_call_args.append((blocks, error_message, reason))
+        elif "Block does not contain transfer/staking events" in error_message:
+            blocks_without_events_call_args.append((blocks, error_message, reason))
+        return AsyncMock()()
+    
+    mock_dependencies["missed_block_repository"].add_missed_blocks = AsyncMock(side_effect=side_effect_add_missed_blocks)
+
+    # Fake out the streaming
+    async def fake_stream(block_numbers, queue, missed_blocks, batch_size=None):
+        assert block_numbers == list(range(start_block, end_block + 1))
+        
+        # Blocks that fail to fetch
+        missed_blocks.extend([4267201, 4267205])
+
+        # Successfully fetched blocks
+        for blk, ev in mock_raw.items():
+            await queue.put({blk: ev})
+        await queue.put(None)  # signal completion
+
+    mock_dependencies["event_fetcher"].stream_all_events = AsyncMock(side_effect=fake_stream)
+    mock_dependencies["event_processor"].process_event_data = AsyncMock(return_value=processed_events)
+    await event_collector._fetch_and_store_events(start_block, end_block)
+
+    # Verify event processing
+    mock_dependencies["event_processor"].process_event_data.assert_awaited_once()
+    
+    # Verify event storage
+    mock_dependencies["event_repository"].add_events.assert_awaited_once()
+    stored_events = mock_dependencies["event_repository"].add_events.call_args[0][0]
+    assert len(stored_events) == 2
+    
+    # Check that missed blocks were recorded properly (4267201, 4267205)
+    assert len(missed_blocks_call_args) == 1
+    assert sorted(missed_blocks_call_args[0][0]) == [4267201, 4267205]
+    assert "Failed fetching blocks!" in missed_blocks_call_args[0][1]
+    
+    # Check that blocks without events were recorded properly (4267202)
+    assert len(blocks_without_events_call_args) == 1
+    assert 4267202 in blocks_without_events_call_args[0][0]
+    assert "Block does not contain transfer/staking events" in blocks_without_events_call_args[0][1]
+
+    # Check correct Enum used when writing missed blocks
+    assert blocks_without_events_call_args[0][2] == MissedBlockReason.NO_EVENTS
+    assert missed_blocks_call_args[0][2] == MissedBlockReason.FETCH_FAILURE

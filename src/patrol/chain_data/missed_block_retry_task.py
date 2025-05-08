@@ -16,7 +16,7 @@ from patrol.validation import hooks
 from patrol.validation.config import DB_URL
 from patrol.validation.persistence import Base
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
-from patrol.validation.persistence.missed_blocks_repository import MissedBlocksRepository
+from patrol.validation.persistence.missed_blocks_repository import MissedBlockReason, MissedBlocksRepository
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class MissedBlocksRetryTask:
         
         # List to track successfully processed blocks
         successful_blocks = []
-        
+        blocks_without_events = []
         async def process_buffered_events(buffer: Deque[Tuple[int, Any]]) -> None:
             """Process a buffer of events and store them in the database."""
             if not buffer:
@@ -94,11 +94,17 @@ class MissedBlocksRetryTask:
             logger.info(f"Processed {len(processed_batch)} events from retry!")
             
             event_data_list = []
+            blocks_with_events = set()
             
             for event in processed_batch:
                 event_data = self._convert_to_db_format(event)
                 event_data_list.append(event_data)
-            
+
+                # Add the block number to blocks_with_events. Once its gone through the event processor we
+                # can be sure it has at least 1 transfer or staking event.
+                if 'block_number' in event_data:
+                    blocks_with_events.add(event_data['block_number'])
+    
             # Store events to DB
             if event_data_list:
                 try:
@@ -106,9 +112,14 @@ class MissedBlocksRetryTask:
                     logger.info(f"Stored {len(event_data_list)} events from retried blocks!")
                     
                     # Add successfully processed blocks to list, for removal from missed blocs repo
-                    successful_blocks.extend(to_process.keys())
+                    successful_blocks.extend(list(blocks_with_events))
                 except Exception as e:
                     logger.error(f"Error storing events in database: {e}")
+
+            if len(to_process.keys()) != len(blocks_with_events):
+                blocks_without_events.extend(
+                    set(to_process.keys()) - blocks_with_events
+                )
 
         async def consumer_event_queue() -> None:
             """Consumer coroutine that processes events from the queue."""
@@ -157,9 +168,17 @@ class MissedBlocksRetryTask:
                 logger.warning(f"Recording {len(missed_blocks)} missed blocks in retry task!")
                 await self.missed_blocks_repository.add_missed_blocks(
                     missed_blocks,
-                    error_message=f"Failed fetching blocks during missed block retry!"
+                    error_message=f"Failed fetching blocks during missed block retry!",
+                    reason=MissedBlockReason.FETCH_FAILURE
                 )
-            
+            if blocks_without_events: 
+                logger.warning(f"Recording {len(blocks_without_events)} blocks which don't have events.")
+                await self.missed_blocks_repository.add_missed_blocks(
+                    blocks_without_events,
+                    error_message=f"Block does not contain transfer/staking events.",
+                    reason=MissedBlockReason.NO_EVENTS
+                )
+
     async def _retry_loop(self) -> None:
         """Main retry loop."""
         try:

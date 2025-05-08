@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 from datetime import datetime
 
 from patrol.chain_data.missed_block_retry_task import MissedBlocksRetryTask
+from patrol.validation.persistence.missed_blocks_repository import MissedBlockReason
 
 
 @pytest.fixture
@@ -176,3 +177,85 @@ async def test_retry_missed_blocks_with_blocks(retry_task, mock_dependencies):
     mock_dependencies["missed_blocks_repository"].remove_blocks.assert_awaited_once()
     removed_blocks = mock_dependencies["missed_blocks_repository"].remove_blocks.call_args[0][0]
     assert set(removed_blocks) == {4267256, 4267356}
+
+
+@pytest.mark.asyncio
+async def test_retry_missed_blocks_with_blocks_without_events(retry_task, mock_dependencies):
+    """Test retrying missed blocks with some blocks having no relevant events."""
+    # List of blocks to retry
+    blocks_to_retry = [4267256, 4267356, 4267456, 4267556]
+    
+    # Setup the event fetcher to return events for all blocks
+    mock_events = {
+        4267256: [{"event": {"Balances": [{"Transfer": {"from": ["source1"], "to": ["dest1"], "amount": 1000}}]}}],
+        4267356: [{"event": {"SubtensorModule": [{"StakeAdded": [["coldkey2"], ["hotkey2"], 2000, 500, 1]}]}}],
+        4267456: [{"event": {"System": [{"NewAccount": ["some_account"]}]}}],  # No transfer/staking events
+        4267556: [{"event": {"System": [{"ExtrinsicSuccess": []}]}}]  # No transfer/staking events
+    }
+    
+    # Track calls to add_missed_blocks
+    blocks_without_events_call_args = []
+    
+    def side_effect_add_missed_blocks(blocks, error_message=None, reason=None):
+        if "Block does not contain transfer/staking events" in error_message:
+            blocks_without_events_call_args.append((blocks, error_message, reason))
+        return AsyncMock()()
+    
+    mock_dependencies["missed_blocks_repository"].add_missed_blocks = AsyncMock(side_effect=side_effect_add_missed_blocks)
+    
+    # Create a function to simulate the stream_all_events behavior
+    async def fake_stream(block_numbers, queue, missed_blocks_list, batch_size):
+        assert set(block_numbers) == set(blocks_to_retry)
+        
+        for blk, ev in mock_events.items():
+            await queue.put({blk: ev})
+        await queue.put(None)  # signal completion
+    
+    mock_dependencies["event_fetcher"].stream_all_events = AsyncMock(side_effect=fake_stream)
+    
+    # Setup the event processor to return only processed events for blocks with transfer/staking events
+    processed_events = [
+        {
+            "coldkey_source": "source1",
+            "coldkey_destination": "dest1",
+            "category": "balance",
+            "type": "transfer",
+            "evidence": {"block_number": 4267256, "rao_amount": 1000}
+        },
+        {
+            "coldkey_source": "coldkey2",
+            "coldkey_destination": "dest_coldkey2",
+            "category": "staking",
+            "type": "add",
+            "evidence": {
+                "block_number": 4267356,
+                "rao_amount": 2000,
+                "delegate_hotkey_destination": "hotkey2",
+                "alpha_amount": 500,
+                "destination_net_uid": 1
+            }
+        }
+    ]
+    
+    mock_dependencies["event_processor"].process_event_data.return_value = processed_events
+    
+    # Run the retry method
+    await retry_task._retry_missed_blocks(blocks_to_retry)
+    
+    # Verify core functionality
+    mock_dependencies["event_fetcher"].stream_all_events.assert_awaited_once()
+    mock_dependencies["event_processor"].process_event_data.assert_awaited_once()
+    mock_dependencies["event_repository"].add_events.assert_awaited_once()
+    
+    # Verify blocks with events were removed from missed blocks
+    mock_dependencies["missed_blocks_repository"].remove_blocks.assert_awaited_once()
+    removed_blocks = mock_dependencies["missed_blocks_repository"].remove_blocks.call_args[0][0]
+    assert set(removed_blocks) == {4267256, 4267356}
+    
+    # Verify blocks without events were recorded separately
+    assert len(blocks_without_events_call_args) == 1
+    recorded_blocks = blocks_without_events_call_args[0][0]
+    assert set(recorded_blocks) == {4267456, 4267556}
+    assert "Block does not contain transfer/staking events" in blocks_without_events_call_args[0][1]
+
+    assert blocks_without_events_call_args[0][2] == MissedBlockReason.NO_EVENTS
