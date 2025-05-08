@@ -3,6 +3,8 @@ import random
 
 from bittensor.core.chain_data import DynamicInfo
 
+import bittensor.core.metagraph
+
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import VersionData, get_version_for_block
 from patrol.constants import Constants
@@ -43,9 +45,10 @@ class HotkeyTargetGenerator:
     
     async def query_metagraph_at_block(self, block_number: int, netuid: int):
 
-        # TODO: Add this in here.
+        #Can we get an archived metagraph in a better way than just querying the subtensor 'archive'?
+        metagraph = bittensor.subtensor('archive').metagraph(netuid=netuid, block=block_number)
 
-        return None
+        return metagraph
 
     async def generate_targets(self, num_targets: int = 5) -> list[str]:
         """
@@ -64,12 +67,18 @@ class HotkeyTargetGenerator:
                 target_hotkeys.add(subnet.owner_hotkey)
                 subnet_list.append((block_number, subnet.netuid))
 
+        i = 0
         for subnet in subnet_list:
+            #random choice of N metagraphs? 
             metagraph = await self.query_metagraph_at_block(block_number=subnet[0], netuid=subnet[1])
-            print(metagraph)
-            # TODO: Parse our just the hotkeys from the metagraph?
+            hotkeys = metagraph.hotkeys
+            # Parse just the hotkeys from the metagraph
+            target_hotkeys.update(hotkeys)
+            if i==3: break
+            i+=1
 
-        print(subnet_list)
+        # print(subnet_list)
+        print(target_hotkeys)
 
         return target_hotkeys
 
