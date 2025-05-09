@@ -4,8 +4,8 @@ import pytest
 import random
 from unittest.mock import AsyncMock, MagicMock
 
-import patrol.validation.hotkey_target_generation as htg
-from patrol.validation.hotkey_target_generation import HotkeyTargetGenerator
+import patrol.validation.hotkey_ownership.hotkey_target_generation as htg
+from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
 from patrol.constants import Constants
 
 
@@ -27,7 +27,7 @@ def test_format_address_success(monkeypatch):
         "decode_account_id",
         lambda x: f"decoded_{x}"
     )
-    out = HotkeyTargetGenerator.format_address(["alice"])
+    out = HotkeyTargetGenerator.format_address("alice")
     assert out == "decoded_alice"
 
 
@@ -37,8 +37,7 @@ def test_format_address_failure(monkeypatch):
         raise ValueError("nope")
     monkeypatch.setattr(htg, "decode_account_id", _boom)
 
-    # on exception, should return the raw addr[0]
-    out = HotkeyTargetGenerator.format_address(["raw_addr"])
+    out = HotkeyTargetGenerator.format_address("raw_addr")
     assert out == "raw_addr"
 
 
