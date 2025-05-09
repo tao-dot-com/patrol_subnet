@@ -18,7 +18,7 @@ from starlette.responses import Response
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScoreRepository
-from patrol.validation.target_generation import TargetGenerator
+from patrol.validation.coldkey_target_generation import TargetGenerator
 from patrol.validation.validator import Validator
 from patrol.validation.weight_setter import WeightSetter
 

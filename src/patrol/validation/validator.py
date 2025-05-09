@@ -14,7 +14,7 @@ from patrol.validation import auto_update, hooks
 from patrol.validation.graph_validation.event_checker import EventChecker
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hooks import HookType
-from patrol.validation.http.HttpDashboardClient import HttpDashboardClient
+from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
@@ -27,7 +27,7 @@ from uuid import UUID
 
 from patrol.protocol import PatrolSynapse
 from patrol.constants import Constants
-from patrol.validation.target_generation import TargetGenerator
+from patrol.validation.coldkey_target_generation import TargetGenerator
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
