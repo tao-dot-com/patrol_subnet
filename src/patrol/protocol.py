@@ -29,9 +29,7 @@ class StakeEvidence:
 
 @dataclass(slots=True)
 class HotkeyOwnershipEvidence:
-    effective_block_number: int
-    swap_scheduled_block_number: Optional[int] = None
-    swap_execution_block_number: Optional[int] = None
+    block_number: int = None
 
 @dataclass(slots=True)
 class Edge:
@@ -66,9 +64,8 @@ class PatrolSynapse(bt.Synapse):
 
     subgraph_output: typing.Optional[GraphPayload] = field(default=None)
 
-
 class HotkeyOwnershipSynapse(bt.Synapse):
     batch_id: Optional[UUID] = None
     task_id: Optional[UUID] = None
-    hotkey_ss58: str
-    subgraph_output: Optional[GraphPayload] = None
+    target : typing.Optional[str] = field(default=None)
+    subgraph_output: typing.Optional[GraphPayload] = field(default=None)
