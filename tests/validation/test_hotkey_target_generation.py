@@ -14,7 +14,8 @@ async def test_get_current_block():
     # substrate_client.query should be awaited and return a dict with header.number
     mock_client = MagicMock()
     mock_client.query = AsyncMock(return_value={"header": {"number": 123}})
-    gen = HotkeyTargetGenerator(mock_client, runtime_versions=None)
+    mock_client.return_runtime_versions = AsyncMock(return_value=None)
+    gen = HotkeyTargetGenerator(mock_client)
 
     block = await gen.get_current_block()
     assert block == 123
@@ -45,7 +46,9 @@ def test_format_address_failure(monkeypatch):
 async def test_generate_random_block_numbers(monkeypatch):
     # force randint to always return 500
     monkeypatch.setattr(random, "randint", lambda a, b: 500)
-    gen = HotkeyTargetGenerator(None, runtime_versions=None)
+    mock_client = MagicMock()
+    mock_client.return_runtime_versions = AsyncMock(return_value=None)
+    gen = HotkeyTargetGenerator(mock_client)
 
     # choose a current_block large enough so high >= low
     blocks = await gen.generate_random_block_numbers(num_blocks=2, current_block=5000)
@@ -76,10 +79,10 @@ async def test_fetch_subnets_and_owners(monkeypatch):
 
     mock_client = MagicMock()
     mock_client.query = AsyncMock(side_effect=fake_query)
-    mock_runtime_versions = {
+    mock_client.return_runtime_versions = MagicMock(return_value={
         '261': {'block_number_min': 99, 'block_hash_min': 'test', 'block_number_max': 201, 'block_hash_max': 'test'}
-    }
-    gen = HotkeyTargetGenerator(mock_client, runtime_versions=mock_runtime_versions)
+    })
+    gen = HotkeyTargetGenerator(mock_client)
 
     subnets, owners = await gen.fetch_subnets_and_owners(block=100, current_block=200)
     # should pick only netuids 1 and 3
@@ -106,7 +109,8 @@ async def test_query_metagraph_direct(monkeypatch):
 
     mock_client = MagicMock()
     mock_client.query = AsyncMock(side_effect=fake_query)
-    gen = HotkeyTargetGenerator(mock_client, runtime_versions=None)
+    mock_client.return_runtime_versions = AsyncMock(return_value=None)
+    gen = HotkeyTargetGenerator(mock_client)
 
     out = await gen.query_metagraph_direct(block_number=42, netuid=7, current_block=100)
     assert out == "hello_neurons"
@@ -116,7 +120,8 @@ async def test_query_metagraph_direct(monkeypatch):
 async def test_generate_targets(monkeypatch):
     # prepare generator
     mock_client = MagicMock()
-    gen = HotkeyTargetGenerator(mock_client, runtime_versions="rv")
+    mock_client.return_runtime_versions = AsyncMock(return_value=None)
+    gen = HotkeyTargetGenerator(mock_client)
 
     # 1) fix current block
     monkeypatch.setattr(gen, "get_current_block", AsyncMock(return_value=1000))
