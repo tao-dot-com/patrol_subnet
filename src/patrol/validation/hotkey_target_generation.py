@@ -33,26 +33,39 @@ class HotkeyTargetGenerator:
         start_block = random.randint(Constants.DTAO_RELEASE_BLOCK, current_block - num_blocks * 4 * 600)
         return [start_block + i * 500 for i in range(num_blocks * 4)]
 
-    async def fetch_subnets_data(self, block, current_block):
+    async def fetch_subnets_and_owners(self, block, current_block):
         block_hash = await self.substrate_client.query("get_block_hash", None, block)
         ver = get_version_for_block(block, current_block, self.runtime_versions)
 
-        if block > Constants.DTAO_RELEASE_BLOCK:
 
-            raw = await self.substrate_client.query(
-                "runtime_call",
+        subnets = []
+
+        result = await self.substrate_client.query(
+            "query_map",
+            ver,
+            "SubtensorModule",
+            "NetworksAdded",
+            params=None,
+            block_hash=block_hash
+        )
+
+        async for netuid, exists in result:
+            if exists.value:
+                subnets.append((block, netuid))
+
+        subnet_owners = set()
+        for _, netuid in subnets:
+            owner = await self.substrate_client.query(
+                "query",
                 ver,
-                "SubnetInfoRuntimeApi",
-                "get_all_dynamic_info",
-                block_hash=block_hash,
+                "SubtensorModule",
+                "SubnetOwner",
+                [netuid],
+                block_hash=block_hash
             )
-            return DynamicInfo.list_from_dicts(raw.decode())
-        else:
+            subnet_owners.add(owner)
 
-            raw = await self.substrate_client.query()
-
-
-            return None
+        return subnets, subnet_owners
     
     async def query_metagraph_direct(self, block_number: int, netuid: int, current_block: int):
         # Get the block hash for the specific block
@@ -72,37 +85,40 @@ class HotkeyTargetGenerator:
         
         return raw.decode()
 
-    async def generate_targets(self, num_targets: int = 2) -> list[str]:
+    async def generate_targets(self, num_targets: int = 10) -> list[str]:
         """
         This function aims to generate target hotkeys from active participants in the ecosystem.
         """
 
         current_block = await self.get_current_block()
-        block_numbers = await self.generate_random_block_numbers(num_targets, current_block)
+        block_numbers = await self.generate_random_block_numbers(2, current_block)
 
         target_hotkeys = set()
         subnet_list = []
         
-        for block_number in block_numbers:
-            subnet_data = await self.fetch_subnets_data(block_number, current_block)
-            for subnet in subnet_data:
-                target_hotkeys.add(subnet.owner_hotkey)
-                subnet_list.append((block_number, subnet.netuid))
-
-        print(subnet_list)
+        # Can you turn the below in tasks with asyncio gather 
+        tasks = [self.fetch_subnets_and_owners(block_number, current_block) for block_number in block_numbers]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = [result for result in results if result is not None]
+        for subnets, subnet_owners in results:
+            target_hotkeys.update(subnet_owners)
+            subnet_list.extend(subnets)
 
         # random choice of subnets from list
-        subnet_list = random.sample(subnet_list, 10)
+        subnet_list = random.sample(subnet_list, 5)
 
-        for subnet in subnet_list:
-            #random choice of N metagraphs? 
-            neurons = await self.query_metagraph_direct(block_number=subnet[0], netuid=subnet[1], current_block=current_block)
+        tasks = [self.query_metagraph_direct(block_number=subnet[0], netuid=subnet[1], current_block=current_block) for subnet in subnet_list]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results = [result for result in results if result is not None]
+
+        for neurons in results:
             hotkeys = [self.format_address(neuron["hotkey"]) for neuron in neurons]
-            # Parse just the hotkeys from the metagraph
             target_hotkeys.update(hotkeys)
 
-        return target_hotkeys
+        target_hotkeys = list(target_hotkeys)
+        random.shuffle(target_hotkeys)
 
+        return target_hotkeys[:num_targets]
 
 if __name__ == "__main__":
     import time
@@ -111,8 +127,9 @@ if __name__ == "__main__":
     async def example():
         network_url = "wss://archive.chain.opentensor.ai:443/"
         versions = load_versions()
+        print(versions)
         # only keep the runtime we care about
-        versions = {k: versions[k] for k in versions.keys() if int(k) > 233}
+        # versions = {k: versions[k] for k in versions.keys() if int(k) == 165}
 
         client = SubstrateClient(
             runtime_mappings=versions,
@@ -123,8 +140,7 @@ if __name__ == "__main__":
         start_time = time.time()
 
         selector = HotkeyTargetGenerator(substrate_client=client, runtime_versions=versions)
-        hotkey_addresses = await selector.generate_targets(num_targets=2)
-
+        hotkey_addresses = await selector.generate_targets(num_targets=256)
         end_time = time.time()
         print(f"Time taken: {end_time - start_time} seconds")
 

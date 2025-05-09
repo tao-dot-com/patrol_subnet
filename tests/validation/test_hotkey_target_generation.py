@@ -1,0 +1,162 @@
+# tests/test_hotkey_target_generator.py
+
+import pytest
+import random
+from unittest.mock import AsyncMock, MagicMock
+
+import patrol.validation.hotkey_target_generation as htg
+from patrol.validation.hotkey_target_generation import HotkeyTargetGenerator
+from patrol.constants import Constants
+
+
+@pytest.mark.asyncio
+async def test_get_current_block():
+    # substrate_client.query should be awaited and return a dict with header.number
+    mock_client = MagicMock()
+    mock_client.query = AsyncMock(return_value={"header": {"number": 123}})
+    gen = HotkeyTargetGenerator(mock_client, runtime_versions=None)
+
+    block = await gen.get_current_block()
+    assert block == 123
+
+
+def test_format_address_success(monkeypatch):
+    # simulate decode_account_id working
+    monkeypatch.setattr(
+        htg,
+        "decode_account_id",
+        lambda x: f"decoded_{x}"
+    )
+    out = HotkeyTargetGenerator.format_address(["alice"])
+    assert out == "decoded_alice"
+
+
+def test_format_address_failure(monkeypatch):
+    # simulate decode_account_id raising
+    def _boom(x):
+        raise ValueError("nope")
+    monkeypatch.setattr(htg, "decode_account_id", _boom)
+
+    # on exception, should return the raw addr[0]
+    out = HotkeyTargetGenerator.format_address(["raw_addr"])
+    assert out == "raw_addr"
+
+
+@pytest.mark.asyncio
+async def test_generate_random_block_numbers(monkeypatch):
+    # force randint to always return 500
+    monkeypatch.setattr(random, "randint", lambda a, b: 500)
+    gen = HotkeyTargetGenerator(None, runtime_versions=None)
+
+    # choose a current_block large enough so high >= low
+    blocks = await gen.generate_random_block_numbers(num_blocks=2, current_block=5000)
+    # num_blocks * 4 = 8 numbers, spaced by 500
+    assert blocks == [500 + i * 500 for i in range(8)]
+
+
+@pytest.mark.asyncio
+async def test_fetch_subnets_and_owners(monkeypatch):
+    # Setup a fake substrate_client.query
+    async def fake_query(method, *args, **kwargs):
+        if method == "get_block_hash":
+            return "fake_hash"
+        elif method == "query_map":
+            class Exists:
+                def __init__(self, v): self.value = v
+            async def gen():
+                yield (1, Exists(True))
+                yield (2, Exists(False))
+                yield (3, Exists(True))
+            return gen()
+        elif method == "query":
+            # args = (ver, module, name, [netuid])
+            netuid = args[3][0]
+            return f"owner{netuid}"
+        else:
+            raise RuntimeError(f"unexpected {method!r}")
+
+    mock_client = MagicMock()
+    mock_client.query = AsyncMock(side_effect=fake_query)
+    mock_runtime_versions = {
+        '261': {'block_number_min': 99, 'block_hash_min': 'test', 'block_number_max': 201, 'block_hash_max': 'test'}
+    }
+    gen = HotkeyTargetGenerator(mock_client, runtime_versions=mock_runtime_versions)
+
+    subnets, owners = await gen.fetch_subnets_and_owners(block=100, current_block=200)
+    # should pick only netuids 1 and 3
+    assert subnets == [(100, 1), (100, 3)]
+    assert owners == {"owner1", "owner3"}
+
+
+@pytest.mark.asyncio
+async def test_query_metagraph_direct(monkeypatch):
+    # stub get_version_for_block
+    monkeypatch.setattr(
+        htg,
+        "get_version_for_block",
+        lambda block, curr, rv: "VER"
+    )
+    async def fake_query(method, *args, **kwargs):
+        if method == "get_block_hash":
+            return "BH"
+        elif method == "runtime_call":
+            # return raw bytes
+            return b"hello_neurons"
+        else:
+            raise RuntimeError()
+
+    mock_client = MagicMock()
+    mock_client.query = AsyncMock(side_effect=fake_query)
+    gen = HotkeyTargetGenerator(mock_client, runtime_versions=None)
+
+    out = await gen.query_metagraph_direct(block_number=42, netuid=7, current_block=100)
+    assert out == "hello_neurons"
+
+
+@pytest.mark.asyncio
+async def test_generate_targets(monkeypatch):
+    # prepare generator
+    mock_client = MagicMock()
+    gen = HotkeyTargetGenerator(mock_client, runtime_versions="rv")
+
+    # 1) fix current block
+    monkeypatch.setattr(gen, "get_current_block", AsyncMock(return_value=1000))
+    # 2) pick exactly two blocks
+    monkeypatch.setattr(gen, "generate_random_block_numbers", AsyncMock(return_value=[100, 200]))
+    # 3) fake fetch_subnets_and_owners
+    async def fake_fetch(block, curr):
+        if block == 100:
+            return ([(100, 1), (100, 2)], {"o1"})
+        else:
+            return ([(200, 3)], {"o2", "o3"})
+    monkeypatch.setattr(gen, "fetch_subnets_and_owners", fake_fetch)
+    # 4) override random.sample so it won't error even if list < 5
+    monkeypatch.setattr(random, "sample", lambda lst, n: lst)
+    # 5) fake query_metagraph_direct to return two neurons each
+    async def fake_qmd(block_number, netuid, current_block):
+        return [
+            {"hotkey": [f"hk{block_number}_{netuid}_A"]},
+            {"hotkey": [f"hk{block_number}_{netuid}_B"]}
+        ]
+    monkeypatch.setattr(gen, "query_metagraph_direct", fake_qmd)
+    # 6) identity format_address
+    monkeypatch.setattr(
+        HotkeyTargetGenerator,
+        "format_address",
+        staticmethod(lambda x: x[0])
+    )
+    # 7) no-op shuffle
+    monkeypatch.setattr(random, "shuffle", lambda x: None)
+
+    out = await gen.generate_targets(num_targets=4)
+    # we expect at most 4 unique items drawn from owners {o1,o2,o3}
+    # plus hotkeys A/B for each of 3 subnets = 6 more -> total 9 possible
+    assert isinstance(out, list)
+    assert len(out) == 4
+    allowed = {
+        "o1", "o2", "o3",
+        "hk100_1_A", "hk100_1_B", "hk100_2_A", "hk100_2_B",
+        "hk200_3_A", "hk200_3_B"
+    }
+    for item in out:
+        assert item in allowed
