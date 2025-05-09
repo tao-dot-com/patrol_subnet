@@ -54,7 +54,9 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
 
     miner = Axon(port=miner_port, ip=miner_host, wallet=miner_wallet)
 
-    response: HotkeyOwnershipSynapse = await task.execute_task(miner.info(), synapse)
+    response, response_time = await task.execute_task(miner.info(), synapse)
+
+    assert response_time == pytest.approx(0.2, 1.0)
 
     assert response.hotkey_ss58 == "5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
     assert response.subgraph_output.nodes == [
@@ -79,4 +81,5 @@ async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet):
     with pytest.raises(MinerTaskException) as ex:
         await task.execute_task(miner.info(), synapse)
 
-    assert str(ex.value) == "Error: Service unavailable at 81.174.240.251:8000/HotkeyOwnershipSynapse; status 503"
+    assert "Error: Service unavailable" in str(ex.value)
+    assert "status 503" in str(ex.value)

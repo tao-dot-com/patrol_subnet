@@ -9,22 +9,18 @@ from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import Hot
 
 import networkx as nx
 
-class HotkeyOwnershipChallenge:
+from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
+from patrol.validation.scoring import MinerScore, MinerScoreRepository
 
-    def __init__(
-            self, miner_client: HotkeyOwnershipMinerClient,
-            chain_reader: ChainReader
-    ):
-        self.miner_client = miner_client
-        self.hotkey_ownership_scoring = None
+
+class HotkeyOwnershipValidator:
+
+    def __init__(self, chain_reader: ChainReader):
         self.chain_reader = chain_reader
 
-    async def execute_challenge(self, miner: AxonInfo, target_hotkey):
-        synapse = HotkeyOwnershipSynapse(target_hotkey_ss58=target_hotkey)
-        response = await self.miner_client.execute_task(miner, synapse)
+    async def validate(self, response: HotkeyOwnershipSynapse, hotkey: str):
         self._validate_graph(response)
-
-        await self._validate_edges(target_hotkey, response.subgraph_output.edges)
+        await self._validate_edges(hotkey, response.subgraph_output.edges)
 
 
     def _validate_graph(self, synapse: HotkeyOwnershipSynapse):
@@ -43,7 +39,7 @@ class HotkeyOwnershipChallenge:
             assert edge.coldkey_source in graph.nodes, f'Edge source [{edge.coldkey_source}] is not a node'
             assert edge.coldkey_destination in graph.nodes, f"Edge destination [{edge.coldkey_destination}] is not a node"
 
-            assert not graph.has_edge(edge.coldkey_source, edge.coldkey_destination, key=edge.evidence.effective_block_number),\
+            assert not graph.has_edge(edge.coldkey_source, edge.coldkey_destination, key=edge.evidence.effective_block_number), \
                 f"Duplicate edge (from={edge.coldkey_source}, to={edge.coldkey_destination}, block={edge.evidence.effective_block_number})"
 
             graph.add_edge(edge.coldkey_source, edge.coldkey_destination, key=edge.evidence.effective_block_number)
@@ -55,7 +51,7 @@ class HotkeyOwnershipChallenge:
 
         async def chain_validation(block_number: int, expected_owning_coldkey: str):
             actual_owner = await self.chain_reader.get_hotkey_owner(hotkey, block_number)
-            assert actual_owner == expected_owning_coldkey,\
+            assert actual_owner == expected_owning_coldkey, \
                 f"Expected hotkey_owner [{expected_owning_coldkey}]; actual [{actual_owner}] for block [{block_number}]"
 
         evidences = itertools.chain.from_iterable([
@@ -64,4 +60,77 @@ class HotkeyOwnershipChallenge:
         ] for e in edges)
 
         await asyncio.gather(*evidences)
+
+
+class HotkeyOwnershipChallenge:
+
+    def __init__(
+            self, miner_client: HotkeyOwnershipMinerClient,
+            chain_reader: ChainReader,
+            scoring: HotkeyOwnershipScoring,
+            validator: HotkeyOwnershipValidator,
+            score_repository: MinerScoreRepository
+    ):
+        self.miner_client = miner_client
+        self.chain_reader = chain_reader
+        self.scoring = scoring
+        self.validator = validator
+        self.score_repository = score_repository
+
+    async def execute_challenge(self, miner: AxonInfo, target_hotkey, batch_id: UUID):
+        task_id = uuid.uuid4()
+        synapse = HotkeyOwnershipSynapse(hotkey_ss58=target_hotkey)
+
+        response, response_time_seconds = await self.miner_client.execute_task(miner, synapse)
+
+        try:
+            self.validator.validate(response, target_hotkey)
+            scores = self.scoring.score(True, response_time_seconds)
+            score = await self._calculate_score(batch_id, task_id, miner, response_time_seconds)
+        except AssertionError as ex:
+            error = str(ex)
+            score = self._calculate_zero_score(batch_id, task_id, miner, response_time_seconds, error)
+
+        await self.score_repository.add(score)
+
+
+    async def _moving_average(self, overall_score, miner):
+        previous_scores =  await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), self.moving_average_denominator - 1)
+        return (sum(previous_scores) + overall_score) / self.moving_average_denominator
+
+    async def _calculate_zero_score(self, batch_id: UUID, task_id: UUID, miner, response_time: float, error_message: str) -> MinerScore:
+        moving_average = await self._moving_average(0)
+        return MinerScore(
+            id=task_id, batch_id=batch_id, created_at=datetime.now(UTC),
+            uid=miner.uid,
+            hotkey=miner.hotkey,
+            coldkey=miner.coldkey,
+            overall_score=0.0,
+            responsiveness_score=0,
+            overall_score_moving_average=moving_average,
+            response_time_seconds=response_time,
+            volume=0,
+            novelty_score=0,
+            volume_score=0,
+            validation_passed=False,
+            error_message=error_message
+        )
+
+    async def _calculate_score(self, batch_id: UUID, task_id: UUID, miner, response_time: float) -> MinerScore:
+        score = self.scoring.score(True, response_time)
+        moving_average = await self._moving_average(score)
+        return MinerScore(
+            id=task_id, batch_id=batch_id, created_at=datetime.now(UTC),
+            uid=miner.uid,
+            hotkey=miner.hotkey,
+            coldkey=miner.coldkey,
+            overall_score=score.overall,
+            responsiveness_score=score.response_time,
+            overall_score_moving_average=moving_average,
+            response_time_seconds=response_time,
+            volume=0,
+            novelty_score=0,
+            volume_score=1.0,
+            validation_passed=True,
+        )
 
