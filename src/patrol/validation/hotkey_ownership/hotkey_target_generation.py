@@ -1,7 +1,6 @@
 import asyncio
 import random
 
-from bittensor.core.chain_data import DynamicInfo
 from bittensor.core.chain_data.utils import decode_account_id
 
 from patrol.chain_data.substrate_client import SubstrateClient
