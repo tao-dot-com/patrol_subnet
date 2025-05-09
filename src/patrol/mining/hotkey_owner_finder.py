@@ -2,13 +2,14 @@ import asyncio
 
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import VersionData, get_version_for_block
+from patrol.protocol import Node, Edge, GraphPayload, HotkeyOwnershipEvidence
 from patrol.constants import Constants
 
 class HotkeyOwnerFinder:
 
-    def __init__(self, substrate_client: SubstrateClient, runtime_versions: VersionData):
+    def __init__(self, substrate_client: SubstrateClient):
         self.substrate_client = substrate_client
-        self.runtime_versions = runtime_versions
+        self.runtime_versions = self.substrate_client.return_runtime_versions()
 
     async def get_current_block(self) -> int:
         result = await self.substrate_client.query("get_block", None)
@@ -66,33 +67,33 @@ class HotkeyOwnerFinder:
             # change is in (low, mid]
             return await self._find_change_block(hotkey, low, mid, owner_low, current_block)
 
-    async def find_owner_ranges(self, hotkey: str, minimum_block: int = Constants.LOWER_BLOCK_LIMIT):
+    async def find_owner_ranges(
+        self,
+        hotkey: str,
+        minimum_block: int = Constants.LOWER_BLOCK_LIMIT
+    ) -> GraphPayload:
         """
-        Returns a list of dicts
-          { "owner": <address>, "ownership_block_start": <start> }
-        covering the entire span [minimum_block .. current_block],
-        split at *exact* change‐points.
+        Builds a graph of hotkey ownership changes over time.
+        Returns a GraphPayload containing wallet and hotkey nodes,
+        and edges capturing ownership-change events with evidence.
         """
         current_block = await self.get_current_block()
-        ranges = []
+        nodes: list[Node] = []
+        edges: list[Edge] = []
 
-        # get owner at the very start
+        # Initialize search
         start = minimum_block
         owner = await self.get_owner_at(hotkey, start, current_block)
+        nodes.append(Node(id=owner, type="wallet", origin="bittensor"))
 
-        # loop until we exhaust up to the head
+        # Walk through ownership changes until head
         while start <= current_block:
-            # check owner at the top
+            # Check if owner at chain head changed
             owner_at_head = await self.get_owner_at(hotkey, current_block, current_block)
             if owner_at_head == owner:
-                # no more changes—one final range
-                ranges.append({
-                    "owner": owner,
-                    "ownership_block_start": start,
-                })
                 break
 
-            # there *is* a change somewhere between start and current_block
+            # Binary search for exact change block
             change_block = await self._find_change_block(
                 hotkey,
                 low=start,
@@ -100,17 +101,29 @@ class HotkeyOwnerFinder:
                 owner_low=owner,
                 current_block=current_block
             )
-            # up to change_block - 1 is still `owner`
-            ranges.append({
-                "owner": owner,
-                "ownership_block_start": start,
-            })
+            # New owner from change point
+            new_owner = await self.get_owner_at(hotkey, change_block, current_block)
+            # Add the new wallet node if unseen
+            nodes.append(Node(id=new_owner, type="wallet", origin="bittensor"))
 
-            # next segment begins at the change itself
+            # Record an ownership-change edge
+            edges.append(
+                Edge(
+                    coldkey_source=owner,
+                    coldkey_destination=new_owner,
+                    category="coldkey_swap",
+                    type="hotkey_ownership",
+                    evidence=HotkeyOwnershipEvidence(effective_block_number=change_block),
+                    coldkey_owner=new_owner
+                )
+            )
+
+            # Advance to next segment
+            owner = new_owner
             start = change_block
-            owner = await self.get_owner_at(hotkey, start, current_block)
 
-        return ranges
+        return GraphPayload(nodes=nodes, edges=edges)
+
 
 
 if __name__ == "__main__":
@@ -131,20 +144,16 @@ if __name__ == "__main__":
         )
         await client.initialize()
 
-        tracker = HotkeyOwnerFinder(client, versions)
+        tracker = HotkeyOwnerFinder(client)
 
         start_time = time.time()
-        owner_ranges = await tracker.find_owner_ranges(
+        owner_graph = await tracker.find_owner_ranges(
             hotkey="5HK5tp6t2S59DywmHRWPBVJeJ86T61KjurYqeooqj8sREpeN",
             minimum_block=Constants.LOWER_BLOCK_LIMIT
         )
         elapsed = time.time() - start_time
 
         print("Owner change ranges:")
-        for r in owner_ranges:
-            print(f"  {r['owner']}  start block: {r['ownership_block_start']}")
-        print(f"\nFetched in {elapsed:.2f}s")
-
-        print(owner_ranges)
+        print(owner_graph)
 
     asyncio.run(example())

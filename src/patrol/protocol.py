@@ -29,7 +29,7 @@ class StakeEvidence:
 
 @dataclass(slots=True)
 class HotkeyOwnershipEvidence:
-    block_number: int = None
+    effective_block_number: int = None
 
 @dataclass(slots=True)
 class Edge:
@@ -68,4 +68,6 @@ class HotkeyOwnershipSynapse(bt.Synapse):
     batch_id: Optional[UUID] = None
     task_id: Optional[UUID] = None
     target : typing.Optional[str] = field(default=None)
+    max_block_number: typing.Optional[int] = field(default=None)
+    
     subgraph_output: typing.Optional[GraphPayload] = field(default=None)
