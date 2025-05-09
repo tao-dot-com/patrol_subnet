@@ -140,3 +140,68 @@ async def test_find_owner_ranges(monkeypatch):
         coldkey_owner="Y"
     )
     assert payload.edges == [expected_edge]
+
+@pytest.mark.asyncio
+async def test_find_owner_ranges_with_max_block(monkeypatch):
+    """
+    When max_block is provided, get_current_block() should NOT be called,
+    and we only walk up to max_block.
+    Here we simulate no owner changes in [minimum_block..max_block].
+    """
+    client = AsyncMock()
+    client.return_runtime_versions = AsyncMock(return_value=None)
+    finder = HotkeyOwnerFinder(client)
+
+    # Ensure get_current_block isn't used
+    finder.get_current_block = AsyncMock(side_effect=AssertionError("get_current_block should not be called"))
+
+    # Always the same owner => no edges
+    finder.get_owner_at = AsyncMock(return_value="Z")
+    finder._find_change_block = AsyncMock(side_effect=AssertionError("_find_change_block should not be called"))
+
+    payload = await finder.find_owner_ranges(
+        hotkey="hk",
+        minimum_block=5,
+        max_block=10
+    )
+
+    # Only the initial wallet node for "Z"
+    assert payload.nodes == [
+        Node(id="Z", type="wallet", origin="bittensor")
+    ]
+    assert payload.edges == []
+
+
+@pytest.mark.asyncio
+async def test_find_owner_ranges_minimum_above_max(monkeypatch):
+    """
+    If minimum_block > max_block, the loop is skipped entirely,
+    so we still get exactly one initial node and no edges.
+    """
+    client = AsyncMock()
+    client.return_runtime_versions = AsyncMock(return_value=None)
+    finder = HotkeyOwnerFinder(client)
+
+    # Again, current_block override shouldn't be called
+    finder.get_current_block = AsyncMock(side_effect=AssertionError("get_current_block should not be called"))
+
+    # Stub get_owner_at just for the initial fetch
+    async def fake_owner(hk, blk, curr):
+        # blk here is minimum_block (20), curr == max_block (10)
+        assert blk == 20 and curr == 10
+        return "A"
+    finder.get_owner_at = fake_owner
+
+    # _find_change_block should never run
+    finder._find_change_block = AsyncMock(side_effect=AssertionError("_find_change_block should not be called"))
+
+    payload = await finder.find_owner_ranges(
+        hotkey="hk",
+        minimum_block=20,
+        max_block=10
+    )
+
+    assert payload.nodes == [
+        Node(id="A", type="wallet", origin="bittensor")
+    ]
+    assert payload.edges == []
