@@ -1,4 +1,6 @@
 import typing
+from uuid import UUID
+
 import bittensor as bt
 from dataclasses import dataclass, field
 from typing import Optional, Union, List
@@ -66,5 +68,7 @@ class PatrolSynapse(bt.Synapse):
 
 
 class HotkeyOwnershipSynapse(bt.Synapse):
+    batch_id: Optional[UUID] = None
+    task_id: Optional[UUID] = None
     hotkey_ss58: str
     subgraph_output: Optional[GraphPayload] = None
