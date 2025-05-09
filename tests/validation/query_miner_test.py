@@ -11,7 +11,7 @@ from patrol.validation.dashboard import DashboardClient
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
-from patrol.validation.target_generation import TargetGenerator
+from patrol.validation.coldkey_target_generation import TargetGenerator
 from patrol.validation.validator import Validator
 
 import bittensor as bt

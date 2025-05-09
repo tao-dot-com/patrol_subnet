@@ -10,7 +10,7 @@ from aiohttp.web_request import Request
 from bittensor_wallet import Keypair, Wallet
 from bittensor_wallet.mock import MockWallet
 
-from patrol.validation.http.HttpDashboardClient import HttpDashboardClient
+from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.scoring import MinerScore
 
 
