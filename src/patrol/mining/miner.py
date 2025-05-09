@@ -10,12 +10,13 @@ import bittensor as bt
 from bittensor import AsyncSubtensor
 from bittensor.utils.networking import get_external_ip
 
-from patrol.protocol import PatrolSynapse
+from patrol.protocol import PatrolSynapse, HotkeyOwnershipSynapse
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.mining.subgraph_generator import SubgraphGenerator
 from patrol.chain_data.substrate_client import SubstrateClient
+from patrol.mining.hotkey_owner_finder import HotkeyOwnerFinder
 from patrol.chain_data.runtime_groupings import load_versions
 
 def get_event_loop():
@@ -61,7 +62,10 @@ class Miner:
                 exit()
             self.my_subnet_uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
 
-    def blacklist_fn(self, synapse: PatrolSynapse) -> Tuple[bool, str]:
+    async def blacklist(
+        self, synapse: bt.Synapse
+    ) -> tuple[bool, str]:
+        
         if self.dev_flag:
             return False, None
         if synapse.dendrite.hotkey not in self.metagraph.hotkeys:
@@ -70,9 +74,15 @@ class Miner:
         if not self.metagraph.validator_permit[uid] or self.metagraph.S[uid] < self.min_stake_allowed:
             return True, "Non-validator hotkey"
         return False, None
+            
+    async def blacklist_coldkey_search(self, synapse: PatrolSynapse) -> Tuple[bool, str]:
+        return await self.blacklist(synapse)
+    
+    async def blacklist_hotkey_ownership_search(self, synapse: HotkeyOwnershipSynapse) -> Tuple[bool, str]:
+        return await self.blacklist(synapse)
 
-    async def forward(self, synapse: PatrolSynapse) -> PatrolSynapse:
-        bt.logging.info(f"Received request: {synapse.target}, with block number: {synapse.target_block_number}")
+    async def coldkey_search(self, synapse: PatrolSynapse) -> PatrolSynapse:
+        bt.logging.info(f"Received coldkey search request: {synapse.target}, with block number: {synapse.target_block_number}")
         start_time = time.time()
         future = run_coroutine_threadsafe(
             self.subgraph_generator.run(synapse.target, synapse.target_block_number, synapse.max_block_number),
@@ -83,10 +93,24 @@ class Miner:
         volume = len(synapse.subgraph_output.nodes) + len(synapse.subgraph_output.edges)
         bt.logging.info(f"Returning a graph of {volume} in {round(time.time() - start_time, 2)} seconds.")
         return synapse
+    
+    async def hotkey_ownership_search(self, synapse: HotkeyOwnershipSynapse) -> HotkeyOwnershipSynapse:
+        bt.logging.info(f"Received hotkey ownership request: {synapse.target}")
+        start_time = time.time()
+        future = run_coroutine_threadsafe(
+            self.hotkey_owner_finder.find_owner_ranges(synapse.target),
+            self.subgraph_loop
+        )
+        synapse.subgraph_output = future.result()
+        volume = len(synapse.subgraph_output.nodes) + len(synapse.subgraph_output.edges)
+        bt.logging.info(f"Returning a graph of {volume} in {round(time.time() - start_time, 2)} seconds.")
+        return synapse
 
     async def setup_axon(self):
         self.axon = bt.axon(wallet=self.wallet, port=self.port, external_ip=self.external_ip)
-        self.axon.attach(forward_fn=self.forward, blacklist_fn=self.blacklist_fn)
+        self.axon.attach(forward_fn=self.coldkey_search, blacklist_fn=self.blacklist_coldkey_search)
+        self.axon.attach(forward_fn=self.hotkey_ownership_search, blacklist_fn=self.blacklist_hotkey_ownership_search)
+        
         if not self.dev_flag:
             await self.subtensor.serve_axon(
                 netuid=self.netuid,
@@ -112,6 +136,7 @@ class Miner:
                 max_past_events=self.max_past_events,
                 batch_size=self.batch_size
             )
+            self.hotkey_owner_finder = HotkeyOwnerFinder(substrate_client=client)
             bt.logging.info("Successfully initialised, waiting for requests...")
             return True
         except Exception as e:
