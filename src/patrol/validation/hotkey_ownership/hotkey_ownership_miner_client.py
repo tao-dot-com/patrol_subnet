@@ -1,0 +1,22 @@
+from typing import cast
+
+from bittensor import AxonInfo, Dendrite
+
+from patrol.protocol import HotkeyOwnershipSynapse
+
+class MinerTaskException(Exception):
+    pass
+
+
+class HotkeyOwnershipMinerClient:
+
+    def __init__(self, dendrite: Dendrite):
+        self._dendrite = dendrite
+
+    async def execute_task(self, miner: AxonInfo, synapse: HotkeyOwnershipSynapse) -> HotkeyOwnershipSynapse:
+        response = await self._dendrite.call(miner, synapse, timeout=60, deserialize=False)
+
+        if response.is_failure:
+            raise MinerTaskException(f"Error: {response.dendrite.status_message}; status {response.dendrite.status_code}")
+
+        return cast(HotkeyOwnershipSynapse, response)

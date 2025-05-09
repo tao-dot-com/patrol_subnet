@@ -29,7 +29,7 @@ def create_event_hash(event: Dict[str, Any]) -> str:
         "block_number": event.get("block_number"),
         "rao_amount": event.get("rao_amount")
     }
-    
+
     # Add stake-specific fields if they exist
     if event.get("edge_category") == "staking":
         hash_fields.update({
@@ -38,10 +38,10 @@ def create_event_hash(event: Dict[str, Any]) -> str:
             "delegate_hotkey_source": event.get("delegate_hotkey_source"),
             "delegate_hotkey_destination": event.get("delegate_hotkey_destination")
         })
-    
+
     # Create a consistent string representation
     hash_string = json.dumps(hash_fields, sort_keys=True, default=str)
-    
+
     # Create SHA-256 hash
     hash_object = hashlib.sha256(hash_string.encode())
     return hash_object.hexdigest()
@@ -52,27 +52,27 @@ class _ChainEvent(Base, MappedAsDataclass):
     # Primary key and metadata
     edge_hash: Mapped[str] = mapped_column(primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
-    
+
     # Edge fields
     coldkey_source: Mapped[str]
     coldkey_destination: Mapped[str]
     edge_category: Mapped[str]
     edge_type: Mapped[str]
     coldkey_owner: Mapped[Optional[str]]
-    
+
     # Evidence fields - Common
     block_number: Mapped[int]
-    
+
     # TransferEvidence specific fields
     rao_amount: Mapped[int] = mapped_column(BigInteger)
-    
+
     # StakeEvidence specific fields
     destination_net_uid: Mapped[Optional[int]]
     source_net_uid: Mapped[Optional[int]]
     alpha_amount: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     delegate_hotkey_source: Mapped[Optional[str]]
     delegate_hotkey_destination: Mapped[Optional[str]]
-    
+
     @classmethod
     def from_event(cls, event):
         return cls(
@@ -91,7 +91,7 @@ class _ChainEvent(Base, MappedAsDataclass):
         delegate_hotkey_destination=event.get('delegate_hotkey_destination'),
         edge_hash=create_event_hash(event)
     )
-    
+
     @staticmethod
     def _to_utc(instant):
         """
@@ -112,10 +112,10 @@ class DatabaseEventStoreRepository:
             event_data_list: List of dictionaries, each containing event data
         """
         duplicate_count = 0
-        
+
         # Convert all events to _ChainEvent objects first
         events = [_ChainEvent.from_event(data) for data in event_data_list]
-        
+
         # First attempt: try to add all events at once
         async with self.LocalAsyncSession() as batch_session:
             try:
@@ -130,7 +130,7 @@ class DatabaseEventStoreRepository:
                 # Handle other errors with the batch operation
                 await batch_session.rollback()
                 logger.error(f"Error in batch add operation: {e}")
-        
+
         # Fall back to adding events one by one with new sessions for each event
         for event in events:
             async with self.LocalAsyncSession() as individual_session:
@@ -170,7 +170,7 @@ class DatabaseEventStoreRepository:
             )
             result = await session.execute(query)
             return list(result.scalars().all())
-        
+
     async def get_highest_block_from_db(self) -> Optional[int]:
         """
         Query the database to find the highest block number that has been stored.
@@ -179,16 +179,16 @@ class DatabaseEventStoreRepository:
             The highest block number in the database, or None if no blocks are stored
         """
         try:
-            async with self.LocalAsyncSession() as session:                
+            async with self.LocalAsyncSession() as session:
                 query = select(func.max(_ChainEvent.block_number))
                 result = await session.execute(query)
                 max_block = result.scalar()
-                
+
                 if max_block is not None:
                     logger.info(f"Highest block in database: {max_block}")
                 else:
                     logger.info("No blocks found in database")
-                    
+
                 return max_block
         except Exception as e:
             return None
