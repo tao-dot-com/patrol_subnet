@@ -42,7 +42,7 @@ class MinerScoring:
     ) -> MinerScore:
 
         previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), self.moving_average_denominator - 1)
-
+        
         if not validation_result.validated:
             logger.warning(f"Zero score added to records for {uid}, reason: {validation_result.message}.")
             return MinerScore(
@@ -52,7 +52,7 @@ class MinerScoring:
                 uid=uid,
                 coldkey=coldkey,
                 hotkey=hotkey,
-                overall_score_moving_average=(sum(previous_overall_scores) + 0.0) / self.moving_average_denominator,
+                overall_score_moving_average=(sum(previous_overall_scores) + 0.0) / len(previous_overall_scores),
                 overall_score=0.0,
                 volume_score=0.0,
                 volume=validation_result.volume,

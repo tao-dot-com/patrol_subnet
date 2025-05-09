@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import random
 from typing import Callable, Tuple, Any
 
 import uuid
@@ -190,11 +191,19 @@ class Validator:
 
         logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
 
-        tasks = []
-        for i, axon in enumerate(axons):
-            if axon.port != 0:
-                target = targets.pop()
-                tasks.append(self.query_miner(batch_id, uids[i], axon, target, max_block))
+        triples = list(zip(uids, axons, targets))
+        random.shuffle(triples) 
+        
+        current_block = await self.target_generator.get_current_block()
+        max_block = current_block - 10 # provide a small buffer
+
+        logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
+
+        tasks = [
+            self.query_miner(batch_id, uid, axon, target, max_block)
+            for uid, axon, target in triples if axon.port!=0
+        ]
+
 
         await asyncio.gather(*tasks, return_exceptions=True)
         logger.info(f"Batch %s finished", batch_id)
