@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime, UTC
 from unittest.mock import patch
 
@@ -6,9 +5,9 @@ import pytest
 
 from patrol.chain_data.patrol_websocket import PatrolWebsocket
 from patrol.chain_data.substrate_client import SubstrateClient
+from patrol.validation.chain import ChainEvent
 from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.chain.runtime_versions import RuntimeVersions
-from patrol.validation.event_store_repository import ChainEvent
 
 runtime_mappings = {
     "150": {
@@ -115,6 +114,16 @@ async def test_read_coldkey_swap_events(mock_datetime, substrate_client):
     assert await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251) == "5CAwB3dSiMC5jJfpvVU47zT3Gyz5ZDoiyHMaYZUuNs5hFh2P"
     assert await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251 + 57_445) == "5CAwB3dSiMC5jJfpvVU47zT3Gyz5ZDoiyHMaYZUuNs5hFh2P"
     assert await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251 + 57_445 + 1) == "5HNEheHMipyfrJGfYnKgCfvGsoJnZS2BXQjNz5299jGWZhwg"
+
+async def test_find_hotkey_owner(substrate_client):
+    hotkey_swapped = "5HK5tp6t2S59DywmHRWPBVJeJ86T61KjurYqeooqj8sREpeN"
+
+    chain_reader = ChainReader(substrate_client, RuntimeVersions())
+    owner = await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251 + 57_445)
+    assert owner == "5CAwB3dSiMC5jJfpvVU47zT3Gyz5ZDoiyHMaYZUuNs5hFh2P"
+
+    owner = await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251 + 57_445 + 1)
+    assert owner == "5HNEheHMipyfrJGfYnKgCfvGsoJnZS2BXQjNz5299jGWZhwg"
 
 
 @pytest.mark.skip()
