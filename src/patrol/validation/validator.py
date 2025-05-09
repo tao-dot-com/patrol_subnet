@@ -305,7 +305,7 @@ async def start():
     miner_validator = Validator(
         validation_mechanism=BittensorValidationMechanism(event_checker),
         target_generator=TargetGenerator(event_fetcher, event_processor),
-        scoring_mechanism=MinerScoring(miner_score_repository, moving_average_denominator=8),
+        scoring_mechanism=MinerScoring(miner_score_repository, moving_average_denominator=20),
         miner_score_repository=miner_score_repository,
         dashboard_client=HttpDashboardClient(wallet, DASHBOARD_BASE_URL),
         dendrite=dendrite,
