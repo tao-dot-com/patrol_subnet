@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Iterable
@@ -22,6 +22,11 @@ class ChainEvent:
 
 
 class EventStoreRepository(ABC):
+    @abstractmethod
     async def add_chain_events(self, events: Iterable[ChainEvent]):
+        pass
+
+    @abstractmethod
+    async def exists(self, chain_event):
         pass
 

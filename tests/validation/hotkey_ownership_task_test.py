@@ -5,7 +5,7 @@ from bittensor import Axon, Dendrite
 from bittensor_wallet import Wallet
 
 from patrol.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
-from patrol.validation.hotkey_ownership.hotkey_ownership_task import HotkeyOwnershipTask, MinerTaskException
+from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import MinerTaskException, HotkeyOwnershipMinerClient
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
         hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
     )
 
-    task = HotkeyOwnershipTask(dendrite)
+    task = HotkeyOwnershipMinerClient(dendrite)
 
     miner = Axon(port=miner_port, ip=miner_host, wallet=miner_wallet)
 
@@ -72,7 +72,7 @@ async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet):
         hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
     )
 
-    task = HotkeyOwnershipTask(dendrite)
+    task = HotkeyOwnershipMinerClient(dendrite)
 
     miner = Axon(port=8000, ip="127.0.0.1", wallet=miner_wallet)
 
