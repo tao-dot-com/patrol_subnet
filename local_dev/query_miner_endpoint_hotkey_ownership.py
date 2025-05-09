@@ -63,7 +63,7 @@ async def test_miner(requests):
 
     miner_client = HotkeyOwnershipMinerClient(dendrite=dendrite)
 
-    synapse = HotkeyOwnershipSynapse(target=hotkey_addresses[0])
+    synapse = HotkeyOwnershipSynapse(target_hotkey_ss58=hotkey_addresses[0])
     response = await miner_client.execute_task(axon.info(), synapse)
     print(response)
     
