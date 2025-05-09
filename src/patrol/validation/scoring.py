@@ -26,7 +26,7 @@ class MinerScore:
     response_time_seconds: float
     novelty_score: Optional[float]
     validation_passed: bool
-    error_message: Optional[str]
+    error_message: Optional[str] = None
 
     @property
     def miner(self) -> tuple[str, int]:
