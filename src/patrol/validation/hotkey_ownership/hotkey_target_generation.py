@@ -23,9 +23,9 @@ class HotkeyTargetGenerator:
         Assumes 'addr' is provided in the format expected by decode_account_id.
         """
         try:
-            return decode_account_id(addr[0])
+            return decode_account_id(addr)
         except Exception as e:
-            return addr[0]
+            return addr
 
     async def generate_random_block_numbers(self, num_blocks: int, current_block: int) -> list[int]:
         # start_block = random.randint(Constants.LOWER_BLOCK_LIMIT, current_block - num_blocks * 4 * 600)
@@ -35,7 +35,6 @@ class HotkeyTargetGenerator:
     async def fetch_subnets_and_owners(self, block, current_block):
         block_hash = await self.substrate_client.query("get_block_hash", None, block)
         ver = get_version_for_block(block, current_block, self.runtime_versions)
-
 
         subnets = []
 
@@ -126,9 +125,11 @@ if __name__ == "__main__":
     async def example():
         network_url = "wss://archive.chain.opentensor.ai:443/"
         versions = load_versions()
-        print(versions)
         # only keep the runtime we care about
-        # versions = {k: versions[k] for k in versions.keys() if int(k) == 165}
+        versions = {k: versions[k] for k in versions.keys() if int(k) == 149}
+
+        # version = get_version_for_block(3014350, 5014352, versions)
+        # print(version)
 
         client = SubstrateClient(
             runtime_mappings=versions,
@@ -139,7 +140,8 @@ if __name__ == "__main__":
         start_time = time.time()
 
         selector = HotkeyTargetGenerator(substrate_client=client, runtime_versions=versions)
-        hotkey_addresses = await selector.generate_targets(num_targets=256)
+        hotkey_addresses = await selector.generate_targets(num_targets=256)        
+        
         end_time = time.time()
         print(f"Time taken: {end_time - start_time} seconds")
 
