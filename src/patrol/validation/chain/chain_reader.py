@@ -1,16 +1,15 @@
 import asyncio
 from datetime import datetime, UTC
 from collections import namedtuple
-from typing import Iterable
+from typing import Iterable, Any
 
 import bittensor.core.chain_data
 
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.chain_data.substrate_client import SubstrateClient
 from bittensor.core.async_subtensor import AsyncSubstrateInterface
 
+from patrol.validation.chain import ChainEvent
 from patrol.validation.chain.runtime_versions import RuntimeVersions
-from patrol.validation.event_store_repository import ChainEvent
 
 import logging
 
@@ -36,7 +35,7 @@ class ChainReader:
             storage_function="Events"
         ))
 
-    async def find_block_events(self, runtime_version: int, block_numbers: list[int]) -> Iterable[ChainEvent]:
+    async def find_block_events(self, runtime_version: int, block_numbers: list[int]) -> Iterable[Any]:
 
         logger.info("Querying blockchain for events in blocks %s to %s", block_numbers[0], block_numbers[-1])
 

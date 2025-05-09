@@ -3,7 +3,7 @@ import json
 import logging
 from datetime import datetime, UTC
 from sqlalchemy.exc import IntegrityError
-from typing import Any, Dict, List, Optional, Iterable
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import BigInteger, DateTime, func, or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
@@ -11,7 +11,6 @@ from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
 from sqlalchemy import BigInteger, DateTime, or_, select
 from datetime import datetime, UTC
 
-from patrol.validation.event_store_repository import EventStoreRepository, ChainEvent
 from patrol.validation.persistence import Base
 
 logger = logging.getLogger(__name__)
@@ -47,7 +46,6 @@ def create_event_hash(event: Dict[str, Any]) -> str:
     hash_object = hashlib.sha256(hash_string.encode())
     return hash_object.hexdigest()
 
-
 class _ChainEvent(Base, MappedAsDataclass):
     __tablename__ = "event_store"
 
@@ -78,40 +76,21 @@ class _ChainEvent(Base, MappedAsDataclass):
     @classmethod
     def from_event(cls, event):
         return cls(
-            created_at=event.get('created_at', datetime.now(UTC)),
-            coldkey_source=event['coldkey_source'],
-            coldkey_destination=event['coldkey_destination'],
-            edge_category=event['edge_category'],
-            edge_type=event['edge_type'],
-            coldkey_owner=event.get('coldkey_owner'),
-            block_number=event['block_number'],
-            rao_amount=event['rao_amount'],
-            destination_net_uid=event.get('destination_net_uid'),
-            source_net_uid=event.get('source_net_uid'),
-            alpha_amount=event.get('alpha_amount'),
-            delegate_hotkey_source=event.get('delegate_hotkey_source'),
-            delegate_hotkey_destination=event.get('delegate_hotkey_destination'),
-            edge_hash=create_event_hash(event)
-        )
-
-    @classmethod
-    def from_chain_event(cls, event: ChainEvent):
-        return cls(
-            created_at=event.created_at,
-            coldkey_source=event.coldkey_source,
-            coldkey_destination=event.coldkey_destination,
-            edge_category=event.edge_category,
-            edge_type=event.edge_type,
-            coldkey_owner=event.coldkey_owner,
-            block_number=event.block_number,
-            rao_amount=event.rao_amount,
-            destination_net_uid=event.destination_net_uid,
-            source_net_uid=event.source_net_uid,
-            alpha_amount=event.alpha_amount,
-            delegate_hotkey_source=event.delegate_hotkey_source,
-            delegate_hotkey_destination=event.delegate_hotkey_destination,
-            edge_hash=create_event_hash(event.__dict__)
-        )
+        created_at=event.get('created_at', datetime.now(UTC)),
+        coldkey_source=event['coldkey_source'],
+        coldkey_destination=event['coldkey_destination'],
+        edge_category=event['edge_category'],
+        edge_type=event['edge_type'],
+        coldkey_owner=event.get('coldkey_owner'),
+        block_number=event['block_number'],
+        rao_amount=event['rao_amount'],
+        destination_net_uid=event.get('destination_net_uid'),
+        source_net_uid=event.get('source_net_uid'),
+        alpha_amount=event.get('alpha_amount'),
+        delegate_hotkey_source=event.get('delegate_hotkey_source'),
+        delegate_hotkey_destination=event.get('delegate_hotkey_destination'),
+        edge_hash=create_event_hash(event)
+    )
 
     @staticmethod
     def _to_utc(instant):
@@ -120,19 +99,10 @@ class _ChainEvent(Base, MappedAsDataclass):
         """
         return instant if instant.tzinfo is not None else instant.replace(tzinfo=UTC)
 
-
-class DatabaseEventStoreRepository(EventStoreRepository):
+class DatabaseEventStoreRepository:
 
     def __init__(self, engine: AsyncEngine):
         self.LocalAsyncSession = async_sessionmaker(bind=engine)
-
-    async def add_chain_events(self, events: Iterable[ChainEvent]):
-        db_events = (_ChainEvent.from_chain_event(e) for e in events)
-        async with self.LocalAsyncSession() as session:
-            session.add_all(db_events)
-            await session.commit()
-
-
 
     async def add_events(self, event_data_list: List[Dict[str, Any]]) -> List[str]:
         """
