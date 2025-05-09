@@ -20,7 +20,7 @@ class HotkeyOwnershipChallenge:
         self.chain_reader = chain_reader
 
     async def execute_challenge(self, miner: AxonInfo, target_hotkey):
-        synapse = HotkeyOwnershipSynapse(hotkey_ss58=target_hotkey)
+        synapse = HotkeyOwnershipSynapse(target_hotkey_ss58=target_hotkey)
         response = await self.miner_client.execute_task(miner, synapse)
         self._validate_graph(response)
 
