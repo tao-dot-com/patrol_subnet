@@ -36,7 +36,7 @@ async def synapse_handler(request: HotkeyOwnershipSynapse):
             Node("bar", type="wallet", origin="bittensor")
         ],
         edges=[Edge("foo", "bar", "hotkey_ownership", "change", HotkeyOwnershipEvidence(
-            4567, 6789, 7890
+            4567
         ))]
     )
     return request
@@ -47,7 +47,7 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
 
     dendrite = Dendrite(dendrite_wallet)
     synapse = HotkeyOwnershipSynapse(
-        hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
+        target_hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
     )
 
     task = HotkeyOwnershipMinerClient(dendrite)
@@ -58,20 +58,20 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
 
     assert response_time == pytest.approx(0.2, 1.0)
 
-    assert response.hotkey_ss58 == "5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
+    assert response.target_hotkey_ss58 == "5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
     assert response.subgraph_output.nodes == [
         Node("foo", type="wallet", origin="bittensor"),
         Node("bar", type="wallet", origin="bittensor")
     ]
     assert response.subgraph_output.edges == [
-        Edge("foo", "bar", "hotkey_ownership", "change", HotkeyOwnershipEvidence(4567, 6789, 7890))
+        Edge("foo", "bar", "hotkey_ownership", "change", HotkeyOwnershipEvidence(4567))
     ]
 
 async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet):
 
     dendrite = Dendrite(dendrite_wallet)
     synapse = HotkeyOwnershipSynapse(
-        hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
+        target_hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
     )
 
     task = HotkeyOwnershipMinerClient(dendrite)

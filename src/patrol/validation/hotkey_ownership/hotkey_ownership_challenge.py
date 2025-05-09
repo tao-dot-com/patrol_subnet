@@ -1,5 +1,8 @@
 import asyncio
+from datetime import datetime, UTC
 import itertools
+import uuid
+from uuid import UUID
 
 from bt_decode.bt_decode import AxonInfo
 
@@ -79,12 +82,12 @@ class HotkeyOwnershipChallenge:
 
     async def execute_challenge(self, miner: AxonInfo, target_hotkey, batch_id: UUID):
         task_id = uuid.uuid4()
-        synapse = HotkeyOwnershipSynapse(hotkey_ss58=target_hotkey)
+        synapse = HotkeyOwnershipSynapse(target_hotkey_ss58=target_hotkey)
 
         response, response_time_seconds = await self.miner_client.execute_task(miner, synapse)
 
         try:
-            self.validator.validate(response, target_hotkey)
+            await self.validator.validate(response, target_hotkey)
             scores = self.scoring.score(True, response_time_seconds)
             score = await self._calculate_score(batch_id, task_id, miner, response_time_seconds)
         except AssertionError as ex:
@@ -98,10 +101,10 @@ class HotkeyOwnershipChallenge:
         previous_scores =  await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), self.moving_average_denominator - 1)
         return (sum(previous_scores) + overall_score) / self.moving_average_denominator
 
-    async def _calculate_zero_score(self, batch_id: UUID, task_id: UUID, miner, response_time: float, error_message: str) -> MinerScore:
+    async def _calculate_zero_score(self, batch_id: uuid.UUID, task_id: UUID, miner, response_time: float, error_message: str) -> MinerScore:
         moving_average = await self._moving_average(0)
         return MinerScore(
-            id=task_id, batch_id=batch_id, created_at=datetime.now(UTC),
+            id=task_id, batch_id=batch_id, created_at=datetime.now(datetime.UTC),
             uid=miner.uid,
             hotkey=miner.hotkey,
             coldkey=miner.coldkey,
