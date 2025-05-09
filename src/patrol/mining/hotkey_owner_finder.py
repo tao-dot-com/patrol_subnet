@@ -70,14 +70,18 @@ class HotkeyOwnerFinder:
     async def find_owner_ranges(
         self,
         hotkey: str,
-        minimum_block: int = Constants.LOWER_BLOCK_LIMIT
+        minimum_block: int = Constants.LOWER_BLOCK_LIMIT,
+        max_block: int = None
     ) -> GraphPayload:
         """
         Builds a graph of hotkey ownership changes over time.
         Returns a GraphPayload containing wallet and hotkey nodes,
         and edges capturing ownership-change events with evidence.
         """
-        current_block = await self.get_current_block()
+        if max_block is None:
+            current_block = await self.get_current_block()
+        else:
+            current_block = max_block
         nodes: list[Node] = []
         edges: list[Edge] = []
 

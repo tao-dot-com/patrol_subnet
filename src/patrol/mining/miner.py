@@ -98,7 +98,7 @@ class Miner:
         bt.logging.info(f"Received hotkey ownership request: {synapse.target_hotkey_ss58}")
         start_time = time.time()
         future = run_coroutine_threadsafe(
-            self.hotkey_owner_finder.find_owner_ranges(synapse.target_hotkey_ss58),
+            self.hotkey_owner_finder.find_owner_ranges(synapse.target_hotkey_ss58, synapse.max_block_number),
             self.subgraph_loop
         )
         synapse.subgraph_output = future.result()
