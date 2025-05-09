@@ -8,9 +8,9 @@ from patrol.chain_data.runtime_groupings import VersionData, get_version_for_blo
 from patrol.constants import Constants
 
 class HotkeyTargetGenerator:
-    def __init__(self, substrate_client: SubstrateClient, runtime_versions: VersionData):
+    def __init__(self, substrate_client: SubstrateClient):
         self.substrate_client = substrate_client
-        self.runtime_versions = runtime_versions
+        self.runtime_versions = self.substrate_client.return_runtime_versions()
 
     async def get_current_block(self) -> int:
         result = await self.substrate_client.query("get_block", None)
