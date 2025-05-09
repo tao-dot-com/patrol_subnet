@@ -4,7 +4,7 @@ import pytest
 
 from patrol.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipValidator
+from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipValidator, ValidationException
 
 
 async def test_validation_of_valid_graph():
@@ -55,7 +55,7 @@ async def test_validation_with_unconnected_node():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Graph is not fully connected"
@@ -83,7 +83,7 @@ async def test_validation_with_unconnected_edges():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == 'Edge destination [carol] is not a node'
@@ -103,7 +103,7 @@ async def test_validation_with_duplicate_nodes():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Duplicate node [alice]"
@@ -120,7 +120,7 @@ async def test_validation_with_empty_nodes():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Zero nodes"
@@ -137,7 +137,7 @@ async def test_validation_with_absent_nodes():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Zero nodes"
@@ -152,7 +152,7 @@ async def test_validation_with_absent_subgraph():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Missing graph"
@@ -180,7 +180,7 @@ async def test_validation_with_incorrect_previous_owner():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Expected hotkey_owner [alice]; actual [carol] for block [122]"
@@ -207,7 +207,7 @@ async def test_validation_with_incorrect_new_owner():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Expected hotkey_owner [bob]; actual [carol] for block [124]"
@@ -236,7 +236,7 @@ async def test_validation_with_duplicate_edge():
 
     validator = HotkeyOwnershipValidator(chain_reader)
 
-    with pytest.raises(AssertionError) as ex:
+    with pytest.raises(ValidationException) as ex:
         await validator.validate(valid_response, "abddef12345")
 
     assert str(ex.value) == "Duplicate edge (from=alice, to=bob, block=123)"

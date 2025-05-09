@@ -7,13 +7,16 @@ from uuid import UUID
 
 from patrol.protocol import HotkeyOwnershipSynapse, Edge
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient
+from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient, \
+    MinerTaskException
 
 import networkx as nx
 
 from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
 from patrol.validation.scoring import MinerScore, MinerScoreRepository
 
+class ValidationException(Exception):
+    pass
 
 class HotkeyOwnershipValidator:
 
@@ -24,37 +27,42 @@ class HotkeyOwnershipValidator:
         self._validate_graph(response)
         await self._validate_edges(hotkey, response.subgraph_output.edges)
 
-
     def _validate_graph(self, synapse: HotkeyOwnershipSynapse):
         HotkeyOwnershipSynapse.model_validate(synapse, strict=True)
 
         subgraph = synapse.subgraph_output
-        assert subgraph, "Missing graph"
-        assert subgraph.nodes, "Zero nodes"
+        if not subgraph:
+            raise ValidationException("Missing graph")
+        if not subgraph.nodes:
+            raise ValidationException("Zero nodes")
 
         graph = nx.MultiDiGraph()
         for node in subgraph.nodes:
-            assert node.id not in graph, f"Duplicate node [{node.id}]"
+            if node.id in graph:
+                raise ValidationException(f"Duplicate node [{node.id}]")
             graph.add_node(node.id)
 
         for edge in subgraph.edges:
-            assert edge.coldkey_source in graph.nodes, f'Edge source [{edge.coldkey_source}] is not a node'
-            assert edge.coldkey_destination in graph.nodes, f"Edge destination [{edge.coldkey_destination}] is not a node"
+            if edge.coldkey_source not in graph.nodes:
+                raise ValidationException(f'Edge source [{edge.coldkey_source}] is not a node')
+            if edge.coldkey_destination not in graph.nodes:
+                raise ValidationException(f"Edge destination [{edge.coldkey_destination}] is not a node")
 
-            assert not graph.has_edge(edge.coldkey_source, edge.coldkey_destination, key=edge.evidence.effective_block_number), \
-                f"Duplicate edge (from={edge.coldkey_source}, to={edge.coldkey_destination}, block={edge.evidence.effective_block_number})"
+            if graph.has_edge(edge.coldkey_source, edge.coldkey_destination, key=edge.evidence.effective_block_number):
+                raise ValidationException(f"Duplicate edge (from={edge.coldkey_source}, to={edge.coldkey_destination}, block={edge.evidence.effective_block_number})")
 
             graph.add_edge(edge.coldkey_source, edge.coldkey_destination, key=edge.evidence.effective_block_number)
 
-        assert nx.is_weakly_connected(graph), "Graph is not fully connected"
+        if not nx.is_weakly_connected(graph):
+            raise ValidationException("Graph is not fully connected")
 
 
     async def _validate_edges(self, hotkey: str, edges: list[Edge]):
 
         async def chain_validation(block_number: int, expected_owning_coldkey: str):
             actual_owner = await self.chain_reader.get_hotkey_owner(hotkey, block_number)
-            assert actual_owner == expected_owning_coldkey, \
-                f"Expected hotkey_owner [{expected_owning_coldkey}]; actual [{actual_owner}] for block [{block_number}]"
+            if actual_owner != expected_owning_coldkey:
+                raise ValidationException(f"Expected hotkey_owner [{expected_owning_coldkey}]; actual [{actual_owner}] for block [{block_number}]")
 
         evidences = itertools.chain.from_iterable([
             chain_validation(e.evidence.effective_block_number - 1, e.coldkey_source),
@@ -84,18 +92,21 @@ class HotkeyOwnershipChallenge:
         task_id = uuid.uuid4()
         synapse = HotkeyOwnershipSynapse(target_hotkey_ss58=target_hotkey)
 
-        response, response_time_seconds = await self.miner_client.execute_task(miner.axon_info, synapse)
-
         try:
-            await self.validator.validate(response, target_hotkey)
-            scores = self.scoring.score(True, response_time_seconds)
-            score = await self._calculate_score(batch_id, task_id, miner, response_time_seconds)
-        except AssertionError as ex:
+            response, response_time_seconds = await self.miner_client.execute_task(miner.axon_info, synapse)
+
+            try:
+                await self.validator.validate(response, target_hotkey)
+                score = await self._calculate_score(batch_id, task_id, miner, response_time_seconds)
+            except ValidationException as ex:
+                error = str(ex)
+                score = await self._calculate_zero_score(batch_id, task_id, miner, response_time_seconds, error)
+
+        except MinerTaskException as ex:
             error = str(ex)
-            score = self._calculate_zero_score(batch_id, task_id, miner, response_time_seconds, error)
+            score = await self._calculate_zero_score(batch_id, task_id, miner, 0, error)
 
         await self.score_repository.add(score)
-
         return task_id
 
 
