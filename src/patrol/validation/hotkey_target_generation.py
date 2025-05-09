@@ -2,8 +2,7 @@ import asyncio
 import random
 
 from bittensor.core.chain_data import DynamicInfo
-
-import bittensor.core.metagraph
+from bittensor.core.chain_data.utils import decode_account_id
 
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import VersionData, get_version_for_block
@@ -17,6 +16,17 @@ class HotkeyTargetGenerator:
     async def get_current_block(self) -> int:
         result = await self.substrate_client.query("get_block", None)
         return result["header"]["number"]
+    
+    @staticmethod
+    def format_address(addr: list) -> str:
+        """
+        Uses Bittensor's decode_account_id to format the given address.
+        Assumes 'addr' is provided in the format expected by decode_account_id.
+        """
+        try:
+            return decode_account_id(addr[0])
+        except Exception as e:
+            return addr[0]
 
     async def generate_random_block_numbers(self, num_blocks: int, current_block: int) -> list[int]:
         # start_block = random.randint(Constants.LOWER_BLOCK_LIMIT, current_block - num_blocks * 4 * 600)
@@ -39,18 +49,30 @@ class HotkeyTargetGenerator:
             return DynamicInfo.list_from_dicts(raw.decode())
         else:
 
-            # TODO: Add this in here.
+            raw = await self.substrate_client.query()
+
 
             return None
     
-    async def query_metagraph_at_block(self, block_number: int, netuid: int):
+    async def query_metagraph_direct(self, block_number: int, netuid: int, current_block: int):
+        # Get the block hash for the specific block
+        block_hash = await self.substrate_client.query("get_block_hash", None, block_number)
+        # Get the runtime version for this block
+        ver = get_version_for_block(block_number, current_block, self.runtime_versions)
 
-        #Can we get an archived metagraph in a better way than just querying the subtensor 'archive'?
-        metagraph = bittensor.subtensor('archive').metagraph(netuid=netuid, block=block_number)
+        # Make the runtime API call
+        raw = await self.substrate_client.query(
+            "runtime_call",
+            ver,
+            "NeuronInfoRuntimeApi",
+            "get_neurons_lite",
+            block_hash=block_hash,
+            params=[netuid]
+        )
+        
+        return raw.decode()
 
-        return metagraph
-
-    async def generate_targets(self, num_targets: int = 5) -> list[str]:
+    async def generate_targets(self, num_targets: int = 2) -> list[str]:
         """
         This function aims to generate target hotkeys from active participants in the ecosystem.
         """
@@ -67,24 +89,23 @@ class HotkeyTargetGenerator:
                 target_hotkeys.add(subnet.owner_hotkey)
                 subnet_list.append((block_number, subnet.netuid))
 
-        i = 0
+        print(subnet_list)
+
+        # random choice of subnets from list
+        subnet_list = random.sample(subnet_list, 10)
+
         for subnet in subnet_list:
             #random choice of N metagraphs? 
-            metagraph = await self.query_metagraph_at_block(block_number=subnet[0], netuid=subnet[1])
-            hotkeys = metagraph.hotkeys
+            neurons = await self.query_metagraph_direct(block_number=subnet[0], netuid=subnet[1], current_block=current_block)
+            hotkeys = [self.format_address(neuron["hotkey"]) for neuron in neurons]
             # Parse just the hotkeys from the metagraph
             target_hotkeys.update(hotkeys)
-            if i==3: break
-            i+=1
-
-        # print(subnet_list)
-        print(target_hotkeys)
 
         return target_hotkeys
 
 
 if __name__ == "__main__":
-
+    import time
     from patrol.chain_data.runtime_groupings import load_versions
 
     async def example():
@@ -99,8 +120,13 @@ if __name__ == "__main__":
         )
         await client.initialize()
 
+        start_time = time.time()
+
         selector = HotkeyTargetGenerator(substrate_client=client, runtime_versions=versions)
-        hotkey_addresses = await selector.generate_targets(num_targets=5)
+        hotkey_addresses = await selector.generate_targets(num_targets=2)
+
+        end_time = time.time()
+        print(f"Time taken: {end_time - start_time} seconds")
 
         print(f"\nSelected {len(hotkey_addresses)} hotkey addresses.")
 
