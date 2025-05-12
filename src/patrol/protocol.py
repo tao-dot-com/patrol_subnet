@@ -65,8 +65,8 @@ class PatrolSynapse(bt.Synapse):
     subgraph_output: typing.Optional[GraphPayload] = field(default=None)
 
 class HotkeyOwnershipSynapse(bt.Synapse):
-    batch_id: Optional[UUID] = None
-    task_id: Optional[UUID] = None
+    batch_id: Optional[str] = None
+    task_id: Optional[str] = None
     target_hotkey_ss58: typing.Optional[str] = field(default=None)
     max_block_number: typing.Optional[int] = field(default=None)
     
