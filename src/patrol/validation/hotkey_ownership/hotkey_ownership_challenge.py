@@ -5,10 +5,11 @@ import itertools
 import uuid
 from uuid import UUID
 
-from patrol.protocol import HotkeyOwnershipSynapse, Edge
+from patrol.protocol import HotkeyOwnershipSynapse, Edge, Node
 from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient, \
     MinerTaskException
+from patrol.constants import Constants
 
 import networkx as nx
 
@@ -25,6 +26,7 @@ class HotkeyOwnershipValidator:
 
     async def validate(self, response: HotkeyOwnershipSynapse, hotkey: str):
         self._validate_graph(response)
+        await self._validate_start_end_ownership(hotkey, response.subgraph_output.nodes, response.max_block_number)
         await self._validate_edges(hotkey, response.subgraph_output.edges)
 
     def _validate_graph(self, synapse: HotkeyOwnershipSynapse):
@@ -56,7 +58,19 @@ class HotkeyOwnershipValidator:
         if not nx.is_weakly_connected(graph):
             raise ValidationException("Graph is not fully connected")
 
+    async def _validate_start_end_ownership(self, hotkey: str, nodes: list[Node], max_block_number: int):
 
+        start_owner = await self.chain_reader.get_hotkey_owner(hotkey, Constants.LOWER_BLOCK_LIMIT)
+        end_owner = await self.chain_reader.get_hotkey_owner(hotkey, max_block_number)
+
+        # check that the start owner is in the graph
+        if start_owner not in [node.id for node in nodes]:
+            raise ValidationException(f"Start owner [{start_owner}] is not in the graph")
+
+        # check that the end owner is in the graph
+        if end_owner not in [node.id for node in nodes]:
+            raise ValidationException(f"End owner [{end_owner}] is not in the graph")
+        
     async def _validate_edges(self, hotkey: str, edges: list[Edge]):
 
         async def chain_validation(block_number: int, expected_owning_coldkey: str):
@@ -150,3 +164,44 @@ class HotkeyOwnershipChallenge:
             validation_passed=True,
         )
 
+
+if __name__ == "__main__":
+    import json
+    from patrol.chain_data.substrate_client import SubstrateClient
+    from patrol.chain_data.runtime_groupings import load_versions
+    from patrol.validation.chain.runtime_versions import RuntimeVersions
+    from patrol.protocol import HotkeyOwnershipSynapse
+
+    async def example():
+
+        # Read the owner graph from a file
+        # with open("owner_graph_5HK5tp6t2S59DywmHRWPBVJeJ86T61KjurYqeooqj8sREpeN.json", "r") as f:
+        #     owner_graph = json.load(f)
+
+        with open("owner_graph_5DXhFEK92RW9cm8tHpHaC3qXjCzsCdWEaxjTDpowATTe4HW2.json", "r") as f:
+            owner_graph = json.load(f)
+
+        # Create a HotkeyOwnershipSynapse from the owner graph
+        synapse = HotkeyOwnershipSynapse(target_hotkey_ss58="5DXhFEK92RW9cm8tHpHaC3qXjCzsCdWEaxjTDpowATTe4HW2", subgraph_output=owner_graph, max_block_number=5550737)
+
+        network_url = "wss://archive.chain.opentensor.ai:443/"
+        versions = load_versions()
+
+        keys_to_keep = {"164", "261", "149", "239"}
+        versions = {k: versions[k] for k in keys_to_keep if k in versions}
+        
+        # Create an instance of SubstrateClient with a shorter keepalive interval.
+        client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
+        
+        # Initialize substrate connections for all groups.
+        await client.initialize()
+
+        chain_reader = ChainReader(client, RuntimeVersions())
+
+        # Create a validator
+        validator = HotkeyOwnershipValidator(chain_reader)
+
+        # Validate the owner graph
+        await validator.validate(synapse, "5DXhFEK92RW9cm8tHpHaC3qXjCzsCdWEaxjTDpowATTe4HW2")
+
+    asyncio.run(example())
