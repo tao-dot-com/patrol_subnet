@@ -53,7 +53,7 @@ async def test_execute_and_score_challenge(mock_datetime):
     scoring.score.return_value=HotkeyOwnershipScore(1, 0.5, 0.75)
     score_repository.find_latest_overall_scores.return_value=[0, 1, 2]
 
-    task_id = await challenge.execute_challenge(miner, "fsdgfdsghfgdshgfh", batch_id)
+    task_id = await challenge.execute_challenge(miner, "fsdgfdsghfgdshgfh", batch_id, 1_000_000)
 
     score_persisted: MinerScore = score_repository.add.mock_calls[0].args[0]
     assert score_persisted.overall_score == 0.75
@@ -85,8 +85,7 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
     score_repository = AsyncMock(MinerScoreRepository)
 
     validator.validate=AsyncMock(side_effect=ValidationException("Whoops"))
-
-    client.execute_task.return_value = (HotkeyOwnershipSynapse(
+    synapse = HotkeyOwnershipSynapse(
         target_hotkey_ss58="target",
         subgraph_output=GraphPayload(
             nodes=[Node("alice", "", ""), Node("bob", "", "")],
@@ -97,7 +96,10 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
                     evidence=HotkeyOwnershipEvidence(123)
                 )
             ]
-        )), 2.0)
+        )
+    )
+
+    client.execute_task.return_value = (synapse, 2.0)
 
     dashboard_client = AsyncMock(DashboardClient)
     challenge = HotkeyOwnershipChallenge(client, scoring, validator, score_repository, dashboard_client)
@@ -115,7 +117,8 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
     scoring.score.return_value=HotkeyOwnershipScore(1, 0.5, 0.75)
     score_repository.find_latest_overall_scores.return_value=[0, 1, 2]
 
-    task_id = await challenge.execute_challenge(miner, "fsdgfdsghfgdshgfh", batch_id)
+    task_id = await challenge.execute_challenge(miner, "fsdgfdsghfgdshgfh", batch_id, 1_000_000)
+    validator.validate.assert_awaited_once_with(synapse, "fsdgfdsghfgdshgfh", 1_000_000)
 
     score_persisted: MinerScore = score_repository.add.mock_calls[0].args[0]
     assert score_persisted.overall_score == 0
