@@ -10,6 +10,7 @@ from aiohttp.web_request import Request
 from bittensor_wallet import Keypair, Wallet
 from bittensor_wallet.mock import MockWallet
 
+from patrol.constants import TaskType
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.scoring import MinerScore
 
@@ -61,6 +62,7 @@ async def test_send_score(mock_dashboard, mock_wallet):
         overall_score_moving_average=0.65,
         novelty_score=0,
         validation_passed=False,
+        task_type=TaskType.HOTKEY_OWNERSHIP,
         error_message="nope"
     )
 
@@ -94,4 +96,5 @@ async def test_send_score(mock_dashboard, mock_wallet):
     assert body["overall_score"] == 0.6
     assert body["overall_moving_average_score"] == 0.65
     assert body["is_valid"] == False
+    assert body['task_type'] == "HOTKEY_OWNERSHIP"
     assert body["error_message"] == "nope"

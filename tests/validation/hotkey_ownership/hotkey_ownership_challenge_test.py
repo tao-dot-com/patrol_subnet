@@ -4,7 +4,9 @@ from unittest.mock import AsyncMock, patch
 
 from bittensor import AxonInfo
 
+from patrol.constants import TaskType
 from patrol.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
+from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, \
     HotkeyOwnershipValidator, Miner, ValidationException
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient
@@ -35,7 +37,8 @@ async def test_execute_and_score_challenge(mock_datetime):
             ]
         )), 2.0)
 
-    challenge = HotkeyOwnershipChallenge(client, scoring, validator, score_repository)
+    dashboard_client = AsyncMock(DashboardClient)
+    challenge = HotkeyOwnershipChallenge(client, scoring, validator, score_repository, dashboard_client)
 
     miner = Miner(
         axon_info=AxonInfo(
@@ -66,6 +69,9 @@ async def test_execute_and_score_challenge(mock_datetime):
     assert score_persisted.coldkey == "bob"
     assert score_persisted.id == task_id
     assert score_persisted.created_at == now
+    assert score_persisted.task_type == TaskType.HOTKEY_OWNERSHIP
+
+    dashboard_client.send_score.assert_called_once_with(score_persisted)
 
 @patch("patrol.validation.hotkey_ownership.hotkey_ownership_challenge.datetime")
 async def test_execute_and_score_challenge_with_validation_errors(mock_datetime):
@@ -93,7 +99,8 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
             ]
         )), 2.0)
 
-    challenge = HotkeyOwnershipChallenge(client, scoring, validator, score_repository)
+    dashboard_client = AsyncMock(DashboardClient)
+    challenge = HotkeyOwnershipChallenge(client, scoring, validator, score_repository, dashboard_client)
 
     miner = Miner(
         axon_info=AxonInfo(
@@ -125,4 +132,8 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
     assert score_persisted.id == task_id
     assert score_persisted.created_at == now
     assert score_persisted.error_message == "Whoops"
+    assert score_persisted.task_type == TaskType.HOTKEY_OWNERSHIP
+
+    dashboard_client.send_score.assert_called_once_with(score_persisted)
+
 

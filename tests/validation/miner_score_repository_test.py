@@ -4,6 +4,8 @@ from datetime import datetime, UTC, timedelta
 from tempfile import TemporaryDirectory
 
 import pytest
+
+from patrol.constants import TaskType
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository, _MinerScore
 from patrol.validation.scoring import MinerScore
@@ -53,6 +55,7 @@ async def test_add_score_postgres(clean_pgsql_engine):
         novelty_score=3.5,
         validation_passed=False,
         error_message="Oh dear",
+        task_type=TaskType.HOTKEY_OWNERSHIP
     )
 
     await repository.add(miner_score)
@@ -77,6 +80,7 @@ async def test_add_score_postgres(clean_pgsql_engine):
     assert score.novelty_score == 3.5
     assert score.validation_passed == False
     assert score.error_message == "Oh dear"
+    assert score.task_type == 'HOTKEY_OWNERSHIP'
 
 async def test_find_sum_of_previous_overall_scores(clean_pgsql_engine):
     batch_ids = [uuid.uuid4(), uuid.uuid4()]
@@ -166,4 +170,5 @@ def make_miner_score(
         novelty_score=3.5,
         validation_passed=False,
         error_message="Oh dear",
+        task_type=TaskType.PATROL
     )

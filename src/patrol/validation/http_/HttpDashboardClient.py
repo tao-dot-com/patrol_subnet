@@ -10,6 +10,7 @@ from bittensor_wallet import Wallet
 
 from pydantic import BaseModel
 
+from patrol.constants import TaskType
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.scoring import MinerScore
 
@@ -28,6 +29,7 @@ class _MinerScore(BaseModel):
     overall_score: float
     overall_moving_average_score: float
     is_valid: bool
+    task_type: TaskType
     error_message: Optional[str] = None
 
     model_config = {
@@ -48,6 +50,7 @@ class _MinerScore(BaseModel):
             response_time_seconds=score.response_time_seconds, response_time_score=score.responsiveness_score,
             overall_score=score.overall_score, overall_moving_average_score=score.overall_score_moving_average,
             is_valid=score.validation_passed,
+            task_type=score.task_type,
             error_message=score.error_message
         )
 
