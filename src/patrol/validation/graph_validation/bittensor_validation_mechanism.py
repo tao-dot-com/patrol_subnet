@@ -37,7 +37,7 @@ class BittensorValidationMechanism:
             validated_volume = self._calculate_validated_volume(verified_edges, target)
 
             if validated_volume < original_volume:
-                message = f"Validation passed with some edges unverifiable: Original Volume:{original_volume}, Validated Volume: {validated_volume}"
+                message = f"Validation passed with some edges unverifiable or zero rao amount for certain edges found: Original Volume:{original_volume}, Validated Volume: {validated_volume}"
             else:
                 message = "Validation passed."
 
@@ -90,7 +90,7 @@ class BittensorValidationMechanism:
                     raise PayloadValidationError(f"Duplicate edge detected: {key}")
                 seen_edges.add(key)
 
-                if edge.get('category') == "balance":                
+                if edge.get('category') == "balance":   
                     edges.append(
                         Edge(
                             coldkey_source=edge['coldkey_source'],
@@ -266,6 +266,9 @@ class BittensorValidationMechanism:
         graph = {}
 
         for event in events:
+            if event.get('evidence', {}).get('rao_amount') == 0:
+                continue
+
             src = event.get("coldkey_source")
             dst = event.get("coldkey_destination")
             ownr = event.get("coldkey_owner")
@@ -345,10 +348,12 @@ if __name__ == "__main__":
 
         validator = BittensorValidationMechanism(event_checker=event_checker)
 
-        file_path = "subgraph_output.json"
+        file_path = "subgraph_output_1.json"
         with open(file_path, "r") as f:
             payload = json.load(f)
 
-        await validator.validate_payload(uid=1, payload=payload, target="5FyCncAf9EBU8Nkcm5gL1DQu3hVmY7aphiqRn3CxwoTmB1cZ", max_block_number=4179351)
+        output = await validator.validate_payload(uid=1, payload=payload['subgraph_output'], target="5FyCncAf9EBU8Nkcm5gL1DQu3hVmY7aphiqRn3CxwoTmB1cZ", max_block_number=4179351)
+
+        print(output)
 
     asyncio.run(main())

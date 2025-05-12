@@ -171,6 +171,11 @@ def test_generate_adjacency_graph_basic(validator):
     assert {"neighbor": "B", "event": evt} in graph["A"]
     assert {"neighbor": "A", "event": evt} in graph["B"]
 
+def test_generate_adjacency_graph_zero_rao_amount(validator):
+    evt = {"coldkey_source": "A", "coldkey_destination": "B", "evidence": {"rao_amount": 0}}
+    graph = validator._generate_adjacency_graph_from_events([evt])
+    assert graph == {}
+
 def test_generate_adjacency_graph_with_owner(validator):
     evt = {
         "coldkey_source": "A",
