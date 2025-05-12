@@ -24,7 +24,7 @@ where `<your network>` is either 81 (Mainnet) or 275 (Testnet)
 See (https://docs.docker.com/engine/install/)
 
 ### 3. Configure docker
-The validator requires a SQL database. This can be either a Postgresql database (recommended) or an embedded SQLite database
+The validator requires a SQL database. Either a local or external Postgresql database is supported. Other database engines may be used but these are not supported.  
 The database is configured using a URL e.g.  
 `postgres+asyncpg://<user>:<password>@<host>:<port>/<db name>` (PostgreSQL)  
 The validator is configured using environment variables. Example docker-compose.yml files are given below.  
@@ -54,8 +54,8 @@ services:
     environment:
       DB_URL: postgresql+asyncpg://${DB_USERNAME:-patrol}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT:-5432}/${DB_NAME:-patrol}
       ENABLE_AUTO_UPDATE: 1
-      # WALLET_NAME: my_wallet
-      # HOTKEY_NAME: my_hotkey
+      WALLET_NAME: <my_wallet>
+      HOTKEY_NAME: <my_hotkey>
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
 ```
@@ -85,30 +85,10 @@ services:
     environment:
       DB_URL: postgresql+asyncpg://patrol:password@db:5432/patrol
       ENABLE_AUTO_UPDATE: 1
-      # WALLET_NAME: my_wallet
-      # HOTKEY_NAME: my_hotkey
+      WALLET_NAME: <my_wallet>
+      HOTKEY_NAME: <my_hotkey>
     volumes:
       - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
-
-```
-#### 3.3 Embedded SQLite database (Quick & dirty)
-```
-volumes:
-  sqlite_data:
-
-services:
-  validator:
-    init: true
-    image: public.ecr.aws/c9f7n4n0/patrol/validator:latest
-    pull_policy: always
-    restart: unless-stopped
-    environment:
-      ENABLE_AUTO_UPDATE: 1
-      # WALLET_NAME: my_wallet
-      # HOTKEY_NAME: my_hotkey
-    volumes:
-      - ~/.bittensor/wallets:/root/.bittensor/wallets:ro
-      - sqlite_data:/var/patrol/sqlite
 ```
 
 ### 4. Start the validator
