@@ -61,7 +61,7 @@ class MinerScoring:
                 novelty_score=None,
                 validation_passed=False,
                 error_message=validation_result.message,
-                task_type=TaskType.PATROL
+                task_type=TaskType.COLDKEY_SEARCH
             )
 
         volume_score = self.calculate_volume_score(validation_result.volume)
@@ -90,7 +90,7 @@ class MinerScoring:
             novelty_score=None,
             validation_passed=True,
             error_message=None,
-            task_type=TaskType.PATROL
+            task_type=TaskType.COLDKEY_SEARCH
         )
 
     async def calculate_zero_score(self, batch_id, uid, coldkey, hotkey, error_message):
@@ -114,7 +114,7 @@ class MinerScoring:
             novelty_score=None,
             validation_passed=False,
             error_message=error_message,
-            task_type=TaskType.PATROL
+            task_type=TaskType.COLDKEY_SEARCH
         )
 
 

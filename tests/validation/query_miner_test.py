@@ -77,7 +77,7 @@ async def test_persist_miner_score(mock_axon, test_wallet):
                              overall_score_moving_average=5.0,
                              response_time_seconds=2.5,
                              novelty_score=1.0, validation_passed=True, error_message=None,
-                             coldkey="foo", hotkey="bar", task_type=TaskType.PATROL)
+                             coldkey="foo", hotkey="bar", task_type=TaskType.COLDKEY_SEARCH)
 
     scoring_mechanism.calculate_score.return_value = miner_score
 
@@ -118,7 +118,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo", hotkey="bar", task_type=TaskType.PATROL)
+                                coldkey="foo", hotkey="bar", task_type=TaskType.COLDKEY_SEARCH)
 
     miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=4,
                                 overall_score_moving_average=15.0,
@@ -127,7 +127,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo2", hotkey="bar2", task_type=TaskType.PATROL)
+                                coldkey="foo2", hotkey="bar2", task_type=TaskType.COLDKEY_SEARCH)
 
     mock_calc_score = AsyncMock(side_effect=[miner_scores_1, miner_scores_2])
     scoring_mechanism.calculate_score = mock_calc_score
@@ -192,7 +192,7 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo", hotkey="bar", task_type=TaskType.PATROL)
+                                coldkey="foo", hotkey="bar", task_type=TaskType.COLDKEY_SEARCH)
 
     miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=4,
                                 overall_score_moving_average=15.0,
@@ -201,7 +201,7 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo2", hotkey="bar2", task_type=TaskType.PATROL)
+                                coldkey="foo2", hotkey="bar2", task_type=TaskType.COLDKEY_SEARCH)
 
     mock_calc_score = AsyncMock(side_effect=[miner_scores_1, miner_scores_2])
     scoring_mechanism.calculate_score = mock_calc_score

@@ -13,4 +13,4 @@ class Constants:
 
 class TaskType(Enum):
     HOTKEY_OWNERSHIP = 'HOTKEY_OWNERSHIP'
-    PATROL = 'PATROL'
+    COLDKEY_SEARCH = 'COLDKEY_SEARCH'

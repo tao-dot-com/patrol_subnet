@@ -170,5 +170,5 @@ def make_miner_score(
         novelty_score=3.5,
         validation_passed=False,
         error_message="Oh dear",
-        task_type=TaskType.PATROL
+        task_type=TaskType.COLDKEY_SEARCH
     )
