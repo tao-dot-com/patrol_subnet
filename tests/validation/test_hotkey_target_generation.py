@@ -9,18 +9,6 @@ from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTa
 from patrol.constants import Constants
 
 
-@pytest.mark.asyncio
-async def test_get_current_block():
-    # substrate_client.query should be awaited and return a dict with header.number
-    mock_client = MagicMock()
-    mock_client.query = AsyncMock(return_value={"header": {"number": 123}})
-    mock_client.return_runtime_versions = AsyncMock(return_value=None)
-    gen = HotkeyTargetGenerator(mock_client)
-
-    block = await gen.get_current_block()
-    assert block == 123
-
-
 def test_format_address_success(monkeypatch):
     # simulate decode_account_id working
     monkeypatch.setattr(
@@ -123,8 +111,6 @@ async def test_generate_targets(monkeypatch):
     mock_client.return_runtime_versions = AsyncMock(return_value=None)
     gen = HotkeyTargetGenerator(mock_client)
 
-    # 1) fix current block
-    monkeypatch.setattr(gen, "get_current_block", AsyncMock(return_value=1000))
     # 2) pick exactly two blocks
     monkeypatch.setattr(gen, "generate_random_block_numbers", AsyncMock(return_value=[100, 200]))
     # 3) fake fetch_subnets_and_owners
@@ -152,7 +138,7 @@ async def test_generate_targets(monkeypatch):
     # 7) no-op shuffle
     monkeypatch.setattr(random, "shuffle", lambda x: None)
 
-    out = await gen.generate_targets(num_targets=4)
+    out = await gen.generate_targets(1000, num_targets=4)
     # we expect at most 4 unique items drawn from owners {o1,o2,o3}
     # plus hotkeys A/B for each of 3 subnets = 6 more -> total 9 possible
     assert isinstance(out, list)

@@ -32,9 +32,9 @@ class HotkeyOwnershipValidator:
     def __init__(self, chain_reader: ChainReader):
         self.chain_reader = chain_reader
 
-    async def validate(self, response: HotkeyOwnershipSynapse, hotkey: str):
+    async def validate(self, response: HotkeyOwnershipSynapse, hotkey: str, max_block_number: int):
         self._validate_graph(response)
-        await self._validate_start_end_ownership(hotkey, response.subgraph_output.nodes, response.max_block_number)
+        await self._validate_start_end_ownership(hotkey, response.subgraph_output.nodes, max_block_number)
         await self._validate_edges(hotkey, response.subgraph_output.edges)
 
     def _validate_graph(self, synapse: HotkeyOwnershipSynapse):
@@ -112,7 +112,7 @@ class HotkeyOwnershipChallenge:
         self.dashboard_client = dashboard_client
         self.moving_average_denominator = 20
 
-    async def execute_challenge(self, miner: Miner, target_hotkey, batch_id: UUID):
+    async def execute_challenge(self, miner: Miner, target_hotkey, batch_id: UUID, max_block_number: int):
         task_id = uuid.uuid4()
         synapse = HotkeyOwnershipSynapse(target_hotkey_ss58=target_hotkey)
 
@@ -120,7 +120,7 @@ class HotkeyOwnershipChallenge:
             response, response_time_seconds = await self.miner_client.execute_task(miner.axon_info, synapse)
 
             try:
-                await self.validator.validate(response, target_hotkey)
+                await self.validator.validate(response, target_hotkey, max_block_number)
                 score = await self._calculate_score(batch_id, task_id, miner, response_time_seconds)
             except ValidationException as ex:
                 error = str(ex)

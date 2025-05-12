@@ -4,7 +4,7 @@ import random
 from bittensor.core.chain_data.utils import decode_account_id
 
 from patrol.chain_data.substrate_client import SubstrateClient
-from patrol.chain_data.runtime_groupings import VersionData, get_version_for_block
+from patrol.chain_data.runtime_groupings import get_version_for_block
 from patrol.constants import Constants
 
 class HotkeyTargetGenerator:
@@ -12,12 +12,8 @@ class HotkeyTargetGenerator:
         self.substrate_client = substrate_client
         self.runtime_versions = self.substrate_client.return_runtime_versions()
 
-    async def get_current_block(self) -> int:
-        result = await self.substrate_client.query("get_block", None)
-        return result["header"]["number"]
-    
     @staticmethod
-    def format_address(addr: list) -> str:
+    def format_address(addr) -> str:
         """
         Uses Bittensor's decode_account_id to format the given address.
         Assumes 'addr' is provided in the format expected by decode_account_id.
@@ -83,19 +79,18 @@ class HotkeyTargetGenerator:
         
         return raw.decode()
 
-    async def generate_targets(self, num_targets: int = 10) -> list[str]:
+    async def generate_targets(self, max_block_number: int, num_targets: int = 10) -> list[str]:
         """
         This function aims to generate target hotkeys from active participants in the ecosystem.
         """
 
-        current_block = await self.get_current_block()
-        block_numbers = await self.generate_random_block_numbers(2, current_block)
+        block_numbers = await self.generate_random_block_numbers(2, max_block_number)
 
         target_hotkeys = set()
         subnet_list = []
         
         # Can you turn the below in tasks with asyncio gather 
-        tasks = [self.fetch_subnets_and_owners(block_number, current_block) for block_number in block_numbers]
+        tasks = [self.fetch_subnets_and_owners(block_number, max_block_number) for block_number in block_numbers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         results = [result for result in results if result is not None]
         for subnets, subnet_owners in results:
@@ -105,7 +100,7 @@ class HotkeyTargetGenerator:
         # random choice of subnets from list
         subnet_list = random.sample(subnet_list, 5)
 
-        tasks = [self.query_metagraph_direct(block_number=subnet[0], netuid=subnet[1], current_block=current_block) for subnet in subnet_list]
+        tasks = [self.query_metagraph_direct(block_number=subnet[0], netuid=subnet[1], current_block=max_block_number) for subnet in subnet_list]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         results = [result for result in results if result is not None]
 
