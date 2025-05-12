@@ -41,7 +41,7 @@ class HotkeyOwnershipBatch:
             (Miner(axon, uids[idx]) for idx, axon in enumerate(axons))
         ))
 
-        target_hotkeys = await self.target_generator.generate_targets(len(miners))
+        target_hotkeys = await self.target_generator.generate_targets(5_400_000, len(miners))
 
         async def challenge(miner):
             try:
