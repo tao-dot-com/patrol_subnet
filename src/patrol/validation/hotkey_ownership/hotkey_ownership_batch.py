@@ -49,6 +49,3 @@ class HotkeyOwnershipBatch:
         logger.info("Batch completed", extra=logging_extra)
 
         return batch_id
-
-
-
