@@ -10,7 +10,7 @@ from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
 from patrol.chain_data.event_processor import EventProcessor
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
-from patrol.validation.target_generation import TargetGenerator
+from patrol.validation.coldkey_target_generation import TargetGenerator
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.validator import Validator
 from patrol.chain_data.substrate_client import SubstrateClient
