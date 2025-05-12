@@ -43,6 +43,8 @@ class SubgraphGenerator:
         # Iterate over the events and add edges based on available keys.
         # We look for 'coldkey_source', 'coldkey_destination' and 'coldkey_owner'
         for event in events:
+            if event.get('evidence', {}).get('rao_amount') == 0:
+                continue
             src = event.get("coldkey_source")
             dst = event.get("coldkey_destination")
             ownr = event.get("coldkey_owner")
@@ -104,7 +106,7 @@ class SubgraphGenerator:
                 try:
                     if edge_key not in seen_edges:
                         seen_edges.add(edge_key)
-                        if event.get('category') == "balance":                
+                        if event.get('category') == "balance":  
                             edges.append(
                                 Edge(
                                     coldkey_source=event['coldkey_source'],

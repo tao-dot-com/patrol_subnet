@@ -22,6 +22,17 @@ def test_generate_adjacency_graph():
     assert set(graph.keys()) == {"A", "B", "C"}
     assert any(conn["neighbor"] == "B" for conn in graph["A"])
 
+def test_generate_adjacency_graph_zero_rao_amount():
+    gen = SubgraphGenerator(event_fetcher=None, event_processor=None)
+    sample_events = [
+        {"coldkey_source": "A", "coldkey_destination": "B", "evidence": {"rao_amount": 100, "block_number": 1}},
+        {"coldkey_source": "B", "coldkey_owner": "C", "evidence": {"rao_amount": 200, "block_number": 2}},
+        {"coldkey_source": "C", "coldkey_destination": "D", "evidence": {"rao_amount": 0, "block_number": 3}},
+    ]
+    graph = gen.generate_adjacency_graph_from_events(sample_events)
+    assert set(graph.keys()) == {"A", "B", "C"}
+    assert any(conn["neighbor"] == "B" for conn in graph["A"])
+
 def test_generate_subgraph_from_adjacency_graph():
     gen = SubgraphGenerator(event_fetcher=None, event_processor=None)
     adjacency_graph = {
