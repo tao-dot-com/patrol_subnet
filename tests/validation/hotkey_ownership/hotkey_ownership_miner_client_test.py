@@ -1,3 +1,4 @@
+import uuid
 from tempfile import TemporaryDirectory
 
 import pytest
@@ -45,9 +46,15 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
 
     miner_host, miner_port = mock_miner
 
+    batch_id = uuid.uuid4()
+    task_id = uuid.uuid4()
+
     dendrite = Dendrite(dendrite_wallet)
     synapse = HotkeyOwnershipSynapse(
-        target_hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
+        batch_id=str(batch_id),
+        task_id=str(task_id),
+        target_hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM",
+        max_block_number=5_400_000
     )
 
     task = HotkeyOwnershipMinerClient(dendrite)
@@ -66,6 +73,9 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
     assert response.subgraph_output.edges == [
         Edge("foo", "bar", "hotkey_ownership", "change", HotkeyOwnershipEvidence(4567))
     ]
+    assert response.batch_id == str(batch_id)
+    assert response.task_id == str(task_id)
+    assert response.max_block_number == 5_400_000
 
 async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet):
 

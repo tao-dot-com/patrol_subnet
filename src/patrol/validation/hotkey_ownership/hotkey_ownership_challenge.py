@@ -114,7 +114,12 @@ class HotkeyOwnershipChallenge:
 
     async def execute_challenge(self, miner: Miner, target_hotkey, batch_id: UUID, max_block_number: int):
         task_id = uuid.uuid4()
-        synapse = HotkeyOwnershipSynapse(target_hotkey_ss58=target_hotkey)
+        synapse = HotkeyOwnershipSynapse(
+            batch_id=str(batch_id),
+            task_id=str(task_id),
+            target_hotkey_ss58=target_hotkey,
+            max_block_number=max_block_number,
+        )
 
         try:
             response, response_time_seconds = await self.miner_client.execute_task(miner.axon_info, synapse)
