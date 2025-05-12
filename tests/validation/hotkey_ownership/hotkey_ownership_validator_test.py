@@ -278,7 +278,7 @@ async def test_validation_with_duplicate_edge():
 
     assert str(ex.value) == "Duplicate edge (from=alice, to=bob, block=123)"
 
-async def test_validation_with_no_changes_of_ownership_since_lowest_block_in_range():
+async def test_pass_validation_with_no_changes_of_ownership_since_lowest_block_in_range():
 
     chain_reader = AsyncMock(ChainReader)
 
@@ -295,6 +295,26 @@ async def test_validation_with_no_changes_of_ownership_since_lowest_block_in_ran
     validator = HotkeyOwnershipValidator(chain_reader)
 
     await validator.validate(valid_response, "abcdef", 5_000_000)
+
+async def test_fail_validation_with_no_changes_of_ownership_since_lowest_block_in_range():
+
+    chain_reader = AsyncMock(ChainReader)
+
+    valid_response = HotkeyOwnershipSynapse(
+        target_hotkey_ss58="abcdef", max_block_number=200, subgraph_output=GraphPayload(
+            nodes=[
+                Node("alice", type="wallet", origin="bittensor"),
+            ],
+            edges=[]
+        ))
+
+    chain_reader.get_hotkey_owner = AsyncMock(side_effect=lambda hk, bn: "bob")
+
+    validator = HotkeyOwnershipValidator(chain_reader)
+    with pytest.raises(ValidationException) as ex:
+        await validator.validate(valid_response, "abcdef", 5_000_000)
+
+    assert str(ex.value) == "Start owner [bob] is not in the graph"
 
 async def test_validation_target_hotkey_not_linked_to_graph():
 
