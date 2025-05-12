@@ -118,7 +118,7 @@ class HotkeyOwnerFinder:
                     category="coldkey_swap",
                     type="hotkey_ownership",
                     evidence=HotkeyOwnershipEvidence(effective_block_number=change_block),
-                    coldkey_owner=new_owner
+                    coldkey_owner=None
                 )
             )
 
@@ -152,11 +152,18 @@ if __name__ == "__main__":
 
         start_time = time.time()
         owner_graph = await tracker.find_owner_ranges(
-            hotkey="5HK5tp6t2S59DywmHRWPBVJeJ86T61KjurYqeooqj8sREpeN",
+            hotkey="5DXhFEK92RW9cm8tHpHaC3qXjCzsCdWEaxjTDpowATTe4HW2",
             minimum_block=Constants.LOWER_BLOCK_LIMIT
         )
+        # save the owner graph to a file (graphpayload is a dataclass)
+        import json
+        from dataclasses import asdict
+        with open("owner_graph_2.json", "w") as f:
+            json.dump(asdict(owner_graph), f)
+
         elapsed = time.time() - start_time
 
+        print(f"Elapsed time: {elapsed} seconds")
         print("Owner change ranges:")
         print(owner_graph)
 
