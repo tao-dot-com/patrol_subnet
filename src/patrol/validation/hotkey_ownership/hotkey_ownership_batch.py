@@ -1,49 +1,54 @@
 import asyncio
+import logging
 import uuid
-from datetime import datetime, UTC
-from uuid import UUID
 
-from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge
-from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
+from bittensor.core.metagraph import AsyncMetagraph
+
+from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, Miner
 from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
-from patrol.validation.scoring import MinerScoreRepository, MinerScore
 
+logger = logging.getLogger(__name__)
 
 class HotkeyOwnershipBatch:
 
     def __init__(self,
                  challenge: HotkeyOwnershipChallenge,
                  target_generator: HotkeyTargetGenerator,
-                 scoring: HotkeyOwnershipScoring,
-                 miner_score_repository: MinerScoreRepository
+                 metagraph: AsyncMetagraph
      ):
         self.challenge = challenge
         self.target_generator = target_generator
-        self.scoring = scoring
-        self.miner_score_repository = miner_score_repository
-        self.moving_average_denominator = 20
+        self.metagraph = metagraph
 
     async def challenge_miners(self):
 
         batch_id = uuid.uuid4()
+        logging_extra = {"batch_id": str(batch_id)}
 
-        # Fetch all the miners
-        miners = []
+        logger.info("Batch started", extra=logging_extra)
 
-        target_hotkeys = await self.target_generator.generate_targets(255)
+        axons = self.metagraph.axons
+        uids = self.metagraph.uids.tolist()
+
+        miners = list(filter(
+            lambda m: m.axon_info.is_serving,
+            (Miner(axon, uids[idx]) for idx, axon in enumerate(axons))
+        ))
+
+        target_hotkeys = await self.target_generator.generate_targets(len(miners))
 
         async def challenge(miner):
-            task_id = uuid.uuid4()
             try:
-                response, response_time = await self.challenge.execute_challenge(miner, target_hotkeys.pop())
-                score = await self._calculate_score(batch_id, task_id, miner, response_time)
-            except AssertionError as ex:
-                score = await self._calculate_zero_score(batch_id, task_id, miner, response_time, str(ex))
+                await self.challenge.execute_challenge(miner, target_hotkeys.pop(), batch_id)
+            except Exception as ex:
+                logger.exception("Unhandled error: %s", ex)
 
-            await self.miner_score_repository.add(score)
-
-        challenge_tasks = [self.challenge.execute_challenge(miner) for miner in miners]
+        challenge_tasks = [challenge(miner) for miner in miners]
         await asyncio.gather(*challenge_tasks)
+
+        logger.info("Batch completed", extra=logging_extra)
+
+        return batch_id
 
 
 
