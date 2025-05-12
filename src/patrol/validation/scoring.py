@@ -4,6 +4,9 @@ from dataclasses import dataclass
 from typing import Optional, Iterable
 from datetime import datetime
 
+from patrol.constants import TaskType
+
+
 @dataclass(frozen=True)
 class ValidationResult:
     validated: bool
@@ -26,6 +29,7 @@ class MinerScore:
     response_time_seconds: float
     novelty_score: Optional[float]
     validation_passed: bool
+    task_type: TaskType
     error_message: Optional[str] = None
 
     @property

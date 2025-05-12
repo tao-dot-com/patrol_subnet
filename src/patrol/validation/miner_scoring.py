@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 from uuid import UUID
 
 from patrol.validation.scoring import MinerScore, MinerScoreRepository, ValidationResult
-from patrol.constants import Constants
+from patrol.constants import Constants, TaskType
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,8 @@ class MinerScoring:
                 response_time_seconds=response_time,
                 novelty_score=None,
                 validation_passed=False,
-                error_message=validation_result.message
+                error_message=validation_result.message,
+                task_type=TaskType.PATROL
             )
 
         volume_score = self.calculate_volume_score(validation_result.volume)
@@ -88,7 +89,8 @@ class MinerScoring:
             response_time_seconds=response_time,
             novelty_score=None,
             validation_passed=True,
-            error_message=None
+            error_message=None,
+            task_type=TaskType.PATROL
         )
 
     async def calculate_zero_score(self, batch_id, uid, coldkey, hotkey, error_message):
@@ -111,7 +113,8 @@ class MinerScoring:
             response_time_seconds=0,
             novelty_score=None,
             validation_passed=False,
-            error_message=error_message
+            error_message=error_message,
+            task_type=TaskType.PATROL
         )
 
 

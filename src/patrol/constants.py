@@ -1,3 +1,5 @@
+from enum import Enum
+
 
 class Constants:
     RESPONSE_TIME_HALF_SCORE: int = 2
@@ -8,3 +10,7 @@ class Constants:
     MAX_RESPONSE_TIME: int = 12
     DTAO_RELEASE_BLOCK: int = 4920351
 
+
+class TaskType(Enum):
+    HOTKEY_OWNERSHIP = 'HOTKEY_OWNERSHIP'
+    PATROL = 'PATROL'

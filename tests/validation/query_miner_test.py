@@ -7,12 +7,15 @@ import bittensor_wallet
 import numpy
 import pytest
 
+from patrol.constants import TaskType
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
+from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge
+from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
 from patrol.validation.miner_scoring import MinerScoring
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 from patrol.validation.coldkey_target_generation import TargetGenerator
-from patrol.validation.validator import Validator
+from patrol.validation.validator import Validator, TaskSelector
 
 import bittensor as bt
 from bittensor.core.metagraph import AsyncMetagraph
@@ -74,7 +77,7 @@ async def test_persist_miner_score(mock_axon, test_wallet):
                              overall_score_moving_average=5.0,
                              response_time_seconds=2.5,
                              novelty_score=1.0, validation_passed=True, error_message=None,
-                             coldkey="foo", hotkey="bar")
+                             coldkey="foo", hotkey="bar", task_type=TaskType.PATROL)
 
     scoring_mechanism.calculate_score.return_value = miner_score
 
@@ -83,7 +86,10 @@ async def test_persist_miner_score(mock_axon, test_wallet):
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository_mock, AsyncMock(DashboardClient), dendrite,
-        metagraph, lambda: batch_id, AsyncMock(WeightSetter), enable_weight_setting=True, enable_dashboard_syndication=True
+        metagraph, lambda: batch_id, AsyncMock(WeightSetter), enable_weight_setting=True, enable_dashboard_syndication=True,
+        hotkey_target_generator=AsyncMock(HotkeyTargetGenerator),
+        hotkey_ownership_challenge=AsyncMock(HotkeyOwnershipChallenge),
+        task_selector=AsyncMock(TaskSelector)
     )
     await validator.query_miner(batch_id, uid, axon.info(), ("bar", 123), max_block_number=None)
 
@@ -112,7 +118,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo", hotkey="bar")
+                                coldkey="foo", hotkey="bar", task_type=TaskType.PATROL)
 
     miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=4,
                                 overall_score_moving_average=15.0,
@@ -121,7 +127,7 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo2", hotkey="bar2")
+                                coldkey="foo2", hotkey="bar2", task_type=TaskType.PATROL)
 
     mock_calc_score = AsyncMock(side_effect=[miner_scores_1, miner_scores_2])
     scoring_mechanism.calculate_score = mock_calc_score
@@ -151,7 +157,10 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository, AsyncMock(DashboardClient),
-        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True, enable_dashboard_syndication=True
+        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True, enable_dashboard_syndication=True,
+        hotkey_target_generator=AsyncMock(HotkeyTargetGenerator),
+        hotkey_ownership_challenge=AsyncMock(HotkeyOwnershipChallenge),
+        task_selector=AsyncMock(TaskSelector)
     )
 
     await validator.query_miner_batch()
@@ -183,7 +192,7 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo", hotkey="bar")
+                                coldkey="foo", hotkey="bar", task_type=TaskType.PATROL)
 
     miner_scores_2 = MinerScore(id=score_2_uid, batch_id=batch_id, uid=4,
                                 overall_score_moving_average=15.0,
@@ -192,7 +201,7 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
                                 responsiveness_score=1.0,
                                 response_time_seconds=2.5,
                                 novelty_score=1.0, validation_passed=True, error_message=None,
-                                coldkey="foo2", hotkey="bar2")
+                                coldkey="foo2", hotkey="bar2", task_type=TaskType.PATROL)
 
     mock_calc_score = AsyncMock(side_effect=[miner_scores_1, miner_scores_2])
     scoring_mechanism.calculate_score = mock_calc_score
@@ -215,7 +224,10 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
 
     validator = Validator(
         validation_mechanism, target_generator, scoring_mechanism, miner_score_repository, AsyncMock(DashboardClient),
-        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True, enable_dashboard_syndication=True
+        dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True, enable_dashboard_syndication=True,
+        hotkey_target_generator=AsyncMock(HotkeyTargetGenerator),
+        hotkey_ownership_challenge=AsyncMock(HotkeyOwnershipChallenge),
+        task_selector=AsyncMock(TaskSelector)
     )
 
     await validator.query_miner_batch()

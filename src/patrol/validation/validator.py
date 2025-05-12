@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import random
 from typing import Callable, Tuple, Any
 
 import uuid
@@ -11,9 +12,17 @@ from patrol.chain_data.event_processor import EventProcessor
 from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.chain_data.runtime_groupings import load_versions
 from patrol.validation import auto_update, hooks
+from patrol.validation.chain.chain_reader import ChainReader
+from patrol.validation.chain.runtime_versions import RuntimeVersions
 from patrol.validation.graph_validation.event_checker import EventChecker
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hooks import HookType
+from patrol.validation.hotkey_ownership.hotkey_ownership_batch import HotkeyOwnershipBatch
+from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, \
+    HotkeyOwnershipValidator
+from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient
+from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
+from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.event_store_repository import DatabaseEventStoreRepository
@@ -26,7 +35,7 @@ import logging
 from uuid import UUID
 
 from patrol.protocol import PatrolSynapse
-from patrol.constants import Constants
+from patrol.constants import Constants, TaskType
 from patrol.validation.coldkey_target_generation import TargetGenerator
 from patrol.chain_data.event_fetcher import EventFetcher
 from patrol.chain_data.coldkey_finder import ColdkeyFinder
@@ -48,6 +57,16 @@ class ResponsePayloadTooLarge(Exception):
         self.message = message
 
 
+class TaskSelector:
+
+    def __init__(self, weightings: dict[TaskType, int]):
+        self._names = list(weightings.keys())
+        self._weights = list(weightings.values())
+
+    def select_task(self):
+        return random.choices(self._names, weights=self._weights, k=1)[0]
+
+
 class Validator:
 
     def __init__(self,
@@ -62,6 +81,9 @@ class Validator:
         weight_setter: WeightSetter,
         enable_weight_setting: bool,
         enable_dashboard_syndication: bool,
+        task_selector: TaskSelector,
+        hotkey_target_generator: HotkeyTargetGenerator,
+        hotkey_ownership_challenge: HotkeyOwnershipChallenge,
         concurrency: int = 10,
         max_response_size_bytes = 64E9,
     ):
@@ -79,6 +101,9 @@ class Validator:
         self.concurrency = concurrency
         self.max_response_size_bytes = max_response_size_bytes
         self.enable_dashboard_syndication = enable_dashboard_syndication
+        self.task_selector = task_selector
+        self.hotkey_ownership_challenge = hotkey_ownership_challenge
+        self.hotkey_target_generator = hotkey_target_generator
 
     async def query_miner(self,
         batch_id: UUID,
@@ -174,7 +199,6 @@ class Validator:
 
 
     async def query_miner_batch(self):
-        batch_id = self.uuid_generator()
 
         await self.metagraph.sync()
 
@@ -184,20 +208,26 @@ class Validator:
         axons = self.metagraph.axons
         uids = self.metagraph.uids.tolist()
 
-        targets = await self.target_generator.generate_targets(len(uids))
-        current_block = await self.target_generator.get_current_block()
-        max_block = current_block - 10 # provide a small buffer
+        task = self.task_selector.select_task()
+        if task == TaskType.HOTKEY_OWNERSHIP:
+            batch = HotkeyOwnershipBatch(self.hotkey_ownership_challenge, self.hotkey_target_generator, self.metagraph)
+            await batch.challenge_miners()
+        else:
+            batch_id = self.uuid_generator()
+            targets = await self.target_generator.generate_targets(len(uids))
+            current_block = await self.target_generator.get_current_block()
+            max_block = current_block - 10 # provide a small buffer
 
-        logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
+            logger.info(f"Selected {len(targets)} targets for batch with id: {batch_id}.")
 
-        tasks = []
-        for i, axon in enumerate(axons):
-            if axon.port != 0:
-                target = targets.pop()
-                tasks.append(self.query_miner(batch_id, uids[i], axon, target, max_block))
+            tasks = []
+            for i, axon in enumerate(axons):
+                if axon.port != 0:
+                    target = targets.pop()
+                    tasks.append(self.query_miner(batch_id, uids[i], axon, target, max_block))
 
-        await asyncio.gather(*tasks, return_exceptions=True)
-        logger.info(f"Batch %s finished", batch_id)
+            await asyncio.gather(*tasks, return_exceptions=True)
+            logger.info(f"Batch %s finished", batch_id)
 
 
     async def _set_weights(self):
@@ -249,7 +279,7 @@ async def start():
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
                                           ENABLE_WEIGHT_SETTING, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS,
                                           ENABLE_AUTO_UPDATE, DB_URL, MAX_RESPONSE_SIZE_BYTES, BATCH_CONCURRENCY,
-                                          DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION)
+                                          DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION, TASK_WEIGHTS)
 
     if ENABLE_AUTO_UPDATE:
         logger.info("Auto update is enabled")
@@ -302,6 +332,15 @@ async def start():
     dendrite = bt.Dendrite(wallet)
 
     metagraph = await subtensor.metagraph(NET_UID)
+
+    hotkey_ownership_challenge = HotkeyOwnershipChallenge(
+        miner_client=HotkeyOwnershipMinerClient(dendrite),
+        scoring=HotkeyOwnershipScoring(),
+        validator=HotkeyOwnershipValidator(ChainReader(my_substrate_client, RuntimeVersions())),
+        score_repository=miner_score_repository,
+        dashboard_client=HttpDashboardClient(wallet, DASHBOARD_BASE_URL) if ENABLE_DASHBOARD_SYNDICATION else None
+    )
+
     miner_validator = Validator(
         validation_mechanism=BittensorValidationMechanism(event_checker),
         target_generator=TargetGenerator(event_fetcher, event_processor),
@@ -315,7 +354,10 @@ async def start():
         enable_weight_setting=ENABLE_WEIGHT_SETTING,
         enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION,
         max_response_size_bytes=MAX_RESPONSE_SIZE_BYTES,
-        concurrency=BATCH_CONCURRENCY
+        concurrency=BATCH_CONCURRENCY,
+        task_selector=TaskSelector(TASK_WEIGHTS),
+        hotkey_target_generator=HotkeyTargetGenerator(my_substrate_client),
+        hotkey_ownership_challenge=hotkey_ownership_challenge
     )
 
     #await asyncio.wait_for(miner_validator.query_miner_batch(), timeout=60*60)

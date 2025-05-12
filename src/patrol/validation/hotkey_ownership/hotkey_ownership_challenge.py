@@ -1,12 +1,17 @@
 import asyncio
+import dataclasses
+import logging
 from collections import namedtuple
 from datetime import datetime, UTC
 import itertools
 import uuid
+from typing import Optional
 from uuid import UUID
 
+from patrol.constants import TaskType
 from patrol.protocol import HotkeyOwnershipSynapse, Edge, Node
 from patrol.validation.chain.chain_reader import ChainReader
+from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient, \
     MinerTaskException
 from patrol.constants import Constants
@@ -15,6 +20,9 @@ import networkx as nx
 
 from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
 from patrol.validation.scoring import MinerScore, MinerScoreRepository
+
+logger = logging.getLogger(__name__)
+
 
 class ValidationException(Exception):
     pass
@@ -70,7 +78,7 @@ class HotkeyOwnershipValidator:
         # check that the end owner is in the graph
         if end_owner not in [node.id for node in nodes]:
             raise ValidationException(f"End owner [{end_owner}] is not in the graph")
-        
+
     async def _validate_edges(self, hotkey: str, edges: list[Edge]):
 
         async def chain_validation(block_number: int, expected_owning_coldkey: str):
@@ -94,12 +102,14 @@ class HotkeyOwnershipChallenge:
             self, miner_client: HotkeyOwnershipMinerClient,
             scoring: HotkeyOwnershipScoring,
             validator: HotkeyOwnershipValidator,
-            score_repository: MinerScoreRepository
+            score_repository: MinerScoreRepository,
+            dashboard_client: Optional[DashboardClient],
     ):
         self.miner_client = miner_client
         self.scoring = scoring
         self.validator = validator
         self.score_repository = score_repository
+        self.dashboard_client = dashboard_client
         self.moving_average_denominator = 20
 
     async def execute_challenge(self, miner: Miner, target_hotkey, batch_id: UUID):
@@ -121,6 +131,14 @@ class HotkeyOwnershipChallenge:
             score = await self._calculate_zero_score(batch_id, task_id, miner, 0, error)
 
         await self.score_repository.add(score)
+        logger.info("Miner scored", extra=dataclasses.asdict(score))
+
+        if self.dashboard_client:
+            try:
+                await self.dashboard_client.send_score(score)
+            except Exception as ex:
+                logger.exception("Failed to send scores tpo dashboard: %s", ex)
+
         return task_id
 
 
@@ -143,7 +161,8 @@ class HotkeyOwnershipChallenge:
             novelty_score=0,
             volume_score=0,
             validation_passed=False,
-            error_message=error_message
+            error_message=error_message,
+            task_type=TaskType.HOTKEY_OWNERSHIP
         )
 
     async def _calculate_score(self, batch_id: UUID, task_id: UUID, miner: Miner, response_time: float) -> MinerScore:
@@ -162,6 +181,7 @@ class HotkeyOwnershipChallenge:
             novelty_score=0,
             volume_score=1.0,
             validation_passed=True,
+            task_type=TaskType.HOTKEY_OWNERSHIP
         )
 
 
@@ -189,10 +209,10 @@ if __name__ == "__main__":
 
         keys_to_keep = {"164", "261", "149", "239"}
         versions = {k: versions[k] for k in keys_to_keep if k in versions}
-        
+
         # Create an instance of SubstrateClient with a shorter keepalive interval.
         client = SubstrateClient(runtime_mappings=versions, network_url=network_url, max_retries=3)
-        
+
         # Initialize substrate connections for all groups.
         await client.initialize()
 
