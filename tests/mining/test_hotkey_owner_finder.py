@@ -137,7 +137,7 @@ async def test_find_owner_ranges(monkeypatch):
         category="coldkey_swap",
         type="hotkey_ownership",
         evidence=HotkeyOwnershipEvidence(effective_block_number=3),
-        coldkey_owner="Y"
+        coldkey_owner=None
     )
     assert payload.edges == [expected_edge]
 
