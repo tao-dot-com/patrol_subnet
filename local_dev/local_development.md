@@ -10,15 +10,17 @@ This will turn off the blacklisting and verify functionality, allowing you to pi
 
 Next, you can run 
 
-"python query_miner_endpoint.py" 
+"python query_miner_endpoint_coldkey_search.py" 
+or 
+"python query_miner_endpoint_hotkey_ownership.py
 
-Which will send a request to your locally running miner. You can change the number of requests by updating the number of REQUESTS on line 79. 
+Which will send a request to your locally running miner for either task you want to test. You can change the number of requests by updating the number of REQUESTS on line 79. 
 
 ## Testing the validator code
 
 While it is not strickly necessary, as the validator code will run itself, it can be useful to test it for debugging purposes. 
 
-With this in mind, we have created a very simple miner endpoint that returns a static response. For more sophisticated testing, it could be useful to set a miner up with the dev flag turned on (see instructions above).
+With this in mind, we have created a very simple miner endpoint that returns a static response for the coldkey search task. For more sophisticated testing, it could be useful to set a miner up with the dev flag turned on (see instructions above).
 
 You can run the static miner endpoint using
 

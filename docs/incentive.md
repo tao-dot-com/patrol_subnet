@@ -1,6 +1,8 @@
 ## Incentive Mechanism Scoring Overview
 
-This repository implements a modular incentive mechanism designed to reward nodes based on the quality, quantity, and efficiency of their payload submissions. The scoring system currently includes two active components — Volume and Responsiveness — with a third component, Novelty, coming soon.
+## Task 1:
+
+This task implements a modular incentive mechanism designed to reward nodes based on the quality, quantity, and efficiency of their payload submissions. The scoring system currently includes two active components — Volume and Responsiveness.
 
 Scoring contributions: 
 - Volume - 90%
@@ -49,22 +51,45 @@ Where RESPONSE_TIME_HALF_SCORE is the response time that yields a score of exact
 
 This rewards both speed and reliability while allowing some flexibility for slower nodes.
 
-
-### Novelty Score (Coming Soon)
-
-The novelty score will reward submissions that introduce unique or less redundant information to the network.
-
-**Goals for Novelty**
-- Discourage spammy or repeated payloads
-- Encourage diverse, non-overlapping contributions
-- Compare payloads against historical data and peer graphs
-
-Stay tuned — this feature is actively being developed and will be integrated soon.
-
 ⸻
 
 ### Overall Scoring Design
 
-Each component (Volume, Responsiveness, Novelty) is normalized between 0.0 and 1.0, and can be combined via weighted averaging or other aggregation logic to produce a final incentive score per payload.
+Each component (Volume, Responsiveness) is normalized between 0.0 and 1.0, and can be combined via weighted averaging or other aggregation logic to produce a final incentive score per payload.
 
 [View the full score calculation here](../src/patrol/validation/miner_scoring.py).
+
+⸻
+
+## Task 2:
+
+This task implements a simple incentive mechanism designed to reward nodes based on the accuracy and efficiency of their payload submissions.
+
+Below shows the pass/fail impact of response validation and the contribution of the responsiveness score incentivizing fast responses from nodes. It is computed using an inverse-scaling function that prioritizes lower latency:
+
+```python
+def score(self, is_valid: bool, response_time_seconds: float):
+        if not is_valid:
+            return HotkeyOwnershipScore(0, 0, 0)
+
+        validity_score = 1
+
+        response_time_score = self._response_time_half_score/(response_time_seconds + self._response_time_half_score)
+
+        overall_score = sum([
+            validity_score * self._validity_weight,
+            response_time_score * self._validity_weight
+        ]) / sum([self._validity_weight, self._validity_weight])
+
+        return HotkeyOwnershipScore(validity_score, response_time_score, overall_score)
+```
+
+Where response_time_half_score is the response time that yields a score of exactly 0.5 (for this challenge it is set to 2 seconds).
+
+**Intuition**
+- Invalid responses score 0.
+- Instant responses get the maximum score (1.0)
+- Responses around the target time get a moderate score (~0.5)
+- Slower responses are still scored, but with diminishing value
+
+This rewards both speed and reliability while allowing some flexibility for slower nodes.
