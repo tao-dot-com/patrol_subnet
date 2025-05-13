@@ -42,6 +42,7 @@ class Miner:
         self.batch_size = batch_size
         self.subgraph_loop = get_event_loop()
         self.subgraph_generator = None
+        self.hotkey_owner_finder = None
 
     async def setup_bittensor_objects(self):
         bt.logging.info("Setting up Bittensor objects.")
@@ -98,7 +99,7 @@ class Miner:
         bt.logging.info(f"Received hotkey ownership request: {synapse.target_hotkey_ss58}")
         start_time = time.time()
         future = run_coroutine_threadsafe(
-            self.hotkey_owner_finder.find_owner_ranges(synapse.target_hotkey_ss58, synapse.max_block_number),
+            self.hotkey_owner_finder.find_owner_ranges(synapse.target_hotkey_ss58, max_block=synapse.max_block_number),
             self.subgraph_loop
         )
         synapse.subgraph_output = future.result()
