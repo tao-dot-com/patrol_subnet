@@ -2,6 +2,8 @@ import uuid
 from unittest.mock import AsyncMock
 
 import pytest
+
+from patrol.constants import TaskType
 from patrol.validation.miner_scoring import MinerScoring, normalize_scores
 from patrol.validation.scoring import MinerScoreRepository, ValidationResult
 
@@ -66,3 +68,29 @@ def test_normalize_scores_varied_values():
     assert isinstance(norm, dict)
     assert norm[1] == 0.0
     assert norm[3] == 1.0
+
+async def test_miner_scoring_when_valid(mock_miner_score_repository):
+    batch_id = uuid.uuid4()
+
+    mock_miner_score_repository.find_latest_overall_scores = AsyncMock(
+        return_value=[0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.9, 0.9, 0.9]
+    )
+
+    scoring = MinerScoring(mock_miner_score_repository, 10)
+    result = ValidationResult(True, "", 1000)
+    score = await scoring.calculate_score(72, "alice", "bob", result, 2, batch_id)
+
+    assert score.volume_score == 0.5
+    assert score.responsiveness_score == 0.5
+    assert score.volume == 1000
+    assert score.response_time_seconds == 2
+    assert score.overall_score == 0.5
+    assert score.overall_score_moving_average == (0.9 * 4 + 0.8 + 0.7 + 0.6 + 0.5) / 8
+    assert score.uid == 72
+    assert score.coldkey == "alice"
+    assert score.hotkey == "bob"
+    assert score.batch_id == batch_id
+    assert score.task_type == TaskType.COLDKEY_SEARCH
+    assert score.validation_passed
+    assert score.error_message is None
+

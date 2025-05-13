@@ -10,6 +10,8 @@ from patrol.constants import Constants, TaskType
 
 logger = logging.getLogger(__name__)
 
+NUMBER_OF_LOW_SCORES_TO_DISCARD = 2
+
 class MinerScoring:
     def __init__(self, miner_score_repository: MinerScoreRepository, moving_average_denominator: int = 20):
         self.importance = {
@@ -31,6 +33,16 @@ class MinerScoring:
     def calculate_responsiveness_score(self, response_time: float) -> float:
         return Constants.RESPONSE_TIME_HALF_SCORE / (response_time + Constants.RESPONSE_TIME_HALF_SCORE)
 
+    async def _moving_average(self, overall_score: float, miner: tuple[str, int]) -> float:
+        previous_scores = list(await self.miner_score_repository.find_latest_overall_scores(miner, self.moving_average_denominator - 1))
+        previous_scores.append(overall_score)
+        numerator_scores = sorted(previous_scores, reverse=True)
+
+        denominator = self.moving_average_denominator - NUMBER_OF_LOW_SCORES_TO_DISCARD
+        numerator_scores = numerator_scores[:denominator]
+
+        return sum(numerator_scores) / denominator
+
     async def calculate_score(
         self,
         uid: int,
@@ -41,9 +53,9 @@ class MinerScoring:
         batch_id: UUID,
     ) -> MinerScore:
 
-        previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores((hotkey, uid), self.moving_average_denominator - 1)
-
         if not validation_result.validated:
+            overall_score_moving_average = self._moving_average(0.0, (hotkey, uid))
+
             logger.warning(f"Zero score added to records for {uid}, reason: {validation_result.message}.")
             return MinerScore(
                 id=uuid.uuid4(),
@@ -52,7 +64,7 @@ class MinerScoring:
                 uid=uid,
                 coldkey=coldkey,
                 hotkey=hotkey,
-                overall_score_moving_average=(sum(previous_overall_scores) + 0.0) / self.moving_average_denominator,
+                overall_score_moving_average=await overall_score_moving_average,
                 overall_score=0.0,
                 volume_score=0.0,
                 volume=validation_result.volume,
@@ -73,6 +85,7 @@ class MinerScoring:
         ])
 
         logger.info(f"Scoring completed for miner {uid}, with overall score: {overall_score}")
+        overall_score_moving_average = await self._moving_average(overall_score, (hotkey, uid))
 
         return MinerScore(
             id=uuid.uuid4(),
@@ -81,7 +94,7 @@ class MinerScoring:
             uid=uid,
             coldkey=coldkey,
             hotkey=hotkey,
-            overall_score_moving_average=(sum(previous_overall_scores) + overall_score) / self.moving_average_denominator,
+            overall_score_moving_average=overall_score_moving_average,
             overall_score=overall_score,
             volume_score=volume_score,
             volume=validation_result.volume,

@@ -23,6 +23,7 @@ from patrol.validation.scoring import MinerScore, MinerScoreRepository
 
 logger = logging.getLogger(__name__)
 
+NUMBER_OF_LOW_SCORES_TO_DISCARD = 2
 
 class ValidationException(Exception):
     pass
@@ -148,8 +149,14 @@ class HotkeyOwnershipChallenge:
 
 
     async def _moving_average(self, overall_score, miner: Miner):
-        previous_scores =  await self.score_repository.find_latest_overall_scores((miner.axon_info.hotkey, miner.uid), self.moving_average_denominator - 1)
-        return (sum(previous_scores) + overall_score) / self.moving_average_denominator
+        previous_scores = list(await self.score_repository.find_latest_overall_scores((miner.axon_info.hotkey, miner.uid), self.moving_average_denominator - 1))
+        previous_scores.append(overall_score)
+        numerator_scores = sorted(previous_scores, reverse=True)
+
+        denominator = self.moving_average_denominator - NUMBER_OF_LOW_SCORES_TO_DISCARD
+        numerator_scores = numerator_scores[:denominator]
+
+        return sum(numerator_scores) / denominator
 
     async def _calculate_zero_score(self, batch_id: uuid.UUID, task_id: UUID, miner: Miner, response_time: float, error_message: str) -> MinerScore:
         moving_average = await self._moving_average(0, miner)
