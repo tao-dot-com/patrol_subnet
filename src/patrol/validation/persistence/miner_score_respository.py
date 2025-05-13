@@ -75,7 +75,7 @@ class _MinerScore(Base, MappedAsDataclass):
             novelty_score=self.novelty_score,
             validation_passed=self.validation_passed,
             error_message=self.error_message,
-            task_type=TaskType[self.task_type] if self.task_type else TaskType.PATROL
+            task_type=TaskType[self.task_type] if self.task_type else TaskType.COLDKEY_SEARCH
         )
 
 
