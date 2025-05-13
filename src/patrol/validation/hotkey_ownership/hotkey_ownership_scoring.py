@@ -26,8 +26,8 @@ class HotkeyOwnershipScoring:
 
         overall_score = sum([
             validity_score * self._validity_weight,
-            response_time_score * self._validity_weight
-        ]) / sum([self._validity_weight, self._validity_weight])
+            response_time_score * self._response_weight
+        ]) / sum([self._validity_weight, self._response_weight])
 
         return HotkeyOwnershipScore(validity_score, response_time_score, overall_score)
 
