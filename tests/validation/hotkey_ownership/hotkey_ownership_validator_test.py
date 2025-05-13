@@ -337,3 +337,29 @@ async def test_validation_target_hotkey_not_linked_to_graph():
 
     assert str(ex.value) == "Start owner [carol] is not in the graph"
 
+async def test_reject_edges_same_source_and_destination_node():
+
+    chain_reader = AsyncMock(ChainReader)
+
+    valid_response = HotkeyOwnershipSynapse(
+        target_hotkey_ss58="abcdef", max_block_number=200, subgraph_output=GraphPayload(
+            nodes=[
+                Node("alice", type="wallet", origin="bittensor"),
+            ],
+            edges=[
+                Edge(
+                    coldkey_source="alice", coldkey_destination="alice", category="", type="",
+                    evidence=HotkeyOwnershipEvidence(123)
+                )
+            ]
+        ))
+
+    chain_reader.get_hotkey_owner = AsyncMock(side_effect=lambda hk, bn: "alice")
+
+    validator = HotkeyOwnershipValidator(chain_reader)
+
+    with pytest.raises(ValidationException) as ex:
+        await validator.validate(valid_response, "abddef12345", 5_000_000)
+
+    assert str(ex.value) == "Edge has same source and destination"
+
