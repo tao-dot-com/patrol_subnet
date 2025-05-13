@@ -57,7 +57,7 @@ async def test_execute_and_score_challenge(mock_datetime):
 
     score_persisted: MinerScore = score_repository.add.mock_calls[0].args[0]
     assert score_persisted.overall_score == 0.75
-    assert score_persisted.volume_score == 1
+    assert score_persisted.volume_score == 0
     assert score_persisted.novelty_score == 0
     assert score_persisted.responsiveness_score == 0.5
     assert score_persisted.volume == 0

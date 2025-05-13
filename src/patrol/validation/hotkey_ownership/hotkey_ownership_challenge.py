@@ -184,7 +184,7 @@ class HotkeyOwnershipChallenge:
             response_time_seconds=response_time,
             volume=0,
             novelty_score=0,
-            volume_score=1.0,
+            volume_score=0,
             validation_passed=True,
             task_type=TaskType.HOTKEY_OWNERSHIP
         )
