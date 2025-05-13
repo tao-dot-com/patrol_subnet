@@ -22,6 +22,13 @@ def test_scoring_for_2_second_response_time():
     assert score.response_time == 0.5
     assert score.validity == 1
 
+def test_scoring_for_2_second_response_time_with_unequal_weights():
+    scoring = HotkeyOwnershipScoring(response_time_weight=20, validity_weight=80)
+    score = scoring.score(True, 2)
+    assert score.overall == 0.9
+    assert score.response_time == 0.5
+    assert score.validity == 1
+
 def test_scoring_for_5_second_response_time():
     scoring = HotkeyOwnershipScoring()
     score = scoring.score(True, 5)
