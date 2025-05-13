@@ -54,8 +54,12 @@ class HotkeyOwnershipValidator:
             graph.add_node(node.id)
 
         for edge in subgraph.edges:
+            if edge.coldkey_source == edge.coldkey_destination:
+                raise ValidationException("Edge has same source and destination")
+
             if edge.coldkey_source not in graph.nodes:
                 raise ValidationException(f'Edge source [{edge.coldkey_source}] is not a node')
+
             if edge.coldkey_destination not in graph.nodes:
                 raise ValidationException(f"Edge destination [{edge.coldkey_destination}] is not a node")
 
