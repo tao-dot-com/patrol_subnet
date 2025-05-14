@@ -8,6 +8,7 @@ import numpy
 import pytest
 
 from patrol.constants import TaskType
+from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.graph_validation.bittensor_validation_mechanism import BittensorValidationMechanism
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge
@@ -89,7 +90,8 @@ async def test_persist_miner_score(mock_axon, test_wallet):
         metagraph, lambda: batch_id, AsyncMock(WeightSetter), enable_weight_setting=True, enable_dashboard_syndication=True,
         hotkey_target_generator=AsyncMock(HotkeyTargetGenerator),
         hotkey_ownership_challenge=AsyncMock(HotkeyOwnershipChallenge),
-        task_selector=AsyncMock(TaskSelector)
+        task_selector=AsyncMock(TaskSelector),
+        chain_reader=AsyncMock(ChainReader)
     )
     await validator.query_miner(batch_id, uid, axon.info(), ("bar", 123), max_block_number=None)
 
@@ -160,7 +162,8 @@ async def test_query_miner_batch_and_set_weights(mock_axon, test_wallet):
         dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True, enable_dashboard_syndication=True,
         hotkey_target_generator=AsyncMock(HotkeyTargetGenerator),
         hotkey_ownership_challenge=AsyncMock(HotkeyOwnershipChallenge),
-        task_selector=AsyncMock(TaskSelector)
+        task_selector=AsyncMock(TaskSelector),
+        chain_reader=AsyncMock(ChainReader)
     )
 
     await validator.query_miner_batch()
@@ -227,7 +230,8 @@ async def test_query_miner_batch_when_weights_are_not_due(mock_axon, test_wallet
         dendrite, metagraph, lambda: batch_id, weight_setter, enable_weight_setting=True, enable_dashboard_syndication=True,
         hotkey_target_generator=AsyncMock(HotkeyTargetGenerator),
         hotkey_ownership_challenge=AsyncMock(HotkeyOwnershipChallenge),
-        task_selector=AsyncMock(TaskSelector)
+        task_selector=AsyncMock(TaskSelector),
+        chain_reader=AsyncMock(ChainReader)
     )
 
     await validator.query_miner_batch()

@@ -61,6 +61,7 @@ jobs:
           build-args: |
             SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
             TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
+            ARCHIVE_NODE=${{ secrets.ARCHIVE_NODE }}
           push: true
           tags: |
             public.ecr.aws/c9f7n4n0/patrol/validator:${{ env.TAG }}
