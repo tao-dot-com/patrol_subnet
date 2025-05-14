@@ -33,7 +33,7 @@ async def test_ownership_batch_challenges_miners():
     metagraph.axons = axons
     metagraph.uids = numpy.array([0, 1, 2])
 
-    batch = HotkeyOwnershipBatch(challenge, target_generator, metagraph, chain_reader)
+    batch = HotkeyOwnershipBatch(challenge, target_generator, metagraph, chain_reader, 1)
     batch_id = await batch.challenge_miners()
 
     assert len(challenge.execute_challenge.mock_calls) == 2
