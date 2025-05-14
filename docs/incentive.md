@@ -1,6 +1,6 @@
 ## Incentive Mechanism Scoring Overview
 
-## Task 1:
+## Task 1 (Coldkey search)
 
 This task implements a modular incentive mechanism designed to reward nodes based on the quality, quantity, and efficiency of their payload submissions. The scoring system currently includes two active components — Volume and Responsiveness.
 
@@ -61,7 +61,7 @@ Each component (Volume, Responsiveness) is normalized between 0.0 and 1.0, and c
 
 ⸻
 
-## Task 2:
+## Task 2 (Hotkey ownership)
 
 This task implements a simple incentive mechanism designed to reward nodes based on the accuracy and efficiency of their payload submissions.
 
@@ -78,8 +78,8 @@ def score(self, is_valid: bool, response_time_seconds: float):
 
         overall_score = sum([
             validity_score * self._validity_weight,
-            response_time_score * self._validity_weight
-        ]) / sum([self._validity_weight, self._validity_weight])
+            response_time_score * self._response_weight
+        ]) / sum([self._validity_weight, self._response_weight])
 
         return HotkeyOwnershipScore(validity_score, response_time_score, overall_score)
 ```
