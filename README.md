@@ -3,29 +3,49 @@
 </div>
 
 
+## 🧠 A decentralized behavioral analysis and prediction engine.
 
-## Great Security Starts With Great Coverage
-Patrol's mission started after the Bittensor summer attacks where we saw $20M+ stolen from TAO holders, members of our Bittensor community.  
+Built to help $TAO investors take decisive action by connecting behavioral signals across the Bittensor network to likely future outcomes. Patrol aims to become the trust and predictive engine for decentralized networks — combining deep historical analysis with forward-looking insight to power smarter decisions across the ecosystem.
 
-Our mission, simply put, is to secure crypto funds and provide all holders peace of mind, wherever they are.
+---
 
-Patrol is our first step in harnessing Bittensor to collect large volumes of live data which in later stages will be analyzed and used to prevent hacks. 
+## 🔍 From Behavior to Insight
 
+Patrol turns raw on-chain activity into forward-looking insight through a structured process we call the **Predictive Intelligence Loop** — a reusable pattern found across the Bittensor network.
 
-## Building a Decentralized Palantir
-In Patrol, miners and validators work together to intelligently collect large volumes of data from various data sources. It lays the foundation for advanced security intelligence by creating a knowledge graph that maps relationships and behaviours, aiding in investigations, threat detection, and risk assessment.
- 
-The first data source we’re covering is in our own backyard: The Bittensor chain. But this is just the beginning as we plan to expand to many other chains as well as other types of data sources like social media, code repos, phishing websites, and more. Ultimately, our goal over time is to build a unified graph of relationships for every crypto wallet that shows all its relationships. 
+1. **Observe Behavior**  
+   Track wallet actions: emissions, transfers, staking, swaps, etc.
 
+2. **Model Actors & Environments**  
+   Identify patterns and personas (e.g. dumpers, holders, flip traders) and map how they shape subnet dynamics.
 
-## Who Needs Patrol?
+3. **Generate Predictions**  
+   Forecast likely outcomes: outflows, instability, accumulation, or price impact.
 
-One of the key lessons from the Bittensor summer attacks is that tracing footprints after the fact takes A LOT of time and is VERY costly. And when it comes to crypto theft investigation, time is of the essence. The longer it is from time of attack the less likely one is to recover funds.
+Each layer sharpens the next. By connecting actions to intent and intent to environment, Patrol helps users understand not just what happened — but what's likely next.
 
-The footprint graph that Patrol creates is a must-have for any security team, investigator and platform developing and solving crypto security.  
+---
+
+## 🧪 Task Types
+
+Patrol supports three categories of mining tasks — each offering a distinct lens on behavior and contributing to a fuller understanding of the network:
+
+1. **Historical Pattern Analysis**  
+   **Status:** Live  
+   Miners identify and label behaviors that have already occurred — such as emission dumping, alpha hoarding, validator churn, or cold key swaps. These signatures help define the behavioral history of wallets and subnets.
+
+2. **Predictive Forecasting**  
+   **Status:** Launching Soon  
+   Miners will analyze recent activity to forecast what might happen next — projecting sell pressure, anticipating post-ownership actions, or detecting early signs of rising risk.
+
+3. **LLM-Based Chain Reasoning**  
+   **Status:** Not Yet Available  
+   Future tasks will leverage large language models to interpret patterns, answer open-ended questions, and generate human-readable explanations of complex behaviors.
+
+Each task type builds on the last — from raw observation to interpretation to predictive insight.
 
 ## Accessing Patrol's Data
-Soon after Patrol launches we plan to provide a Public API for developers interested in consuming the data collected by the Patrol subnet.
+In the near future we plan to provide a Public API for developers interested in consuming the data collected by the Patrol subnet.
 
 ## How Patrol Works
 
