@@ -96,7 +96,7 @@ async def batch(vali_wallet, miner_wallet):
 
     target_generator = HotkeyTargetGenerator(substrate_client)
     mock_metagraph = AsyncMock(AsyncMetagraph)
-    mock_metagraph.axons = [AxonInfo(0, "127.0.0.1", 8001, 4, miner_wallet.hotkey.ss58_address, miner_wallet.coldkeypub.ss58_address)]
+    mock_metagraph.axons = [AxonInfo(0, "127.0.0.1", 8002, 4, miner_wallet.hotkey.ss58_address, miner_wallet.coldkeypub.ss58_address)]
     mock_metagraph.uids = numpy.array([1])
 
     challenge = HotkeyOwnershipChallenge(miner_client, scoring, validator, score_repository, None)

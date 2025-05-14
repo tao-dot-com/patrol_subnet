@@ -84,6 +84,7 @@ class Validator:
         task_selector: TaskSelector,
         hotkey_target_generator: HotkeyTargetGenerator,
         hotkey_ownership_challenge: HotkeyOwnershipChallenge,
+        chain_reader: ChainReader,
         concurrency: int = 10,
         max_response_size_bytes = 64E9,
     ):
@@ -104,6 +105,7 @@ class Validator:
         self.task_selector = task_selector
         self.hotkey_ownership_challenge = hotkey_ownership_challenge
         self.hotkey_target_generator = hotkey_target_generator
+        self.chain_reader = chain_reader
 
     async def query_miner(self,
         batch_id: UUID,
@@ -210,7 +212,7 @@ class Validator:
 
         task = self.task_selector.select_task()
         if task == TaskType.HOTKEY_OWNERSHIP:
-            batch = HotkeyOwnershipBatch(self.hotkey_ownership_challenge, self.hotkey_target_generator, self.metagraph)
+            batch = HotkeyOwnershipBatch(self.hotkey_ownership_challenge, self.hotkey_target_generator, self.metagraph, self.chain_reader)
             await batch.challenge_miners()
         else:
             batch_id = self.uuid_generator()
@@ -332,11 +334,12 @@ async def start():
     dendrite = bt.Dendrite(wallet)
 
     metagraph = await subtensor.metagraph(NET_UID)
+    chain_reader = ChainReader(my_substrate_client, RuntimeVersions())
 
     hotkey_ownership_challenge = HotkeyOwnershipChallenge(
         miner_client=HotkeyOwnershipMinerClient(dendrite),
         scoring=HotkeyOwnershipScoring(),
-        validator=HotkeyOwnershipValidator(ChainReader(my_substrate_client, RuntimeVersions())),
+        validator=HotkeyOwnershipValidator(chain_reader),
         score_repository=miner_score_repository,
         dashboard_client=HttpDashboardClient(wallet, DASHBOARD_BASE_URL) if ENABLE_DASHBOARD_SYNDICATION else None
     )
@@ -357,7 +360,8 @@ async def start():
         concurrency=BATCH_CONCURRENCY,
         task_selector=TaskSelector(TASK_WEIGHTS),
         hotkey_target_generator=HotkeyTargetGenerator(my_substrate_client),
-        hotkey_ownership_challenge=hotkey_ownership_challenge
+        hotkey_ownership_challenge=hotkey_ownership_challenge,
+        chain_reader = chain_reader
     )
 
     #await asyncio.wait_for(miner_validator.query_miner_batch(), timeout=60*60)
