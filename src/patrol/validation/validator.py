@@ -212,7 +212,13 @@ class Validator:
 
         task = self.task_selector.select_task()
         if task == TaskType.HOTKEY_OWNERSHIP:
-            batch = HotkeyOwnershipBatch(self.hotkey_ownership_challenge, self.hotkey_target_generator, self.metagraph, self.chain_reader)
+            batch = HotkeyOwnershipBatch(
+                self.hotkey_ownership_challenge,
+                self.hotkey_target_generator,
+                self.metagraph,
+                self.chain_reader,
+                self.concurrency
+            )
             await batch.challenge_miners()
         else:
             batch_id = self.uuid_generator()

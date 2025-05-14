@@ -17,11 +17,13 @@ class HotkeyOwnershipBatch:
                  target_generator: HotkeyTargetGenerator,
                  metagraph: AsyncMetagraph,
                  chain_reader: ChainReader,
+                 concurrency: int
      ):
         self.challenge = challenge
         self.target_generator = target_generator
         self.metagraph = metagraph
         self.chain_reader = chain_reader
+        self.concurrency_semaphore = asyncio.Semaphore(concurrency)
 
     async def challenge_miners(self):
 
@@ -45,7 +47,8 @@ class HotkeyOwnershipBatch:
 
         async def challenge(miner):
             try:
-                await self.challenge.execute_challenge(miner, target_hotkeys.pop(), batch_id, max_block_number)
+                async with self.concurrency_semaphore:
+                    await self.challenge.execute_challenge(miner, target_hotkeys.pop(), batch_id, max_block_number)
             except Exception as ex:
                 logger.exception("Unhandled error: %s", ex)
 
