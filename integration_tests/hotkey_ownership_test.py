@@ -1,4 +1,5 @@
 import asyncio
+import os
 from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock
 
@@ -26,6 +27,7 @@ from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOw
 from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
 
+ARCHIVE_NODE = os.environ['ARCHIVE_NODE']
 
 @pytest.fixture
 def miner_wallet():
@@ -56,7 +58,7 @@ def miner_fixture(miner_wallet):
                     netuid=81,
                     subtensor=subtensor,
                     min_stake_allowed=3000,
-                    network_url="ws://157.90.13.58:9944",
+                    network_url=ARCHIVE_NODE,
                     max_future_events=50,
                     max_past_events=50,
                     batch_size=25
@@ -85,7 +87,7 @@ async def batch(vali_wallet, miner_wallet):
     #     "block_hash_max": "0x063e166ea94adf9d9267bf6a902864f6196a96ad1d085f0df87a012c73e85b48"
     # }})
     scoring = HotkeyOwnershipScoring()
-    substrate_client = SubstrateClient(runtime_versions.versions, "ws://157.90.13.58:9944", PatrolWebsocket("ws://157.90.13.58:9944"))
+    substrate_client = SubstrateClient(runtime_versions.versions, ARCHIVE_NODE, PatrolWebsocket(ARCHIVE_NODE))
     await substrate_client.initialize()
 
     chain_reader = ChainReader(substrate_client, runtime_versions)

@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, UTC
 from unittest.mock import patch
 
@@ -54,9 +55,11 @@ runtime_mappings = {
 #     yield loop
 #     loop.close()
 
+ARCHIVE_NODE = os.environ['ARCHIVE_NODE']
+
 @pytest.fixture#(scope="module")
 async def substrate_client():
-    substrate_client = SubstrateClient(runtime_mappings, "ws://157.90.13.58:9944", PatrolWebsocket("ws://157.90.13.58:9944"))
+    substrate_client = SubstrateClient(runtime_mappings, ARCHIVE_NODE, PatrolWebsocket(ARCHIVE_NODE))
     await substrate_client.initialize()
     return substrate_client
 

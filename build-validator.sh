@@ -15,6 +15,7 @@ docker build \
   -t patrol/validator \
   -f validator.dockerfile \
   --build-arg TEST_POSTGRESQL_URL="postgresql+asyncpg://patrol:password@172.17.0.1:5432/patrol" \
+  --build-arg ARCHIVE_NODE="$ARCHIVE_NODE" \
   --progress plain \
   .
 

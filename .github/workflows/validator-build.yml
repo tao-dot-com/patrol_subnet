@@ -15,6 +15,7 @@ jobs:
           - "5432:5432"
 
     runs-on: ubuntu-latest
+    environment: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,4 +31,5 @@ jobs:
           file: ./validator.dockerfile
           build-args: |
             TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
+            ARCHIVE_NODE=${{ secrets.ARCHIVE_NODE }}
           push: false
