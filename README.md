@@ -49,11 +49,13 @@ In the near future we plan to provide a Public API for developers interested in 
 
 ## How Patrol Works
 
-### Validator selects target wallet to cover
+### Coldkey search task
+
+#### Validator selects target wallet to cover
 The flow of the subnet begins with validators selecting target wallets to submit to miners.  These targets are randomly selected from the chain. The [validator](src/patrol/validation/validator.py) then sends a target to each [miner](src/patrol/mining/miner.py). 
 [See full target selection code here](src/patrol/validation/target_generation.py)
 
-### Miner builds subgraph for target wallet
+#### Miner builds subgraph for target wallet
 [Miners](src/patrol/mining/miner.py) receive the target from the validator and begin their search for related data.  Miners construct a *subgraph* of relational data for the target, and follow the data trace to expand their subgraph to N degrees of separation from the original target. 
 
 Example:
@@ -77,7 +79,7 @@ The subgraph that miners submit is composed of:
 These subgraphs are then submitted to the validator for evaluation.
 
 
-### Validator verifies miner’s subgraph
+#### Validator verifies miner’s subgraph
 
 Once miners submit their subgraphs, [Validators](src/patrol/validation/validator.py) will [verify](src/patrol/validation/graph_validation/bittensor_validation_mechanism.py) the data by checking the *evidence* against the *node* and *edge* data submitted by the miners. This validation is pass/fail, failing will result in a score of 0 for that submission. This verification process currently supports the following node and edges types:
 
@@ -90,7 +92,7 @@ Edges:
 
 See [here](src/patrol/protocol.py) for more details on the supported node and edge types.
 
-### Validator scores subgraph
+#### Validator scores subgraph
 
 Once the data has been verified, validators will calculate a *score* for the miner based on the following criteria:
 - **Volume** (90%): Amount of valid data submitted, with reasonable caps
@@ -112,7 +114,46 @@ Once the data has been verified, validators will calculate a *score* for the min
 
 Ultimately, the mission for each miner is to achieve the highest coverage score by delivering data that is high quality, high quantity, and novel. By doing so, miners ensure that only top-tier data is presented to validators, fortifying a comprehensive and dynamic knowledge graph. This invaluable resource is pivotal for a wide array of security applications, driving the future of digital asset protection and intelligence.
 
- ## Documentation and Resources
+### Hotkey ownership task
+
+This task challenges miners to discover changes in the ownership of a hotkey.
+
+1. The validator selects a set of random hotkeys, and sends one to each miner as a **target_hotkey**
+2. The miner finds the coldkeys that have owned the target_hotkey and responds with a graph where the nodes are coldkeys and the edges contain the block number where the hotkey ownership change became effective.
+
+Example Request:
+```json
+{
+     "target_hotkey_ss58": "5E4JBpbx3p3BchvJF2RQ4CLqAF5ECZNYuPbCg8u9T8Y5jtgi"
+}
+```
+Example Response:
+
+```json
+{
+     "subgraph_output": {
+          "nodes": [
+               { "id": "5CMEwRYLefRmtJg8zzRyJtcXrQqmspr9B1r1nKySDReA37Z1", "type": "wallet", "origin": "bittensor" },
+               { "id": "5G694c15wAu1LKb9rpSQqJjpBfg4K1oiBxEm5QSVdVZAfp9f", "type": "wallet", "origin": "bittensor" }
+          ],
+          "edges": [
+               { 
+                    "category": "coldkey_swap",
+                    "type": "hotkey_ownership",
+                    "coldkey_source": "5CMEwRYLefRmtJg8zzRyJtcXrQqmspr9B1r1nKySDReA37Z1",
+                    "coldkey_destination": "5G694c15wAu1LKb9rpSQqJjpBfg4K1oiBxEm5QSVdVZAfp9f",
+                    "evidence": {
+                         "effective_block_number": 5070010 
+                    }
+               }
+          ]
+     }
+}
+```
+3. The validator ensures that the response is syntactically correct, and that the asserted changes of ownership(s) are genuine.
+4. The validator scores the response according to the [incentive mechanism](docs/incentive.md).
+
+## Documentation and Resources
 
 <table style="border: none !important; width: 100% !important; border-collapse: collapse !important; margin: 0 auto !important;">
   <tbody>
