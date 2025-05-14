@@ -27,7 +27,7 @@ HARDWARE REQUIREMENTS:
 3. Create a virtual environtment and install prerequisite packages:
    ```sh
    git clone https://github.com/tao_dot_com/patrol_subnet
-   cd Patrol
+   cd patrol_subnet
    python3 -m venv venv
    source venv/bin/activate
    pip install -e .
