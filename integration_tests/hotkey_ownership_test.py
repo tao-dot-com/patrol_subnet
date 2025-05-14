@@ -102,7 +102,7 @@ async def batch(vali_wallet, miner_wallet):
     mock_metagraph.uids = numpy.array([1])
 
     challenge = HotkeyOwnershipChallenge(miner_client, scoring, validator, score_repository, None)
-    batch = HotkeyOwnershipBatch(challenge, target_generator, mock_metagraph, chain_reader)
+    batch = HotkeyOwnershipBatch(challenge, target_generator, mock_metagraph, chain_reader, 4)
 
     return batch
 
