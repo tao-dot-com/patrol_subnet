@@ -93,3 +93,4 @@ Where response_time_half_score is the response time that yields a score of exact
 - Slower responses are still scored, but with diminishing value
 
 This rewards both speed and reliability while allowing some flexibility for slower nodes.
+
