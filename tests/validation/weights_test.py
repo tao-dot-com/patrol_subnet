@@ -2,7 +2,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet.bittensor_wallet import Wallet
+from more_itertools.more import side_effect
 
+from patrol.constants import TaskType
 from patrol.validation.scoring import MinerScoreRepository
 from patrol.validation.weight_setter import WeightSetter
 from bittensor.core.async_subtensor import AsyncSubtensor
@@ -15,37 +17,50 @@ async def test_calculate_weights():
 
     mock_score_repository = AsyncMock(MinerScoreRepository)
 
-    scores = {
+    coldkey_search_scores = {
         ("alice", 1): 10.0,
         ("bob", 2): 3.0,
         ("carol", 2): 2.0,
         ("dave", 4): 12.0,
         ("emily", 6): 7.0
     }
-    mock_score_repository.find_last_average_overall_scores.return_value = scores
+    hotkey_ownership_scores = {
+        ("alice", 1): 5.0,
+        ("bob", 2): 1.5,
+        ("carol", 2): 1.0,
+        ("dave", 4): 6.0,
+    }
+
+    def last_average_overall_scores(task_type: TaskType):
+        return coldkey_search_scores if task_type == TaskType.COLDKEY_SEARCH else hotkey_ownership_scores
+
+    mock_score_repository.find_last_average_overall_scores = AsyncMock(side_effect=last_average_overall_scores)
 
     mock_subtensor = AsyncMock(AsyncSubtensor)
     mock_metagraph = AsyncMock(AsyncMetagraph)
     mock_subtensor.metagraph.return_value = mock_metagraph
 
     mock_metagraph.uids = np.array([1, 2, 4, 6])
-    # async with AsyncSubtensor("finney") as st:
-    #     mg = await st.metagraph(81)
 
     mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
 
-    sum_of_scores = sum(scores.values()) - 3.0 # No Bob!
+    sum_of_scores_weighted = (80 * (sum(coldkey_search_scores.values()) - 3.0)) + (20 * (sum(hotkey_ownership_scores.values()) - 1.5)) # No Bob!
 
-    weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81)
+    task_weights = {
+        TaskType.COLDKEY_SEARCH: 80,
+        TaskType.HOTKEY_OWNERSHIP: 20,
+    }
+
+    weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81, task_weights)
 
     weights = await weights.calculate_weights()
 
     assert sum(weights.values()) == 1
     assert weights == {
-        ("alice", 1): 10.0/sum_of_scores,
-        ("carol", 2): 2.0/sum_of_scores,
-        ("dave", 4): 12.0/sum_of_scores,
-        ("emily", 6): 7.0/sum_of_scores
+        ("alice", 1): (10.0 * 80 + 5.0 * 20) / sum_of_scores_weighted,
+        ("carol", 2): (2.0 * 80 + 1.0 * 20)  / sum_of_scores_weighted,
+        ("dave", 4):  (12.0 * 80 + 6.0 * 20) / sum_of_scores_weighted,
+        ("emily", 6): (7.0 * 80)  / sum_of_scores_weighted
     }
 
 async def test_calculate_weights_with_no_existing_scores():
@@ -59,12 +74,15 @@ async def test_calculate_weights_with_no_existing_scores():
     mock_subtensor.metagraph.return_value = mock_metagraph
 
     mock_metagraph.uids = np.array([1, 2, 4, 6])
-    # async with AsyncSubtensor("finney") as st:
-    #     mg = await st.metagraph(81)
 
     mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
 
-    weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81)
+    task_weights = {
+        TaskType.COLDKEY_SEARCH: 80,
+        TaskType.HOTKEY_OWNERSHIP: 20,
+    }
+
+    weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81, task_weights)
 
     weights = await weights.calculate_weights()
 
@@ -85,7 +103,7 @@ async def test_set_weights():
     wallet = MagicMock(Wallet)
     mock_subtensor = AsyncMock(AsyncSubtensor)
 
-    weight_setter = WeightSetter(mock_score_repository, mock_subtensor, wallet, 81)
+    weight_setter = WeightSetter(mock_score_repository, mock_subtensor, wallet, 81, {})
     await weight_setter.set_weights(weights)
 
     mock_subtensor.set_weights.assert_awaited_once_with(
@@ -100,7 +118,7 @@ async def test_set_no_weights():
     wallet = MagicMock(Wallet)
     mock_subtensor = AsyncMock(AsyncSubtensor)
 
-    weight_setter = WeightSetter(mock_score_repository, mock_subtensor, wallet, 81)
+    weight_setter = WeightSetter(mock_score_repository, mock_subtensor, wallet, 81, {})
     await weight_setter.set_weights(weights)
 
     mock_subtensor.set_weights.assert_not_awaited()

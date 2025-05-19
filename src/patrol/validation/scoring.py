@@ -44,9 +44,9 @@ class MinerScoreRepository(ABC):
         pass
 
     @abstractmethod
-    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Iterable[float]:
+    async def find_latest_overall_scores(self, miner: tuple[str, int], task_type: TaskType, batch_count: int = 19) -> Iterable[float]:
         pass
 
     @abstractmethod
-    async def find_last_average_overall_scores(self) -> dict[tuple[str, int], float]:
+    async def find_last_average_overall_scores(self, task_type: TaskType) -> dict[tuple[str, int], float]:
         pass

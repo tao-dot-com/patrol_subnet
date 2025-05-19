@@ -61,10 +61,9 @@ class TaskSelector:
 
     def __init__(self, weightings: dict[TaskType, int]):
         self._names = list(weightings.keys())
-        self._weights = list(weightings.values())
 
     def select_task(self):
-        return random.choices(self._names, weights=self._weights, k=1)[0]
+        return random.choices(self._names, k=1)[0]
 
 
 class Validator:
@@ -145,7 +144,7 @@ class Validator:
                 error_message = ex.message
             else:
                 logger.info(f"Error for miner {uid}.  Skipping.  Error: {ex}")
-                error_message = "Unknown error"
+                error_message = f"Unhandled error: {ex}"
 
             miner_score = await self.scoring_mechanism.calculate_zero_score(
                 batch_id, uid, axon_info.coldkey, axon_info.hotkey, error_message
@@ -185,20 +184,18 @@ class Validator:
                     json=processed_synapse.model_dump(),
                     timeout=Constants.MAX_RESPONSE_TIME
             ) as response:
-                buffer = bytearray()
                 if response.ok:
+                    response_time = time.perf_counter() - timings["request_start"]
+                    buffer = bytearray()
                     async for chunk in response.content.iter_chunked(8*1024):
                         buffer.extend(chunk)
                         if len(buffer) > self.max_response_size_bytes:
                             raise ResponsePayloadTooLarge(f"Response payload too large: Aborted at {len(buffer)} bytes")
+
+                    json_response = json.loads(buffer.decode('utf-8'))
+                    return json_response, response_time
                 else:
                     raise Exception("Bad response status %s", response.status)
-
-                response_time = time.perf_counter() - timings["request_start"]
-                json_response = json.loads(buffer.decode('utf-8'))
-
-                return json_response, response_time
-
 
     async def query_miner_batch(self):
 
@@ -311,7 +308,7 @@ async def start():
     await my_substrate_client.initialize()
 
     coldkey_finder = ColdkeyFinder(my_substrate_client)
-    weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID)
+    weight_setter = WeightSetter(miner_score_repository, subtensor, wallet, NET_UID, TASK_WEIGHTS)
 
     event_fetcher = EventFetcher(my_substrate_client)
     event_processor = EventProcessor(coldkey_finder)

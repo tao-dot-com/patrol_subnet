@@ -90,16 +90,17 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             session.add(obj)
             await session.commit()
 
-    async def find_latest_overall_scores(self, miner: tuple[str, int], batch_count: int = 19) -> Iterable[float]:
+    async def find_latest_overall_scores(self, miner: tuple[str, int], task_type: TaskType, batch_count: int = 19) -> Iterable[float]:
         async with self.LocalAsyncSession() as session:
             query = select(_MinerScore.overall_score).filter(
                 _MinerScore.hotkey == miner[0],
                 _MinerScore.uid == miner[1],
+                _MinerScore.task_type == task_type.name
             ).order_by(_MinerScore.created_at.desc()).limit(batch_count)
             result = await session.scalars(query)
             return result.all()
 
-    async def find_last_average_overall_scores(self) -> dict[tuple[str, int], float]:
+    async def find_last_average_overall_scores(self, task_type: TaskType) -> dict[tuple[str, int], float]:
 
         async with self.LocalAsyncSession() as session:
 
@@ -108,7 +109,7 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
                 _MinerScore.hotkey,
                 _MinerScore.uid,
                 func.row_number().over(partition_by=[_MinerScore.hotkey, _MinerScore.uid], order_by=_MinerScore.created_at.desc()).label("rnk")
-            ).subquery()
+            ).where(_MinerScore.task_type == task_type.name).subquery()
 
             results = await session.execute(select(ranked).filter(ranked.c.rnk == 1))
             scores = results.mappings().all()
