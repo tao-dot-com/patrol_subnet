@@ -1,6 +1,8 @@
 import logging
 
 from bittensor_wallet.bittensor_wallet import Wallet
+
+from patrol.constants import TaskType
 from patrol.validation.scoring import MinerScoreRepository
 from bittensor.core.async_subtensor import AsyncSubtensor
 
@@ -12,26 +14,34 @@ class WeightSetter:
                  miner_score_repository: MinerScoreRepository,
                  subtensor: AsyncSubtensor,
                  wallet: Wallet,
-                 net_uid: int
+                 net_uid: int,
+                 task_weights: dict[TaskType, float]
     ):
         self.miner_score_repository = miner_score_repository
         self.subtensor = subtensor
         self.wallet = wallet
         self.net_uid = net_uid
+        self.task_weights = task_weights
 
     async def calculate_weights(self):
-        overall_scores = await self.miner_score_repository.find_last_average_overall_scores()
-
         metagraph = await self.subtensor.metagraph(self.net_uid)
         miners = list(zip(metagraph.hotkeys, metagraph.uids.tolist()))
 
-        scores_to_convert = {k: v for k, v in overall_scores.items() if k in miners}
+        overall_coldkey_search_scores = await self.miner_score_repository.find_last_average_overall_scores(TaskType.COLDKEY_SEARCH)
+        weighted_coldkey_search_scores = {k: v * self.task_weights[TaskType.COLDKEY_SEARCH] for k, v in overall_coldkey_search_scores.items() if k in miners}
 
-        sum_of_scores = sum(scores_to_convert.values())
+        overall_hotkey_ownership_scores = await self.miner_score_repository.find_last_average_overall_scores(TaskType.HOTKEY_OWNERSHIP)
+        weighted__hotkey_ownership_scores = {k: v * self.task_weights[TaskType.HOTKEY_OWNERSHIP] for k, v in overall_hotkey_ownership_scores.items() if k in miners}
+
+        overall_scores = {}
+        for key in set(weighted_coldkey_search_scores) | set(weighted__hotkey_ownership_scores):
+            overall_scores[key] = weighted_coldkey_search_scores.get(key, 0) + weighted__hotkey_ownership_scores.get(key, 0)
+
+        sum_of_scores = sum(overall_scores.values())
         if sum_of_scores == 0:
             return {}
 
-        overall_weights = {k: v / sum_of_scores for k, v in scores_to_convert.items()}
+        overall_weights = {k: v / sum_of_scores for k, v in overall_scores.items()}
         return overall_weights
 
     async def set_weights(self, weights: dict[tuple[str, int], float]):

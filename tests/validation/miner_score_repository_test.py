@@ -92,8 +92,10 @@ async def test_find_sum_of_previous_overall_scores(clean_pgsql_engine):
         await repository.add(miner_score_1)
         miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
         await repository.add(miner_score_2)
+        miner_score_3 = make_miner_score(uuid.uuid4(), b, now, task_type=TaskType.HOTKEY_OWNERSHIP)
+        await repository.add(miner_score_3)
 
-    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 20)
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), TaskType.COLDKEY_SEARCH, 20)
     assert overall_scores == [10.0, 10.0, 10.0, 10.0]
 
 async def test_find_sum_of_limited_previous_overall_scores(clean_pgsql_engine):
@@ -107,7 +109,7 @@ async def test_find_sum_of_limited_previous_overall_scores(clean_pgsql_engine):
         miner_score_2 = make_miner_score(uuid.uuid4(), b, now)
         await repository.add(miner_score_2)
 
-    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), TaskType.COLDKEY_SEARCH, 2)
     assert overall_scores == [10.0, 10.0]
 
 async def test_find_latest_overall_scores_when_only_one_present(clean_pgsql_engine):
@@ -119,19 +121,22 @@ async def test_find_latest_overall_scores_when_only_one_present(clean_pgsql_engi
         miner_score_1 = make_miner_score(uuid.uuid4(), b, now)
         await repository.add(miner_score_1)
 
-    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), TaskType.COLDKEY_SEARCH, 2)
     assert overall_scores == [10.0]
 
 async def test_find_latest_overall_scores_when_none_present(clean_pgsql_engine):
     repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
 
-    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), 2)
+    overall_scores = await repository.find_latest_overall_scores(("ghijkl", 42), TaskType.COLDKEY_SEARCH, 2)
     assert overall_scores == []
 
 async def test_find_last_average_overall_scores(clean_pgsql_engine):
     batch_id = uuid.uuid4()
     now = datetime.now(UTC)
     repository = DatabaseMinerScoreRepository(clean_pgsql_engine)
+    await repository.add(make_miner_score(
+        uuid.uuid4(), batch_id, miner=("abc", 1),
+        created_at = now - timedelta(minutes=1), overall_score_moving_average=4.0, task_type=TaskType.HOTKEY_OWNERSHIP))
     await repository.add(make_miner_score(
         uuid.uuid4(), batch_id, miner=("abc", 1),
         created_at = now - timedelta(minutes=10), overall_score_moving_average=5.0))
@@ -142,7 +147,7 @@ async def test_find_last_average_overall_scores(clean_pgsql_engine):
         uuid.uuid4(), batch_id, miner=("def", 1),
         created_at = now - timedelta(minutes=30), overall_score_moving_average=7.0))
 
-    scores = await repository.find_last_average_overall_scores()
+    scores = await repository.find_last_average_overall_scores(TaskType.COLDKEY_SEARCH)
     assert scores == {
         ("abc", 1): 5.0,
         ("def", 1): 7.0,
@@ -152,7 +157,8 @@ def make_miner_score(
         score_id: uuid.UUID, batch_id: uuid.UUID, created_at: datetime,
         miner: tuple[str, int] = ("ghijkl", 42),
         overall_score: float = 10.0,
-        overall_score_moving_average: float = 10.0
+        overall_score_moving_average: float = 10.0,
+        task_type: TaskType = TaskType.COLDKEY_SEARCH
 ):
     return MinerScore(
         id=score_id,
@@ -170,5 +176,5 @@ def make_miner_score(
         novelty_score=3.5,
         validation_passed=False,
         error_message="Oh dear",
-        task_type=TaskType.COLDKEY_SEARCH
+        task_type=task_type
     )

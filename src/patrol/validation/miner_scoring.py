@@ -34,7 +34,11 @@ class MinerScoring:
         return Constants.RESPONSE_TIME_HALF_SCORE / (response_time + Constants.RESPONSE_TIME_HALF_SCORE)
 
     async def _moving_average(self, overall_score: float, miner: tuple[str, int]) -> float:
-        previous_scores = list(await self.miner_score_repository.find_latest_overall_scores(miner, self.moving_average_denominator - 1))
+        previous_scores = list(await self.miner_score_repository.find_latest_overall_scores(
+            miner,
+            TaskType.COLDKEY_SEARCH,
+            self.moving_average_denominator - 1
+        ))
         previous_scores.append(overall_score)
         numerator_scores = sorted(previous_scores, reverse=True)
 

@@ -153,7 +153,10 @@ class HotkeyOwnershipChallenge:
 
 
     async def _moving_average(self, overall_score, miner: Miner):
-        previous_scores = list(await self.score_repository.find_latest_overall_scores((miner.axon_info.hotkey, miner.uid), self.moving_average_denominator - 1))
+        previous_scores = list(await self.score_repository.find_latest_overall_scores(
+            (miner.axon_info.hotkey, miner.uid),
+            TaskType.HOTKEY_OWNERSHIP,
+            self.moving_average_denominator - 1))
         previous_scores.append(overall_score)
         numerator_scores = sorted(previous_scores, reverse=True)
 
