@@ -23,7 +23,6 @@ from patrol.validation.scoring import MinerScore, MinerScoreRepository
 
 logger = logging.getLogger(__name__)
 
-NUMBER_OF_LOW_SCORES_TO_DISCARD = 2
 
 class ValidationException(Exception):
     pass
@@ -158,10 +157,9 @@ class HotkeyOwnershipChallenge:
             TaskType.HOTKEY_OWNERSHIP,
             self.moving_average_denominator - 1))
         previous_scores.append(overall_score)
-        numerator_scores = sorted(previous_scores, reverse=True)
 
-        denominator = self.moving_average_denominator - NUMBER_OF_LOW_SCORES_TO_DISCARD
-        numerator_scores = numerator_scores[:denominator]
+        denominator = self.moving_average_denominator
+        numerator_scores = previous_scores[:denominator]
 
         return sum(numerator_scores) / denominator
 
