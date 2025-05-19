@@ -31,11 +31,11 @@ class WeightSetter:
         weighted_coldkey_search_scores = {k: v * self.task_weights[TaskType.COLDKEY_SEARCH] for k, v in overall_coldkey_search_scores.items() if k in miners}
 
         overall_hotkey_ownership_scores = await self.miner_score_repository.find_last_average_overall_scores(TaskType.HOTKEY_OWNERSHIP)
-        weighted__hotkey_ownership_scores = {k: v * self.task_weights[TaskType.HOTKEY_OWNERSHIP] for k, v in overall_hotkey_ownership_scores.items() if k in miners}
+        weighted_hotkey_ownership_scores = {k: v * self.task_weights[TaskType.HOTKEY_OWNERSHIP] for k, v in overall_hotkey_ownership_scores.items() if k in miners}
 
         overall_scores = {}
-        for key in set(weighted_coldkey_search_scores) | set(weighted__hotkey_ownership_scores):
-            overall_scores[key] = weighted_coldkey_search_scores.get(key, 0) + weighted__hotkey_ownership_scores.get(key, 0)
+        for key in set(weighted_coldkey_search_scores) | set(weighted_hotkey_ownership_scores):
+            overall_scores[key] = weighted_coldkey_search_scores.get(key, 0) + weighted_hotkey_ownership_scores.get(key, 0)
 
         sum_of_scores = sum(overall_scores.values())
         if sum_of_scores == 0:
