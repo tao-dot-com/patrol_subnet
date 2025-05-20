@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 import uuid
 
 from bittensor.core.metagraph import AsyncMetagraph
@@ -44,11 +45,14 @@ class HotkeyOwnershipBatch:
         ))
 
         target_hotkeys = await self.target_generator.generate_targets(max_block_number, len(miners))
+        miner_target_hotkeys = {miner.uid: target_hotkeys.pop() for miner in miners}
+
+        random.shuffle(miners)
 
         async def challenge(miner):
             try:
                 async with self.concurrency_semaphore:
-                    await self.challenge.execute_challenge(miner, target_hotkeys.pop(), batch_id, max_block_number)
+                    await self.challenge.execute_challenge(miner, miner_target_hotkeys[miner.uid], batch_id, max_block_number)
             except Exception as ex:
                 logger.exception("Unhandled error: %s", ex)
 

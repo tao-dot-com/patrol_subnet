@@ -1,3 +1,5 @@
+import asyncio
+import time
 import uuid
 from tempfile import TemporaryDirectory
 
@@ -29,8 +31,10 @@ def mock_miner(miner_wallet):
 
     yield "127.0.0.1", 8000
     axon.stop()
+    time.sleep(0.1)
 
 async def synapse_handler(request: HotkeyOwnershipSynapse):
+    await asyncio.sleep(0.2)
     request.subgraph_output=GraphPayload(
         nodes=[
             Node("foo", type="wallet", origin="bittensor"),
@@ -59,7 +63,7 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
 
     task = HotkeyOwnershipMinerClient(dendrite)
 
-    miner = Axon(port=miner_port, ip=miner_host, wallet=miner_wallet)
+    miner = Axon(port=miner_port, ip=miner_host, external_ip=miner_host, wallet=miner_wallet)
 
     response, response_time = await task.execute_task(miner.info(), synapse)
 
@@ -77,7 +81,7 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
     assert response.task_id == str(task_id)
     assert response.max_block_number == 5_400_000
 
-async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet):
+async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet, mock_miner):
 
     dendrite = Dendrite(dendrite_wallet)
     synapse = HotkeyOwnershipSynapse(
@@ -86,10 +90,27 @@ async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet):
 
     task = HotkeyOwnershipMinerClient(dendrite)
 
-    miner = Axon(port=8000, ip="127.0.0.1", wallet=miner_wallet)
+    miner = Axon(port=8009, ip="127.0.0.1", external_ip="127.0.0.1", wallet=miner_wallet)
 
     with pytest.raises(MinerTaskException) as ex:
         await task.execute_task(miner.info(), synapse)
 
-    assert "Error: Service unavailable" in str(ex.value)
-    assert "status 503" in str(ex.value)
+    assert "Connect call failed" in str(ex.value)
+
+async def test_challenge_miner_with_timeout(dendrite_wallet, miner_wallet, mock_miner):
+
+    miner_ip, miner_port = mock_miner
+
+    dendrite = Dendrite(dendrite_wallet)
+    synapse = HotkeyOwnershipSynapse(
+        target_hotkey_ss58="5C4hrfjw9DjXZTzV3MwzrrAr9P1MJhSrvWGWqi1eSuyUpnhM"
+    )
+
+    task = HotkeyOwnershipMinerClient(dendrite, 0.01)
+
+    miner = Axon(port=miner_port, ip=miner_ip, external_ip=miner_ip, wallet=miner_wallet)
+
+    with pytest.raises(MinerTaskException) as ex:
+        await task.execute_task(miner.info(), synapse)
+
+    assert "Timeout" in str(ex.value)
