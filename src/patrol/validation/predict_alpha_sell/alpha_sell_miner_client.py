@@ -1,18 +1,18 @@
 import time
+
 import aiohttp
 from bittensor import AxonInfo, Dendrite
 
-from patrol.protocol import HotkeyOwnershipSynapse
 from patrol.validation.error import MinerTaskException
+from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 
 
-class HotkeyOwnershipMinerClient:
-
+class AlphaSellMinerClient:
     def __init__(self, dendrite: Dendrite, timeout_seconds: float=60.0):
         self._dendrite = dendrite
         self._timeout_seconds = timeout_seconds
 
-    async def execute_task(self, miner: AxonInfo, synapse: HotkeyOwnershipSynapse) -> tuple[HotkeyOwnershipSynapse, float]:
+    async def execute_task(self, miner: AxonInfo, synapse: AlphaSellSynapse) -> tuple[AlphaSellSynapse, float]:
 
         processed_synapse = self._dendrite.preprocess_synapse_for_request(miner, synapse)
         url = f"http://{miner.ip}:{miner.port}/{synapse.name}"
@@ -36,7 +36,7 @@ class HotkeyOwnershipMinerClient:
                 response = await session.post(url, headers=headers, json=json_body, timeout=self._timeout_seconds, ssl=False)
                 if not response.ok:
                     raise MinerTaskException(f"Error: {response.reason}; status {response.status}")
-                response_synapse = HotkeyOwnershipSynapse.model_validate_json(await response.text())
+                response_synapse = AlphaSellSynapse.model_validate_json(await response.text())
                 response_time = timings['response_received'] - timings['request_start']
                 return response_synapse, response_time
         except TimeoutError:
