@@ -37,7 +37,7 @@ async def test_ownership_batch_challenges_miners():
     batch_id = await batch.challenge_miners()
 
     assert len(challenge.execute_challenge.mock_calls) == 2
-    challenge.execute_challenge.assert_has_calls([
+    challenge.execute_challenge.assert_has_awaits([
         call(Miner(axons[0], 0), "alice", batch_id, 4_999_990),
-        call(Miner(axons[2], 2), "bob", batch_id, 4_999_990),
-    ])
+        call(Miner(axons[2], 2), "bob", batch_id, 4_999_990)],
+        any_order=True)
