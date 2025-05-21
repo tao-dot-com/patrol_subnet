@@ -41,7 +41,7 @@ class _AlphaSellPrediction(Base):
     __tablename__ = "alpha_sell_prediction"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    task_id: Mapped[str] = mapped_column(ForeignKey("alpha_sell_challenge.task_id"))
+    task_id: Mapped[str] = mapped_column(ForeignKey(_AlphaSellChallenge.task_id, ondelete="CASCADE"))
     transaction_type: Mapped[str]
     amount: Mapped[float]
     hotkey: Mapped[str]
