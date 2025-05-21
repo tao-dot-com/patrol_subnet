@@ -23,6 +23,7 @@ class _AlphaSellChallenge(Base):
         mapped_column("prediction_interval_start"), mapped_column("prediction_interval_end")
     )
     predictions: Mapped[list["_AlphaSellPrediction"]] = relationship(back_populates="challenge", cascade="all")
+    response_time: Mapped[float]
 
     @classmethod
     def from_challenge(cls, challenge: AlphaSellChallenge):
@@ -33,7 +34,8 @@ class _AlphaSellChallenge(Base):
             subnet_uid=challenge.subnet_uid,
             hotkeys_ss58_json=challenge.hotkeys_ss58,
             prediction_interval=challenge.prediction_interval,
-            predictions=[_AlphaSellPrediction.from_prediction(prediction) for prediction in challenge.predictions]
+            predictions=[_AlphaSellPrediction.from_prediction(prediction) for prediction in challenge.predictions],
+            response_time=challenge.response_time_seconds,
         )
 
 

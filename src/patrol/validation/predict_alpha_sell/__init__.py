@@ -31,11 +31,12 @@ class AlphaSellChallenge:
     prediction_interval: PredictionInterval
     hotkeys_ss58: list[str]
     predictions: list[AlphaSellPrediction]
+    response_time_seconds: float
 
 
 class AlphaSellChallengeRepository(ABC):
     @abstractmethod
-    def add(self, challenge):
+    async def add(self, challenge):
         pass
 
 @dataclass(frozen=True)

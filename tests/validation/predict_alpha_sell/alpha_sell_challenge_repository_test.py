@@ -41,7 +41,8 @@ async def test_add_challenge(clean_pgsql_engine):
         [
             AlphaSellPrediction("alice", "alice_ck", TransactionType.UNSTAKE, 25.0),
             AlphaSellPrediction("carol", "carol_ck", TransactionType.UNSTAKE, 15.0),
-        ]
+        ],
+        9.7
     )
 
     await repository.add(challenge)
@@ -58,6 +59,7 @@ async def test_add_challenge(clean_pgsql_engine):
     assert challenge_result["prediction_interval_start"] == challenge.prediction_interval.start_block
     assert challenge_result["prediction_interval_end"] == challenge.prediction_interval.end_block
     assert challenge_result["hotkeys_ss58_json"] == ["alice", "bob", "carol"]
+    assert challenge_result["response_time"] == 9.7
 
     async with clean_pgsql_engine.connect() as conn:
         prediction_results = await conn.execute(text("SELECT * FROM alpha_sell_prediction"))

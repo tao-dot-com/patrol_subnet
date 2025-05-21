@@ -35,4 +35,4 @@ bt.logging.enable_third_party_loggers()
 config.fileConfig(str(Path(__file__).with_name("logging.ini")))
 
 from importlib.metadata import version
-logging.info("Patrol Subnet Validator. Version %s", version("patrol-subnet"))
+logging.info("Patrol Subnet. Version %s", version("patrol-subnet"))
