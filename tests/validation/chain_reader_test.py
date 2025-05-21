@@ -55,7 +55,7 @@ runtime_mappings = {
 #     yield loop
 #     loop.close()
 
-#ARCHIVE_NODE = os.environ['ARCHIVE_NODE']
+ARCHIVE_NODE = os.environ.get('ARCHIVE_NODE')
 
 @pytest.fixture#(scope="module")
 async def substrate_client():

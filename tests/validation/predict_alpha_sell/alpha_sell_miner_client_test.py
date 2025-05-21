@@ -8,8 +8,9 @@ from bittensor import Axon, Dendrite
 from bittensor_wallet import Wallet
 
 from patrol.validation.error import MinerTaskException
+from patrol.validation.predict_alpha_sell import TransactionType
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
-from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse, AlphaSellPrediction
+from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse, AlphaSellPrediction, PredictionInterval
 
 
 @pytest.fixture
@@ -26,6 +27,15 @@ def miner_wallet():
         wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
         yield wallet
 
+async def synapse_handler(request: AlphaSellSynapse):
+    await asyncio.sleep(0.2)
+    request.predictions=[
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.UNSTAKE, 25.0),
+        AlphaSellPrediction("bob", "bob_ck",  TransactionType.UNSTAKE, 15.0)
+    ]
+    return request
+
+
 @pytest.fixture()
 def mock_miner(miner_wallet):
     axon = Axon(wallet=miner_wallet, port=8000, external_ip="127.0.0.1").attach(forward_fn=synapse_handler).start()
@@ -34,13 +44,6 @@ def mock_miner(miner_wallet):
     axon.stop()
     time.sleep(0.1)
 
-async def synapse_handler(request: AlphaSellSynapse):
-    await asyncio.sleep(0.2)
-    request.predictions=[
-        AlphaSellPrediction("alice", "alice_ck", 25.0),
-        AlphaSellPrediction("bob", "bob_ck", 15.0)
-    ]
-    return request
 
 async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
 
@@ -54,8 +57,8 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
         batch_id=str(batch_id),
         task_id=str(task_id),
         subnet_uid=42,
-        prediction_interval_blocks=7200,
-        wallet_hotkeys_ss58=["alice", "bob"]
+        wallet_hotkeys_ss58=["alice", "bob"],
+        prediction_interval=PredictionInterval(5000000, 50007200),
     )
 
     task = AlphaSellMinerClient(dendrite)
@@ -67,8 +70,8 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
     assert response_time == pytest.approx(0.2, 1.0)
 
     assert response.predictions == [
-        AlphaSellPrediction("alice", "alice_ck", 25.0),
-        AlphaSellPrediction("bob", "bob_ck", 15.0),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.UNSTAKE, 25.0),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.UNSTAKE, 15.0),
     ]
     assert response.batch_id == str(batch_id)
     assert response.task_id == str(task_id)
@@ -81,7 +84,7 @@ async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet, mock_m
         batch_id=str(uuid.uuid4()),
         task_id=str(uuid.uuid4()),
         subnet_uid=42,
-        prediction_interval_blocks=7200,
+        prediction_interval=PredictionInterval(5000000, 50007200),
         wallet_hotkeys_ss58=["alice", "bob"]
     )
 
@@ -103,7 +106,7 @@ async def test_challenge_miner_with_timeout(dendrite_wallet, miner_wallet, mock_
         batch_id=str(uuid.uuid4()),
         task_id=str(uuid.uuid4()),
         subnet_uid=42,
-        prediction_interval_blocks=7200,
+        prediction_interval=PredictionInterval(5000000, 50007200),
         wallet_hotkeys_ss58=["alice", "bob"]
     )
 
