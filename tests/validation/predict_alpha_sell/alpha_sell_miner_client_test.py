@@ -30,8 +30,8 @@ def miner_wallet():
 async def synapse_handler(request: AlphaSellSynapse):
     await asyncio.sleep(0.2)
     request.predictions=[
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.UNSTAKE, 25.0),
-        AlphaSellPrediction("bob", "bob_ck",  TransactionType.UNSTAKE, 15.0)
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+        AlphaSellPrediction("bob", "bob_ck",  TransactionType.STAKE_REMOVED, 15.0)
     ]
     return request
 
@@ -70,8 +70,8 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
     assert response_time == pytest.approx(0.2, 1.0)
 
     assert response.predictions == [
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.UNSTAKE, 25.0),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.UNSTAKE, 15.0),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 15.0),
     ]
     assert response.batch_id == str(batch_id)
     assert response.task_id == str(task_id)

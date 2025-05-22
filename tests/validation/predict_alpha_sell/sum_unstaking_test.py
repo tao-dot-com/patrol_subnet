@@ -89,7 +89,6 @@ def test_filter_events_empty_list():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=1,
-            edge_type="test",
             source_net_uid=1,
             delegate_hotkey_source="key1"
         ),
@@ -97,7 +96,6 @@ def test_filter_events_empty_list():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=2,
-            edge_type="test",
             source_net_uid=2,
             delegate_hotkey_source="key2"
         )
@@ -115,7 +113,6 @@ def test_filter_events_duplicate_events():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=1,
-            edge_type="test",
             source_net_uid=1,
             delegate_hotkey_source="key1"
         ),
@@ -123,7 +120,6 @@ def test_filter_events_duplicate_events():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=2,
-            edge_type="test",
             source_net_uid=1,
             delegate_hotkey_source="key1"
         )
@@ -143,7 +139,6 @@ def test_filter_events_none_hotkey():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=1,
-            edge_type="test",
             source_net_uid=1,
             delegate_hotkey_source="key1"
         ),
@@ -151,7 +146,6 @@ def test_filter_events_none_hotkey():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=2,
-            edge_type="test",
             source_net_uid=1,
             delegate_hotkey_source=None
         )
@@ -170,7 +164,6 @@ def test_calculate_stake_removed_empty():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=1,
-            edge_type="StakeAdded",  # Different edge type
             source_net_uid=1,
             delegate_hotkey_source="key1",
             rao_amount=100
@@ -179,7 +172,6 @@ def test_calculate_stake_removed_empty():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=2,
-            edge_type="OtherType",  # Different edge type
             source_net_uid=1,
             delegate_hotkey_source="key2",
             rao_amount=200
@@ -196,7 +188,6 @@ def test_calculate_stake_removed_sum_amounts():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=1,
-            edge_type="StakeRemoved",
             source_net_uid=1,
             delegate_hotkey_source="key1",
             rao_amount=100
@@ -205,7 +196,6 @@ def test_calculate_stake_removed_sum_amounts():
             created_at=datetime.now(UTC),
             edge_category="test",
             block_number=2,
-            edge_type="StakeRemoved",
             source_net_uid=1,
             delegate_hotkey_source="key1",  # Same hotkey
             rao_amount=200

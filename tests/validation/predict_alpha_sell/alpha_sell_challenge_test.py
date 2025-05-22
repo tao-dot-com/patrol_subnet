@@ -7,10 +7,9 @@ from bittensor import AxonInfo
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellMinerChallenge, AlphaSellValidator
 from patrol.validation.predict_alpha_sell import TransactionType, PredictionInterval, \
-    AlphaSellPrediction, AlphaSellChallenge, AlphaSellChallengeRepository
+    AlphaSellPrediction, AlphaSellChallengeRepository, AlphaSellChallengeTask, AlphaSellChallengeBatch
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
-from validation.test_event_checker import repository
 
 
 @patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.uuid")
@@ -18,17 +17,24 @@ async def test_challenge_sends_correct_synapse(mock_uuid):
     miner_client = AsyncMock(AlphaSellMinerClient)
 
     mock_axon_info = MagicMock(AxonInfo)
+    mock_axon_info.hotkey = "miner_hk"
     miner = Miner(mock_axon_info, 123)
     batch_id = uuid.uuid4()
 
     task_id = uuid.uuid4()
     mock_uuid.uuid4.return_value = task_id
 
+    batch = AlphaSellChallengeBatch(
+        batch_id=batch_id, subnet_uid=42,
+        prediction_interval=PredictionInterval(5_000_000, 5_000_7200),
+        hotkeys_ss58=["alice", "bob"],
+        created_at=datetime.now(UTC),
+    )
+
     challenge = AlphaSellMinerChallenge(
-        batch_id, 42, ["alice", "bob"],
+        batch,
         miner_client,
         AsyncMock(AlphaSellChallengeRepository),
-        PredictionInterval(5_000_000, 5_000_7200)
     )
 
     expected_synapse = AlphaSellSynapse(
@@ -60,8 +66,8 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
     hotkeys = ["alice", "bob"]
     prediction_interval = PredictionInterval(5_000_000, 5_000_7200)
     predictions = [
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.UNSTAKE, 25.0),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.UNSTAKE, 15.0),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 15.0),
     ]
 
     miner_client = AsyncMock(AlphaSellMinerClient)
@@ -79,13 +85,12 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
 
     repository = AsyncMock(AlphaSellChallengeRepository)
 
-    challenge = AlphaSellMinerChallenge(batch_id, subnet_uid, hotkeys, miner_client, repository, prediction_interval)
-    response: AlphaSellChallenge = await challenge.execute_challenge(miner)
+    batch = AlphaSellChallengeBatch(batch_id, now, subnet_uid, prediction_interval, hotkeys)
+
+    challenge = AlphaSellMinerChallenge(batch, miner_client, repository)
+    response: AlphaSellChallengeTask = await challenge.execute_challenge(miner)
 
     assert response.batch_id == batch_id
-    assert response.subnet_uid == subnet_uid
-    assert response.hotkeys_ss58 == hotkeys
-    assert response.prediction_interval == prediction_interval
     assert response.created_at == now
     assert response.task_id == task_id
     assert response.predictions == predictions
