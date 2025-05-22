@@ -1,15 +1,17 @@
 import asyncio
 from datetime import datetime, UTC
 from collections import namedtuple
-from typing import Iterable, Any
+from typing import Dict, Iterable, List, Optional, Any
 
 import bittensor.core.chain_data
 
 from patrol.chain_data.substrate_client import SubstrateClient
 from bittensor.core.async_subtensor import AsyncSubstrateInterface
+from patrol.validation.predict_alpha_sell import ChainStakeEvent
 
 from patrol.validation.chain import ChainEvent
 from patrol.validation.chain.runtime_versions import RuntimeVersions
+from bittensor.core.chain_data.utils import decode_account_id
 
 import logging
 
@@ -22,6 +24,18 @@ class ChainReader:
     def __init__(self, substrate_client: SubstrateClient, runtime_versions: RuntimeVersions):
         self._substrate_client = substrate_client
         self._runtime_versions = runtime_versions
+
+    @staticmethod
+    def _format_address(addr: List) -> str:
+        """
+        Uses Bittensor's decode_account_id to format the given address.
+        Assumes 'addr' is provided in the format expected by decode_account_id.
+        """
+        try:
+            return decode_account_id(addr[0])
+        except Exception as e:
+            logger.warning(f"Error parsing address from {addr}: {e}")
+            return addr[0]
 
     async def _preprocess_system_events(self, runtime_version: int, block_number: int) -> PreprocessedTuple:
         _, block_hash = await self._get_block_hash(block_number, runtime_version)
@@ -66,6 +80,38 @@ class ChainReader:
         events = await self._chain_events_for(raw_events, block_numbers_by_hash)
         logger.info("Found %s events in blocks %s to %s", len(events), block_numbers[0], block_numbers[-1])
         return events
+    
+    async def find_stake_events(self, runtime_version: int, block_numbers: list[int]) -> Iterable[ChainStakeEvent]:
+
+        logger.info("Querying blockchain for stake events in blocks %s to %s", block_numbers[0], block_numbers[-1])
+
+        preprocessed_tasks = [self._preprocess_system_events(runtime_version, it) for it in block_numbers]
+        preprocessed_events = await asyncio.gather(*preprocessed_tasks)
+
+        block_numbers_by_hash = {it.block_hash: it.block_number for it in preprocessed_events}
+
+        def make_payload(preprocessed: PreprocessedTuple):
+            return AsyncSubstrateInterface.make_payload(
+                preprocessed.block_hash,
+                preprocessed.event.method,
+                [preprocessed.event.params[0], preprocessed.block_hash]
+            )
+
+        rpc_request_payloads = [make_payload(it) for it in preprocessed_events]
+        value_scale_type = preprocessed_events[0].event.value_scale_type
+        storage_item = preprocessed_events[0].event.storage_item
+
+        raw_events = await self._substrate_client.query(
+                "_make_rpc_request",
+                runtime_version,
+                rpc_request_payloads,
+                value_scale_type,
+                storage_item
+            )
+
+        events = await self._chain_events_for_staking(raw_events, block_numbers_by_hash)
+        logger.info("Found %s events in blocks %s to %s", len(events), block_numbers[0], block_numbers[-1])
+        return events
 
     async def get_current_block(self) -> int:
         current_block = await self._substrate_client.query("get_block", None)
@@ -94,6 +140,23 @@ class ChainReader:
 
         chain_events = await asyncio.gather(*chain_event_builders)
         return list(filter(lambda it: it is not None, chain_events))
+    
+    async def _chain_events_for_staking(self, raw_events: dict[str, list[tuple[dict]]], block_numbers: dict[str, int]):
+
+        def transform(event_tuple: tuple):
+            return [it['event'] for it in event_tuple]
+
+        event_data = (((k, transform(v[0])) for k, v in raw_events.items()))
+
+        chain_event_builders = []
+
+        for block_hash, events in event_data:
+            block_number = block_numbers[block_hash]
+            for event in events:
+                chain_event_builders.append(self.make_chain_event_for_staking(block_number, event))
+
+        chain_events = await asyncio.gather(*chain_event_builders)
+        return list(filter(lambda it: it is not None, chain_events))
 
     async def make_chain_event_for(self, block_number: int, event: dict):
         if "SubtensorModule" in event:
@@ -103,8 +166,109 @@ class ChainReader:
                 return await self._make_coldkey_swap_scheduled_event(event, block_number)
             else:
                 return None
-        else:
-            return None
+    
+    async def make_chain_event_for_staking(self, block_number: int, event: dict):
+        # Handle SubtensorModule stake related events
+        if "SubtensorModule" in event:
+            event_data = event["SubtensorModule"][0]
+            
+            if "StakeAdded" in event_data:
+                return await self._make_stake_added_event(event, block_number)
+            if "StakeRemoved" in event_data:
+                return await self._make_stake_removed_event(event, block_number)
+            elif "StakeMoved" in event_data:
+                return await self._make_stake_moved_event(event, block_number)
+            
+        return None
+    
+    async def _make_stake_added_event(self, event, block_number):
+        details = event["SubtensorModule"][0]["StakeAdded"]
+        
+        # Check if it's new or old format
+        if len(details) == 2:
+            # Old format
+            delegate_hotkey = self._format_address(details[0])
+            return ChainStakeEvent(
+                created_at=datetime.now(UTC),
+                edge_category="SubtensorModule",
+                edge_type="StakeAdded",
+                block_number=block_number,
+                delegate_hotkey_destination=delegate_hotkey,
+                rao_amount=details[1],
+                coldkey_destination=None
+            )
+        elif len(details) >= 5:
+            # New format
+            coldkey = self._format_address(details[0])
+            delegate_hotkey = self._format_address(details[1])
+            return ChainStakeEvent(
+                created_at=datetime.now(UTC),
+                edge_category="SubtensorModule",
+                edge_type="StakeAdded",
+                block_number=block_number,
+                coldkey_source=coldkey,
+                delegate_hotkey_destination=delegate_hotkey,
+                rao_amount=details[2],
+                alpha_amount=details[3],
+                destination_net_uid=details[4],
+                coldkey_destination=None
+            )
+        return None
+
+    async def _make_stake_removed_event(self, event, block_number):
+        details = event["SubtensorModule"][0]["StakeRemoved"]
+        
+        # Check if it's new or old format
+        if len(details) == 2:
+            # Old format
+            delegate_hotkey = self._format_address(details[0])
+            return ChainStakeEvent(
+                created_at=datetime.now(UTC),
+                edge_category="SubtensorModule",
+                edge_type="StakeRemoved",
+                block_number=block_number,
+                delegate_hotkey_source=delegate_hotkey,
+                rao_amount=details[1],
+                coldkey_destination=None
+            )
+        elif len(details) >= 5:
+            # New format
+            coldkey = self._format_address(details[0])
+            delegate_hotkey = self._format_address(details[1])
+            return ChainStakeEvent(
+                created_at=datetime.now(UTC),
+                edge_category="SubtensorModule",
+                edge_type="StakeRemoved",
+                block_number=block_number,
+                coldkey_destination=coldkey,
+                delegate_hotkey_source=delegate_hotkey,
+                rao_amount=details[2],
+                alpha_amount=details[3],
+                source_net_uid=details[4]
+            )
+        return None
+
+    async def _make_stake_moved_event(self, event, block_number):
+        details = event["SubtensorModule"][0]["StakeMoved"]
+        
+        if len(details) == 6:
+            coldkey = self._format_address(details[0])
+            source_delegate_hotkey = self._format_address(details[1])
+            destination_delegate_hotkey = self._format_address(details[3])
+            
+            return ChainStakeEvent(
+                created_at=datetime.now(UTC),
+                edge_category="SubtensorModule",
+                edge_type="StakeMoved",
+                block_number=block_number,
+                coldkey_owner=coldkey,
+                delegate_hotkey_source=source_delegate_hotkey,
+                delegate_hotkey_destination=destination_delegate_hotkey,
+                source_net_uid=details[2],
+                destination_net_uid=details[4],
+                rao_amount=details[5]
+            )
+        return None
 
     async def _make_neuron_registered_event(self, event, block_number: int):
         neuron_registered = event["SubtensorModule"][0]["NeuronRegistered"]
