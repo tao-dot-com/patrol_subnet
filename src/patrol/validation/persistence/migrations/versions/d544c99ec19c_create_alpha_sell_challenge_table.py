@@ -20,18 +20,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.create_table("alpha_sell_challenge",
-        sa.Column('task_id', sa.String, primary_key=True),
-        sa.Column('batch_id', sa.String, nullable=False),
+    op.create_table("alpha_sell_challenge_batch",
+        sa.Column('id', sa.String, primary_key=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('subnet_uid', sa.Integer, nullable=False),
         sa.Column('hotkeys_ss58_json', sa.JSON, nullable=False),
         sa.Column('prediction_interval_start', sa.Integer, nullable=False),
         sa.Column('prediction_interval_end', sa.Integer, nullable=False),
     )
+    op.create_table("alpha_sell_challenge_task",
+        sa.Column('id', sa.String, primary_key=True),
+        sa.Column("batch_id", sa.String, ForeignKey("alpha_sell_challenge_batch.id", ondelete="CASCADE"), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('miner_hotkey', sa.String, nullable=False),
+        sa.Column('miner_uid', sa.Integer, nullable=False),
+        sa.Column('response_time', sa.Float, nullable=False),
+    )
     op.create_table("alpha_sell_prediction",
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
-        sa.Column("task_id", sa.String, ForeignKey("alpha_sell_challenge.task_id", ondelete="CASCADE"), nullable=False),
+        sa.Column("task_id", sa.String, ForeignKey("alpha_sell_challenge_task.id", ondelete="CASCADE"), nullable=False),
         sa.Column("hotkey", sa.String, nullable=False),
         sa.Column("transaction_type", sa.String, nullable=False),
         sa.Column("amount", sa.Float, nullable=False)
@@ -41,4 +48,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     op.drop_table("alpha_sell_prediction")
-    op.drop_table("alpha_sell_challenge")
+    op.drop_table("alpha_sell_challenge_task")
+    op.drop_table("alpha_sell_challenge_batch")
