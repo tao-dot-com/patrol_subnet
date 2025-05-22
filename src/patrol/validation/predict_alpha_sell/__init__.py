@@ -42,15 +42,15 @@ class AlphaSellChallengeRepository(ABC):
 @dataclass(frozen=True)
 class ChainStakeEvent:
     created_at: datetime
-    edge_category: str
     block_number: int
-    edge_type: str
-    coldkey_destination: Optional[str] = None
-    coldkey_source: Optional[str] = None
-    coldkey_owner: Optional[str] = None
-    rao_amount: Optional[int] = None
-    destination_net_uid: Optional[int] = None
-    source_net_uid: Optional[int] = None
+    event_type: str
+    coldkey: str
+    hotkey: str
+    rao_amount: int
+    net_uid: int
     alpha_amount: Optional[int] = None
-    delegate_hotkey_source: Optional[str] = None
-    delegate_hotkey_destination: Optional[str] = None
+
+class AlphaSellEventRepository(ABC):
+    @abstractmethod
+    async def add(self, events: list[ChainStakeEvent]):
+        pass
