@@ -40,9 +40,8 @@ class AlphaSellMinerChallenge:
             wallet_hotkeys_ss58=self.hotkeys_ss58,
         )
 
-        now = datetime.now(UTC)
-
         response, response_time = await self.miner_client.execute_task(miner.axon_info, synapse)
+        now = datetime.now(UTC)
         challenge = AlphaSellChallenge(
             batch_id=self.batch_id,
             subnet_uid=self.subnet_uid,

@@ -1,7 +1,6 @@
 import asyncio
 import dataclasses
 import logging
-from collections import namedtuple
 from datetime import datetime, UTC
 import itertools
 import uuid
@@ -10,6 +9,7 @@ from uuid import UUID
 
 from patrol.constants import TaskType
 from patrol.protocol import HotkeyOwnershipSynapse, Edge, Node
+from patrol.validation import Miner, ValidationException
 from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient, \
@@ -23,9 +23,6 @@ from patrol.validation.scoring import MinerScore, MinerScoreRepository
 
 logger = logging.getLogger(__name__)
 
-
-class ValidationException(Exception):
-    pass
 
 class HotkeyOwnershipValidator:
 
@@ -97,8 +94,6 @@ class HotkeyOwnershipValidator:
 
         await asyncio.gather(*evidences)
 
-
-Miner = namedtuple("Miner", ["axon_info", "uid"])
 
 class HotkeyOwnershipChallenge:
 

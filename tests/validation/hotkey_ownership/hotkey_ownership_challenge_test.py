@@ -6,9 +6,10 @@ from bittensor import AxonInfo
 
 from patrol.constants import TaskType
 from patrol.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
+from patrol.validation import Miner, ValidationException
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, \
-    HotkeyOwnershipValidator, Miner, ValidationException
+    HotkeyOwnershipValidator
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring, HotkeyOwnershipScore
 from patrol.validation.scoring import MinerScoreRepository, MinerScore

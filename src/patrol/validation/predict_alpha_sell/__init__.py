@@ -6,7 +6,7 @@ from uuid import UUID
 from typing import Optional
 
 class TransactionType(Enum):
-    UNSTAKE = "UNSTAKE"
+    STAKE_REMOVED = "StakeRemoved"
 
 @dataclass(frozen=True)
 class AlphaSellPrediction:
@@ -23,21 +23,31 @@ class PredictionInterval:
 
 
 @dataclass(frozen=True)
-class AlphaSellChallenge:
+class AlphaSellChallengeBatch:
     batch_id: UUID
-    task_id: UUID
     created_at: datetime
     subnet_uid: int
     prediction_interval: PredictionInterval
     hotkeys_ss58: list[str]
-    predictions: list[AlphaSellPrediction]
-    response_time_seconds: float
 
+@dataclass(frozen=True)
+class AlphaSellChallengeTask:
+    batch_id: UUID
+    task_id: UUID
+    created_at: datetime
+    miner: tuple[str, int]
+    response_time_seconds: float
+    predictions: list[AlphaSellPrediction]
 
 class AlphaSellChallengeRepository(ABC):
     @abstractmethod
     async def add(self, challenge):
         pass
+
+    @abstractmethod
+    async def find_scorable_challenges(self, upper_block: int):
+        pass
+
 
 @dataclass(frozen=True)
 class ChainStakeEvent:

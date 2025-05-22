@@ -3,8 +3,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 from patrol.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
+from patrol.validation import ValidationException
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipValidator, ValidationException
+from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipValidator
 
 
 async def test_validation_of_valid_graph():

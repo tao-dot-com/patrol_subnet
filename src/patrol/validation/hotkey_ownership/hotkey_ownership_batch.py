@@ -5,8 +5,9 @@ import uuid
 
 from bittensor.core.metagraph import AsyncMetagraph
 
+from patrol.validation import Miner
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, Miner
+from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge
 from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
 
 logger = logging.getLogger(__name__)
