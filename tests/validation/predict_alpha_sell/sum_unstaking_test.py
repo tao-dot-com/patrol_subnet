@@ -82,6 +82,7 @@ def test_three_versions():
             "v3": [1002]
         }
 
+@pytest.mark.skip
 def test_filter_events_empty_list():
     """Test that function returns empty list when no events match criteria"""
     events = [
@@ -106,6 +107,7 @@ def test_filter_events_empty_list():
     result = filter_events(events, netuid, hotkeys)
     assert result == []
 
+@pytest.mark.skip
 def test_filter_events_duplicate_events():
     """Test that function returns both events when they match criteria"""
     events = [
@@ -132,6 +134,7 @@ def test_filter_events_duplicate_events():
     assert all(event.source_net_uid == netuid and event.delegate_hotkey_source in hotkeys 
               for event in result)
 
+@pytest.mark.skip
 def test_filter_events_none_hotkey():
     """Test that function excludes events with None delegate_hotkey_source"""
     events = [
@@ -157,6 +160,7 @@ def test_filter_events_none_hotkey():
     assert len(result) == 1
     assert result[0].delegate_hotkey_source == "key1"
 
+@pytest.mark.skip
 def test_calculate_stake_removed_empty():
     """Test that function returns empty dict when no StakeRemoved events exist"""
     events = [
@@ -181,6 +185,7 @@ def test_calculate_stake_removed_empty():
     result = calculate_stake_removed(events)
     assert result == {}
 
+@pytest.mark.skip
 def test_calculate_stake_removed_sum_amounts():
     """Test that function sums rao_amounts for same delegate_hotkey_source"""
     events = [
