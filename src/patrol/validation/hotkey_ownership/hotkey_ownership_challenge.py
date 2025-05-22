@@ -114,7 +114,7 @@ class HotkeyOwnershipChallenge:
         self.validator = validator
         self.score_repository = score_repository
         self.dashboard_client = dashboard_client
-        self.moving_average_denominator = 20
+        self.moving_average_denominator = 12
 
     async def execute_challenge(self, miner: Miner, target_hotkey, batch_id: UUID, max_block_number: int):
         task_id = uuid.uuid4()

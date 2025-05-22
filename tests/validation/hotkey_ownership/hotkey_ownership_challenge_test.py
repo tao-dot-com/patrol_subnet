@@ -62,7 +62,7 @@ async def test_execute_and_score_challenge(mock_datetime):
     assert score_persisted.responsiveness_score == 0.5
     assert score_persisted.volume == 0
     assert score_persisted.response_time_seconds == 2.0
-    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0.75) / 20
+    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0.75) / 12
     assert score_persisted.batch_id == batch_id
     assert score_persisted.uid == 12
     assert score_persisted.hotkey == "alice"
@@ -111,7 +111,7 @@ async def test_execute_and_score_challenge_with_20_previous_scores(mock_datetime
 
     batch_id = uuid.uuid4()
     scoring.score.return_value=HotkeyOwnershipScore(1, 0.5, 0.75)
-    score_repository.find_latest_overall_scores.return_value=list(range(19))
+    score_repository.find_latest_overall_scores.return_value=list(range(11))
 
     task_id = await challenge.execute_challenge(miner, "fsdgfdsghfgdshgfh", batch_id, 1_000_000)
 
@@ -122,7 +122,7 @@ async def test_execute_and_score_challenge_with_20_previous_scores(mock_datetime
     assert score_persisted.responsiveness_score == 0.5
     assert score_persisted.volume == 0
     assert score_persisted.response_time_seconds == 2.0
-    assert score_persisted.overall_score_moving_average == (sum(range(19)) + 0.75) / 20
+    assert score_persisted.overall_score_moving_average == (sum(range(11)) + 0.75) / 12
     assert score_persisted.batch_id == batch_id
     assert score_persisted.uid == 12
     assert score_persisted.hotkey == "alice"
@@ -187,7 +187,7 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
     assert score_persisted.responsiveness_score == 0
     assert score_persisted.volume == 0
     assert score_persisted.response_time_seconds == 2.0
-    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0) / 20
+    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0) / 12
     assert score_persisted.batch_id == batch_id
     assert score_persisted.uid == 12
     assert score_persisted.hotkey == "alice"
