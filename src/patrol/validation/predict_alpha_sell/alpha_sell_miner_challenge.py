@@ -1,18 +1,57 @@
+import math
 import uuid
 from datetime import datetime, UTC
 from uuid import UUID
 
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.predict_alpha_sell import PredictionInterval, AlphaSellChallengeRepository, \
-    AlphaSellChallengeBatch, AlphaSellChallengeTask
+    AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellEventRepository, TransactionType
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
+from patrol.validation.scoring import MinerScore
 
 
 class AlphaSellValidator:
-    async def validate(self, challenge: AlphaSellChallengeBatch) -> bool:
-        return True
+    def __init__(self, batch: AlphaSellChallengeBatch, stake_removals):
+        self.batch = batch
+        self.stake_removals = stake_removals
 
+    @classmethod
+    async def create(cls, batch: AlphaSellChallengeBatch, event_repository: AlphaSellEventRepository):
+        stake_removals = event_repository.find_aggregate_stake_movement_by_hotkey(
+            batch.subnet_uid,
+            batch.prediction_interval.start_block, batch.prediction_interval.end_block,
+            TransactionType.STAKE_REMOVED
+        )
+        return cls(batch, stake_removals)
+
+    def score_miner(self, task: AlphaSellChallengeTask) -> float:
+        predictions_by_hotkey = {p.wallet_hotkey_ss58: p.amount for p in task.predictions}
+
+        accuracies = []
+
+        all_hotkeys = set(predictions_by_hotkey.keys() | self.stake_removals.keys())
+
+        for hk in all_hotkeys:
+            predicted = predictions_by_hotkey.get(hk, 0.0)
+            actual_amount = self.stake_removals.get(hk, 0.0)
+            delta = abs(predicted - actual_amount)
+
+            # if delta == 0:
+            #     accuracies.append(1)
+            # else:
+            accuracy = self.parabolic_accuracy(predicted, actual_amount)
+            accuracies.append(accuracy)
+
+        mean_accuracy = sum(accuracies) / len(accuracies)
+
+        return mean_accuracy
+
+    def parabolic_accuracy(self, prediction, actual) -> float:
+        error = abs(actual - prediction)
+        relative_error = (0.9 * error) / max(2, error)
+        ret = 1 - (relative_error ** 2)
+        return max(ret, 0.0)
 
 class AlphaSellMinerChallenge:
 

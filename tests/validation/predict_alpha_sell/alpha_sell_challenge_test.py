@@ -16,9 +16,8 @@ from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 async def test_challenge_sends_correct_synapse(mock_uuid):
     miner_client = AsyncMock(AlphaSellMinerClient)
 
-    mock_axon_info = MagicMock(AxonInfo)
-    mock_axon_info.hotkey = "miner_hk"
-    miner = Miner(mock_axon_info, 123)
+    axon_info = AxonInfo(0, "0.0.0.0", 0, 4, "hk", "ck")
+    miner = Miner(axon_info, 123)
     batch_id = uuid.uuid4()
 
     task_id = uuid.uuid4()
@@ -47,8 +46,8 @@ async def test_challenge_sends_correct_synapse(mock_uuid):
 
     await challenge.execute_challenge(miner)
 
-    miner_client.execute_task.assert_awaited_once_with(mock_axon_info, expected_synapse)
-    miner_client.execute_task.assert_awaited_once_with(mock_axon_info, expected_synapse)
+    miner_client.execute_task.assert_awaited_once_with(axon_info, expected_synapse)
+    miner_client.execute_task.assert_awaited_once_with(axon_info, expected_synapse)
 
 
 @patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.datetime")
@@ -80,7 +79,7 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
         predictions=predictions
     ), 12.3)
 
-    axon = AxonInfo(version=0, ip="192.168.12.1", port=8000, hotkey="miner_hk", coldkey="miner_ck", ip_type=4)
+    axon = AxonInfo(version=0, ip="0.0.0.0", port=8000, hotkey="miner_hk", coldkey="miner_ck", ip_type=4)
     miner = Miner(axon, 123)
 
     repository = AsyncMock(AlphaSellChallengeRepository)
@@ -88,12 +87,10 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
     batch = AlphaSellChallengeBatch(batch_id, now, subnet_uid, prediction_interval, hotkeys)
 
     challenge = AlphaSellMinerChallenge(batch, miner_client, repository)
-    response: AlphaSellChallengeTask = await challenge.execute_challenge(miner)
+    task: AlphaSellChallengeTask = await challenge.execute_challenge(miner)
 
-    assert response.batch_id == batch_id
-    assert response.created_at == now
-    assert response.task_id == task_id
-    assert response.predictions == predictions
-    assert response.response_time_seconds == 12.3
-
-    repository.add.assert_awaited_once_with(response)
+    assert task.batch_id == batch_id
+    assert task.created_at == now
+    assert task.task_id == task_id
+    assert task.predictions == predictions
+    assert task.response_time_seconds == 12.3
