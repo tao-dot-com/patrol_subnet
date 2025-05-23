@@ -15,7 +15,8 @@ dependencies = [
     "python-json-logger",
     "async_lru",
     "greenlet>=3.2.1",
-    "networkx"
+    "networkx",
+    "async-substrate-interface==1.0.9"
 ]
 
 [project.optional-dependencies]
