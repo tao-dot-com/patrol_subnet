@@ -6,7 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from patrol.validation.persistence import migrate_db
-from patrol.validation.predict_alpha_sell import ChainStakeEvent
+from patrol.validation.predict_alpha_sell import ChainStakeEvent, TransactionType
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
 
 @pytest.fixture
@@ -50,4 +50,21 @@ async def test_add_event_when_alpha_not_present(clean_pgsql_engine):
     async with clean_pgsql_engine.connect() as conn:
         row = await conn.execute(text("SELECT * FROM alpha_sell_event"))
         result = [dict(it._mapping) for it in row][0]
-        assert result["alpha_amount"] == None
+        assert result["alpha_amount"] is None
+
+
+async def test_find_aggregate_stake_movement_by_hotkey(clean_pgsql_engine):
+    events = [
+        ChainStakeEvent(datetime.now(UTC), 5000000, "StakeRemoved", "coldkey1", "hotkey1", 400, 72, 1000),
+        ChainStakeEvent(datetime.now(UTC), 5000001, "StakeRemoved", "coldkey1", "hotkey1", 500, 72, 1000),
+        ChainStakeEvent(datetime.now(UTC), 5000001, "StakeRemoved", "coldkey1", "hotkey2", 600, 72, 1000),
+        ChainStakeEvent(datetime.now(UTC), 5000010, "StakeRemoved", "coldkey1", "hotkey1", 700, 72, 1000),
+        ChainStakeEvent(datetime.now(UTC), 5000010, "StakeRemoved", "coldkey2", "hotkey4", 800, 70, 1000),
+    ]
+    repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
+    await repository.add(events)
+
+    stake_removed_events = await repository.find_aggregate_stake_movement_by_hotkey(72, 5000000, 5000001, TransactionType.STAKE_REMOVED)
+    assert stake_removed_events.keys() == {"hotkey1", "hotkey2"}
+    assert stake_removed_events['hotkey1'] == 400 + 500
+    assert stake_removed_events['hotkey2'] == 600

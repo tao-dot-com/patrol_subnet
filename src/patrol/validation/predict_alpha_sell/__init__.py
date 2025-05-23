@@ -64,3 +64,7 @@ class AlphaSellEventRepository(ABC):
     @abstractmethod
     async def add(self, events: list[ChainStakeEvent]):
         pass
+
+    @abstractmethod
+    async def find_aggregate_stake_movement_by_hotkey(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> list[ChainStakeEvent]:
+        pass

@@ -1,8 +1,8 @@
-from patrol.validation.predict_alpha_sell import ChainStakeEvent, AlphaSellEventRepository
+from patrol.validation.predict_alpha_sell import ChainStakeEvent, AlphaSellEventRepository, TransactionType
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from patrol.validation.persistence import Base
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, select, between, func
 from datetime import datetime
 from typing import Optional
 
@@ -37,3 +37,16 @@ class DataBaseAlphaSellEventRepository(AlphaSellEventRepository):
         async with self.LocalSession() as session:
             session.add_all([_ChainStakeEvent.from_event(event) for event in events])
             await session.commit()
+
+    async def find_aggregate_stake_movement_by_hotkey(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> dict[str, int]:
+        async with self.LocalSession() as session:
+            query = select(
+                _ChainStakeEvent.hotkey,
+                func.sum(_ChainStakeEvent.rao_amount).label("rao_amount"),
+            ).filter(
+                _ChainStakeEvent.net_uid == subnet_id,
+                _ChainStakeEvent.block_number.between(lower_block, upper_block)
+            ).group_by(_ChainStakeEvent.hotkey)
+            results = (await session.execute(query)).all()
+            results_dict = dict(results)
+            return results_dict
