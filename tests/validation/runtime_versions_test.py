@@ -18,4 +18,4 @@ def test_lookup_runtime_version_from_out_of_range_block_number(runtime_versions)
 
 def test_lookup_runtime_version_at_extreme_range_boundaries(runtime_versions):
     assert runtime_versions.runtime_version_for_block(3_014_340) == 149
-    assert runtime_versions.runtime_version_for_block(5_413_452) == 261
+    assert runtime_versions.runtime_version_for_block(5_622_077) == 265
