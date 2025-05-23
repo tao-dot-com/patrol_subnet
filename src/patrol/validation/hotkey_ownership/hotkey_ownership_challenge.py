@@ -161,7 +161,7 @@ class HotkeyOwnershipChallenge:
         denominator = self.moving_average_denominator
         numerator_scores = previous_scores[:denominator]
 
-        return sum(numerator_scores) / denominator
+        return sum(numerator_scores) / len(numerator_scores)
 
     async def _calculate_zero_score(self, batch_id: uuid.UUID, task_id: UUID, miner: Miner, response_time: float, error_message: str) -> MinerScore:
         moving_average = await self._moving_average(0, miner)

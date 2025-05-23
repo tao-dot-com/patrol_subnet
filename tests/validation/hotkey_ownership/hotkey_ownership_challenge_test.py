@@ -62,7 +62,7 @@ async def test_execute_and_score_challenge(mock_datetime):
     assert score_persisted.responsiveness_score == 0.5
     assert score_persisted.volume == 0
     assert score_persisted.response_time_seconds == 2.0
-    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0.75) / 12
+    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0.75) / 4
     assert score_persisted.batch_id == batch_id
     assert score_persisted.uid == 12
     assert score_persisted.hotkey == "alice"
@@ -187,7 +187,7 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
     assert score_persisted.responsiveness_score == 0
     assert score_persisted.volume == 0
     assert score_persisted.response_time_seconds == 2.0
-    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0) / 12
+    assert score_persisted.overall_score_moving_average == (0 + 1 + 2 + 0) / 4
     assert score_persisted.batch_id == batch_id
     assert score_persisted.uid == 12
     assert score_persisted.hotkey == "alice"
