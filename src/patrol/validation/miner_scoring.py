@@ -45,7 +45,7 @@ class MinerScoring:
         denominator = self.moving_average_denominator - NUMBER_OF_LOW_SCORES_TO_DISCARD
         numerator_scores = numerator_scores[:denominator]
 
-        return sum(numerator_scores) / denominator
+        return sum(numerator_scores) / len(numerator_scores)
 
     async def calculate_score(
         self,
