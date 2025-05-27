@@ -2,6 +2,7 @@ from patrol.validation.predict_alpha_sell import ChainStakeEvent, AlphaSellEvent
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from patrol.validation.persistence import Base
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger
 from sqlalchemy import DateTime, select, between, func
 from datetime import datetime
 from typing import Optional
@@ -14,9 +15,9 @@ class _ChainStakeEvent(Base):
     event_type: Mapped[str]
     coldkey: Mapped[str]
     hotkey:  Mapped[str]
-    rao_amount:  Mapped[int]
+    rao_amount:  Mapped[int] = mapped_column(BigInteger)
     net_uid:  Mapped[int]
-    alpha_amount:  Mapped[Optional[int]]
+    alpha_amount:  Mapped[Optional[int]] = mapped_column(BigInteger)
     @classmethod
     def from_event(cls, event: ChainStakeEvent):
         return cls(created_at = event.created_at, 
