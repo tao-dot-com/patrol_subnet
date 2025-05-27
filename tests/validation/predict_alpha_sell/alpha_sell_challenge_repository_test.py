@@ -107,3 +107,66 @@ async def test_add_challenge_task(clean_pgsql_engine):
     assert carol_prediction_result["task_id"] == str(task.task_id)
     assert carol_prediction_result["amount"] == 15.0
     assert carol_prediction_result["hotkey"] == "carol"
+
+
+async def test_find_tasks_for_batch(clean_pgsql_engine):
+    batch_id_1 = uuid.uuid4()
+    batch_id_2 = uuid.uuid4()
+
+    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
+    batch_1 = AlphaSellChallengeBatch(batch_id_1, datetime.now(UTC), 42, PredictionInterval(100, 120), ["alice", "bob", "carol"])
+    await repository.add(batch_1)
+
+    batch_2 = AlphaSellChallengeBatch(batch_id_2, datetime.now(UTC), 42, PredictionInterval(100, 120), ["alice", "bob", "carol"])
+    await repository.add(batch_2)
+
+    task_1_a = AlphaSellChallengeTask(
+            batch_id_1, uuid.uuid4(), datetime.now(UTC), ("miner", 1), 5.0, predictions=[
+               AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+               AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
+            ])
+    await repository.add_task(task_1_a)
+
+    task_1_b = AlphaSellChallengeTask(
+            batch_id_1, uuid.uuid4(), datetime.now(UTC), ("miner", 2), 5.0, predictions=[
+               AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+               AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
+            ])
+    await repository.add_task(task_1_b)
+
+    task_2 = AlphaSellChallengeTask(
+        batch_id_2, uuid.uuid4(), datetime.now(UTC), ("miner", 1), 5.0, predictions=[
+            AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+            AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
+        ])
+    await repository.add_task(task_2)
+
+    found_tasks = await repository.find_tasks(batch_id_1)
+    assert len(found_tasks) == 2
+    assert task_1_a in found_tasks
+    assert task_1_b in found_tasks
+    assert task_2 not in found_tasks
+
+
+async def test_find_scorable_challenge_batches(clean_pgsql_engine):
+    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
+
+    batch_id_1 = uuid.uuid4()
+    batch_id_2 = uuid.uuid4()
+
+    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
+    batch_1 = AlphaSellChallengeBatch(batch_id_1, datetime.now(UTC), 42, PredictionInterval(111, 120), ["alice", "bob", "carol"])
+    await repository.add(batch_1)
+
+    batch_2 = AlphaSellChallengeBatch(batch_id_2, datetime.now(UTC), 42, PredictionInterval(121, 130), ["alice", "bob", "carol"])
+    await repository.add(batch_2)
+
+    challenges = await repository.find_scorable_challenges(130)
+    assert len(challenges) == 2
+    assert batch_1 in challenges
+    assert batch_2 in challenges
+
+    challenges = await repository.find_scorable_challenges(120)
+    assert len(challenges) == 1
+    assert batch_1 in challenges
+    assert batch_2 not in challenges

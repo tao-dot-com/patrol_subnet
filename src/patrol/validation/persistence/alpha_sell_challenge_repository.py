@@ -1,12 +1,13 @@
 from datetime import datetime
+from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, ForeignKey
+from sqlalchemy import JSON, DateTime, ForeignKey, select
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
-from sqlalchemy.orm import mapped_column, Mapped, composite, relationship
+from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
 
 from patrol.validation.persistence import Base
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, PredictionInterval, \
-    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch
+    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch, TransactionType
 
 
 class _AlphaSellChallengeBatch(Base):
@@ -16,13 +17,13 @@ class _AlphaSellChallengeBatch(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     subnet_uid: Mapped[int]
     hotkeys_ss58_json: Mapped[list[str]] = mapped_column(type_=JSON)
+    prediction_interval_start: Mapped[int] = mapped_column()
+    prediction_interval_end: Mapped[int] = mapped_column()
 
     prediction_interval: Mapped[PredictionInterval] = composite(
         PredictionInterval,
-        mapped_column("prediction_interval_start"), mapped_column("prediction_interval_end")
+        prediction_interval_start, prediction_interval_end
     )
-    #predictions: Mapped[list["_AlphaSellPrediction"]] = relationship(back_populates="challenge", cascade="all")
-    #response_time: Mapped[float]
 
     @classmethod
     def from_batch(cls, batch: AlphaSellChallengeBatch):
@@ -32,6 +33,12 @@ class _AlphaSellChallengeBatch(Base):
             subnet_uid=batch.subnet_uid,
             hotkeys_ss58_json=batch.hotkeys_ss58,
             prediction_interval=batch.prediction_interval,
+        )
+
+    @property
+    def batch(self) -> AlphaSellChallengeBatch:
+        return AlphaSellChallengeBatch(
+            UUID(self.id), self.created_at, self.subnet_uid, self.prediction_interval, self.hotkeys_ss58_json,
         )
 
 class _AlphaSellChallengeTask(Base):
@@ -57,6 +64,14 @@ class _AlphaSellChallengeTask(Base):
             response_time=task.response_time_seconds,
         )
 
+    @property
+    def task(self):
+        return AlphaSellChallengeTask(
+            UUID(self.batch_id), UUID(self.id), self.created_at,
+            (self.miner_hotkey, self.miner_uid), self.response_time,
+            [it.prediction for it in self.predictions]
+        )
+
 
 class _AlphaSellPrediction(Base):
     __tablename__ = "alpha_sell_prediction"
@@ -66,6 +81,7 @@ class _AlphaSellPrediction(Base):
     transaction_type: Mapped[str]
     amount: Mapped[float]
     hotkey: Mapped[str]
+    coldkey: Mapped[str]
     task: Mapped[_AlphaSellChallengeTask] = relationship(back_populates="predictions")
 
     @classmethod
@@ -73,7 +89,14 @@ class _AlphaSellPrediction(Base):
         return cls(
             amount=prediction.amount,
             hotkey=prediction.wallet_hotkey_ss58,
+            coldkey=prediction.wallet_coldkey_ss58,
             transaction_type=prediction.transaction_type.name
+        )
+
+    @property
+    def prediction(self) -> AlphaSellPrediction:
+        return AlphaSellPrediction(
+            self.hotkey, self.coldkey, TransactionType[self.transaction_type], self.amount
         )
 
 
@@ -92,5 +115,21 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
             await session.commit()
 
     async def find_scorable_challenges(self, upper_block: int) -> list[AlphaSellChallengeBatch]:
-        pass
+        async with self.LocalSession() as session:
+            query = (select(_AlphaSellChallengeBatch)
+                     .where(_AlphaSellChallengeBatch.prediction_interval_end <= upper_block)
+            )
+            results = await session.scalars(query)
+            return [it.batch for it in results]
+
+    async def find_tasks(self, batch_id: UUID) -> list[AlphaSellChallengeTask]:
+        async with self.LocalSession() as session:
+            query = (select(_AlphaSellChallengeTask)
+                     .filter(_AlphaSellChallengeTask.batch_id == str(batch_id))
+                     .outerjoin(_AlphaSellChallengeTask.predictions)
+                     .options(joinedload(_AlphaSellChallengeTask.predictions))
+            )
+            results = await session.scalars(query)
+            tasks = [it.task for it in results.unique()]
+            return tasks
 

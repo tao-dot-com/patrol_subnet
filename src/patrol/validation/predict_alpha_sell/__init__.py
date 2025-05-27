@@ -45,7 +45,11 @@ class AlphaSellChallengeRepository(ABC):
         pass
 
     @abstractmethod
-    async def find_scorable_challenges(self, upper_block: int):
+    async def find_scorable_challenges(self, upper_block: int) -> list[AlphaSellChallengeBatch]:
+        pass
+
+    @abstractmethod
+    async def find_tasks(self, batch_id: UUID) -> list[AlphaSellChallengeTask]:
         pass
 
 

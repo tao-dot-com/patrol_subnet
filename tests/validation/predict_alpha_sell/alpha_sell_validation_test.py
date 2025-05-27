@@ -44,8 +44,8 @@ async def test_validate_exact_predictions(batch):
 
     alpha_sell_validator = AlphaSellValidator(batch, stake_removals)
 
-    score = alpha_sell_validator.score_miner(task)
-    assert score == 1.0
+    mean_square = alpha_sell_validator.score_miner(task)
+    assert mean_square == 1.0
 
 async def test_validate_where_no_movements_exist(batch):
 
@@ -62,8 +62,8 @@ async def test_validate_where_no_movements_exist(batch):
 
     alpha_sell_validator = AlphaSellValidator(batch, stake_removals)
 
-    score = alpha_sell_validator.score_miner(task)
-    assert score == 1.0
+    accuracy = alpha_sell_validator.score_miner(task)
+    assert accuracy == 1 / (1 + (100 ** 2 + 200 ** 2) / 2)
 
 async def test_validate_where_no_predictions_made(batch):
 
@@ -77,5 +77,5 @@ async def test_validate_where_no_predictions_made(batch):
 
     alpha_sell_validator = AlphaSellValidator(batch, stake_removals)
 
-    score = alpha_sell_validator.score_miner(task)
-    assert score == 0.0
+    accuracy = alpha_sell_validator.score_miner(task)
+    assert accuracy == 1 / (1 + (100 ** 2 + 200 ** 2) / 2)

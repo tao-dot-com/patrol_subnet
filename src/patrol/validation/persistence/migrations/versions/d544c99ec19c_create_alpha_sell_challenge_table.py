@@ -40,6 +40,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
         sa.Column("task_id", sa.String, ForeignKey("alpha_sell_challenge_task.id", ondelete="CASCADE"), nullable=False),
         sa.Column("hotkey", sa.String, nullable=False),
+        sa.Column("coldkey", sa.String, nullable=False),
         sa.Column("transaction_type", sa.String, nullable=False),
         sa.Column("amount", sa.Float, nullable=False)
     )
