@@ -7,7 +7,7 @@ from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joine
 
 from patrol.validation.persistence import Base
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, PredictionInterval, \
-    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch, TransactionType
+    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch, TransactionType, AlphaSellChallengeMiner
 
 
 class _AlphaSellChallengeBatch(Base):
@@ -48,6 +48,7 @@ class _AlphaSellChallengeTask(Base):
     batch_id: Mapped[str] = mapped_column(ForeignKey(_AlphaSellChallengeBatch.id, ondelete="CASCADE"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     miner_hotkey: Mapped[str]
+    miner_coldkey: Mapped[str]
     miner_uid: Mapped[int]
     predictions: Mapped[list["_AlphaSellPrediction"]] = relationship(back_populates="task", cascade="all")
     response_time: Mapped[float]
@@ -58,8 +59,9 @@ class _AlphaSellChallengeTask(Base):
             id=str(task.task_id),
             batch_id=str(task.batch_id),
             created_at=task.created_at,
-            miner_hotkey=task.miner[0],
-            miner_uid=task.miner[1],
+            miner_hotkey=task.miner.hotkey,
+            miner_coldkey=task.miner.coldkey,
+            miner_uid=task.miner.uid,
             predictions=[_AlphaSellPrediction.from_prediction(prediction) for prediction in task.predictions],
             response_time=task.response_time_seconds,
         )
@@ -68,7 +70,7 @@ class _AlphaSellChallengeTask(Base):
     def task(self):
         return AlphaSellChallengeTask(
             UUID(self.batch_id), UUID(self.id), self.created_at,
-            (self.miner_hotkey, self.miner_uid), self.response_time,
+            AlphaSellChallengeMiner(self.miner_hotkey, self.miner_coldkey, self.miner_uid), self.response_time,
             [it.prediction for it in self.predictions]
         )
 
@@ -130,6 +132,6 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
                      .options(joinedload(_AlphaSellChallengeTask.predictions))
             )
             results = await session.scalars(query)
-            tasks = [it.task for it in results.unique()]
+            tasks = [it.task for it in results.unique().all()]
             return tasks
 

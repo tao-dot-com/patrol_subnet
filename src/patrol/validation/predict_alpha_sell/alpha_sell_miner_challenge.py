@@ -3,36 +3,24 @@ from datetime import datetime, UTC
 
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, \
-    AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellEventRepository, TransactionType
+    AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 
 
 class AlphaSellValidator:
-    def __init__(self, batch: AlphaSellChallengeBatch, stake_removals):
-        self.batch = batch
-        self.stake_removals = stake_removals
 
-    @classmethod
-    async def create(cls, batch: AlphaSellChallengeBatch, event_repository: AlphaSellEventRepository):
-        stake_removals = event_repository.find_aggregate_stake_movement_by_hotkey(
-            batch.subnet_uid,
-            batch.prediction_interval.start_block, batch.prediction_interval.end_block,
-            TransactionType.STAKE_REMOVED
-        )
-        return cls(batch, stake_removals)
-
-    def score_miner(self, task: AlphaSellChallengeTask) -> float:
+    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, float]) -> float:
         predictions_by_hotkey = {p.wallet_hotkey_ss58: p.amount for p in task.predictions}
 
-        all_hotkeys = set(predictions_by_hotkey.keys() | self.stake_removals.keys())
+        all_hotkeys = set(predictions_by_hotkey.keys() | stake_removals.keys())
 
         square_deltas = []
         total_actual = []
 
         for hk in all_hotkeys:
             predicted = predictions_by_hotkey.get(hk, 0.0)
-            actual_amount = self.stake_removals.get(hk, 0.0)
+            actual_amount = stake_removals.get(hk, 0.0)
             total_actual.append(actual_amount)
             delta = (predicted - actual_amount) ** 2
             square_deltas.append(delta)
@@ -72,7 +60,7 @@ class AlphaSellMinerChallenge:
             task_id=task_id,
             predictions=response.predictions,
             response_time_seconds=response_time,
-            miner=(miner.axon_info.hotkey, miner.uid),
+            miner=AlphaSellChallengeMiner(miner.axon_info.hotkey, miner.axon_info.coldkey, miner.uid),
         )
 
         await self.repository.add(challenge)

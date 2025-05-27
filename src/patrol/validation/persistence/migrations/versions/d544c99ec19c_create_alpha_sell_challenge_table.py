@@ -33,6 +33,7 @@ def upgrade() -> None:
         sa.Column("batch_id", sa.String, ForeignKey("alpha_sell_challenge_batch.id", ondelete="CASCADE"), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('miner_hotkey', sa.String, nullable=False),
+        sa.Column('miner_coldkey', sa.String, nullable=False),
         sa.Column('miner_uid', sa.Integer, nullable=False),
         sa.Column('response_time', sa.Float, nullable=False),
     )

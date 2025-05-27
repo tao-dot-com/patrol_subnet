@@ -70,8 +70,8 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
     ]
 
     miner_client = AsyncMock(AlphaSellMinerClient)
-    validator = AsyncMock(AlphaSellValidator)
-    validator.validate.return_value = True
+    # validator = AsyncMock(AlphaSellValidator)
+    # validator.validate.return_value = True
 
     miner_client.execute_task.return_value = (AlphaSellSynapse(
         batch_id=str(batch_id), task_id=str(task_id), subnet_uid=subnet_uid, prediction_interval=prediction_interval,
@@ -94,3 +94,8 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
     assert task.task_id == task_id
     assert task.predictions == predictions
     assert task.response_time_seconds == 12.3
+    assert task.miner.uid == 123
+    assert task.miner.hotkey == "miner_hk"
+    assert task.miner.coldkey == "miner_ck"
+
+    repository.add.assert_awaited_once_with(task)

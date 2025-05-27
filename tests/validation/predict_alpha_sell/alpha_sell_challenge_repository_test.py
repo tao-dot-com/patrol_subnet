@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.predict_alpha_sell import PredictionInterval, AlphaSellPrediction, \
-    TransactionType, AlphaSellChallengeBatch, AlphaSellChallengeTask
+    TransactionType, AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner
 
 
 @pytest.fixture
@@ -71,7 +71,7 @@ async def test_add_challenge_task(clean_pgsql_engine):
         batch_id=batch.batch_id,
         task_id=uuid.uuid4(),
         created_at=now,
-        miner=("miner", 1),
+        miner=AlphaSellChallengeMiner("miner_hk", "miner_ck", 1),
         predictions=[
             AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
             AlphaSellPrediction("carol", "carol_ck", TransactionType.STAKE_REMOVED, 15.0),
@@ -89,8 +89,9 @@ async def test_add_challenge_task(clean_pgsql_engine):
     assert task_result["id"] == str(task.task_id)
     assert task_result["batch_id"] == str(task.batch_id)
     assert task_result["created_at"] == task.created_at
-    assert task_result["miner_hotkey"] == task.miner[0]
-    assert task_result["miner_uid"] == task.miner[1]
+    assert task_result["miner_hotkey"] == task.miner.hotkey
+    assert task_result["miner_coldkey"] == task.miner.coldkey
+    assert task_result["miner_uid"] == task.miner.uid
     assert task_result["response_time"] == 9.7
 
     async with clean_pgsql_engine.connect() as conn:
@@ -121,21 +122,21 @@ async def test_find_tasks_for_batch(clean_pgsql_engine):
     await repository.add(batch_2)
 
     task_1_a = AlphaSellChallengeTask(
-            batch_id_1, uuid.uuid4(), datetime.now(UTC), ("miner", 1), 5.0, predictions=[
+            batch_id_1, uuid.uuid4(), datetime.now(UTC), AlphaSellChallengeMiner("miner_hk", "miner_ck", 1), 5.0, predictions=[
                AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
                AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
             ])
     await repository.add_task(task_1_a)
 
     task_1_b = AlphaSellChallengeTask(
-            batch_id_1, uuid.uuid4(), datetime.now(UTC), ("miner", 2), 5.0, predictions=[
+            batch_id_1, uuid.uuid4(), datetime.now(UTC), AlphaSellChallengeMiner("miner_hk", "miner_ck", 2), 5.0, predictions=[
                AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
                AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
             ])
     await repository.add_task(task_1_b)
 
     task_2 = AlphaSellChallengeTask(
-        batch_id_2, uuid.uuid4(), datetime.now(UTC), ("miner", 1), 5.0, predictions=[
+        batch_id_2, uuid.uuid4(), datetime.now(UTC), AlphaSellChallengeMiner("miner_hk", "miner_ck", 1), 5.0, predictions=[
             AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
             AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
         ])

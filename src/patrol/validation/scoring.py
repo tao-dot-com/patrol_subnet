@@ -31,6 +31,7 @@ class MinerScore:
     validation_passed: bool
     task_type: TaskType
     error_message: Optional[str] = None
+    accuracy_score: Optional[float] = None
 
     @property
     def miner(self) -> tuple[str, int]:

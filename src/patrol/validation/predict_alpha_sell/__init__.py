@@ -23,6 +23,13 @@ class PredictionInterval:
 
 
 @dataclass(frozen=True)
+class AlphaSellChallengeMiner:
+    hotkey: str
+    coldkey: str
+    uid: int
+
+
+@dataclass(frozen=True)
 class AlphaSellChallengeBatch:
     batch_id: UUID
     created_at: datetime
@@ -35,7 +42,7 @@ class AlphaSellChallengeTask:
     batch_id: UUID
     task_id: UUID
     created_at: datetime
-    miner: tuple[str, int]
+    miner: AlphaSellChallengeMiner
     response_time_seconds: float
     predictions: list[AlphaSellPrediction]
 
@@ -70,5 +77,5 @@ class AlphaSellEventRepository(ABC):
         pass
 
     @abstractmethod
-    async def find_aggregate_stake_movement_by_hotkey(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> list[ChainStakeEvent]:
+    async def find_aggregate_stake_movement_by_hotkey(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> dict[str, int]:
         pass

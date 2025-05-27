@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeTask, AlphaSellChallengeBatch, PredictionInterval, \
-    TransactionType, AlphaSellPrediction, AlphaSellEventRepository
+    TransactionType, AlphaSellPrediction, AlphaSellEventRepository, AlphaSellChallengeMiner
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellValidator
 from patrol.validation.scoring import MinerScoreRepository
 
@@ -21,10 +21,10 @@ def batch():
 
 def make_task(batch_id: uuid.UUID, predictions: list[AlphaSellPrediction]):
     return AlphaSellChallengeTask(
-        batch_id=uuid.uuid4(),
+        batch_id=batch_id,
         task_id=uuid.uuid4(),
         created_at=datetime.now(UTC) - timedelta(days=1),
-        miner=("miner_1", 2),
+        miner=AlphaSellChallengeMiner("miner_1", "miner", 2),
         predictions=predictions,
         response_time_seconds=2.0
     )
@@ -42,9 +42,9 @@ async def test_validate_exact_predictions(batch):
 
     stake_removals = {"alice": 100, "bob": 200}
 
-    alpha_sell_validator = AlphaSellValidator(batch, stake_removals)
+    alpha_sell_validator = AlphaSellValidator()
 
-    mean_square = alpha_sell_validator.score_miner(task)
+    mean_square = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
     assert mean_square == 1.0
 
 async def test_validate_where_no_movements_exist(batch):
@@ -60,9 +60,9 @@ async def test_validate_where_no_movements_exist(batch):
 
     stake_removals = {}
 
-    alpha_sell_validator = AlphaSellValidator(batch, stake_removals)
+    alpha_sell_validator = AlphaSellValidator()
 
-    accuracy = alpha_sell_validator.score_miner(task)
+    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
     assert accuracy == 1 / (1 + (100 ** 2 + 200 ** 2) / 2)
 
 async def test_validate_where_no_predictions_made(batch):
@@ -75,7 +75,7 @@ async def test_validate_where_no_predictions_made(batch):
 
     stake_removals = {"alice": 100, "bob": 200}
 
-    alpha_sell_validator = AlphaSellValidator(batch, stake_removals)
+    alpha_sell_validator = AlphaSellValidator()
 
-    accuracy = alpha_sell_validator.score_miner(task)
+    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
     assert accuracy == 1 / (1 + (100 ** 2 + 200 ** 2) / 2)
