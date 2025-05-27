@@ -190,12 +190,10 @@ class ChainReader:
             delegate_hotkey = self._format_address(details[0])
             return ChainStakeEvent(
                 created_at=datetime.now(UTC),
-                edge_category="SubtensorModule",
-                edge_type="StakeAdded",
+                event_type="StakeAdded",
                 block_number=block_number,
-                delegate_hotkey_destination=delegate_hotkey,
+                hotkey=delegate_hotkey,
                 rao_amount=details[1],
-                coldkey_destination=None
             )
         elif len(details) >= 5:
             # New format
@@ -203,15 +201,13 @@ class ChainReader:
             delegate_hotkey = self._format_address(details[1])
             return ChainStakeEvent(
                 created_at=datetime.now(UTC),
-                edge_category="SubtensorModule",
-                edge_type="StakeAdded",
+                event_type="StakeAdded",
                 block_number=block_number,
-                coldkey_source=coldkey,
-                delegate_hotkey_destination=delegate_hotkey,
+                coldkey=coldkey,
+                hotkey=delegate_hotkey,
                 rao_amount=details[2],
                 alpha_amount=details[3],
-                destination_net_uid=details[4],
-                coldkey_destination=None
+                net_uid=details[4],
             )
         return None
 
@@ -224,12 +220,10 @@ class ChainReader:
             delegate_hotkey = self._format_address(details[0])
             return ChainStakeEvent(
                 created_at=datetime.now(UTC),
-                edge_category="SubtensorModule",
-                edge_type="StakeRemoved",
+                event_type="StakeRemoved",
                 block_number=block_number,
-                delegate_hotkey_source=delegate_hotkey,
+                hotkey=delegate_hotkey,
                 rao_amount=details[1],
-                coldkey_destination=None
             )
         elif len(details) >= 5:
             # New format
@@ -237,14 +231,13 @@ class ChainReader:
             delegate_hotkey = self._format_address(details[1])
             return ChainStakeEvent(
                 created_at=datetime.now(UTC),
-                edge_category="SubtensorModule",
-                edge_type="StakeRemoved",
+                event_type="StakeRemoved",
                 block_number=block_number,
-                coldkey_destination=coldkey,
-                delegate_hotkey_source=delegate_hotkey,
+                coldkey=coldkey,
+                hotkey=delegate_hotkey,
                 rao_amount=details[2],
                 alpha_amount=details[3],
-                source_net_uid=details[4]
+                net_uid=details[4]
             )
         return None
 
@@ -258,14 +251,13 @@ class ChainReader:
             
             return ChainStakeEvent(
                 created_at=datetime.now(UTC),
-                edge_category="SubtensorModule",
-                edge_type="StakeMoved",
+                event_type="StakeMoved",
                 block_number=block_number,
-                coldkey_owner=coldkey,
-                delegate_hotkey_source=source_delegate_hotkey,
-                delegate_hotkey_destination=destination_delegate_hotkey,
-                source_net_uid=details[2],
-                destination_net_uid=details[4],
+                coldkey=coldkey,
+                hotkey=source_delegate_hotkey,
+                # delegate_hotkey_destination=destination_delegate_hotkey,
+                net_uid=details[2],
+                # destination_net_uid=details[4],
                 rao_amount=details[5]
             )
         return None
