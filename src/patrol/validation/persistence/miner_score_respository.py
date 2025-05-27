@@ -28,6 +28,7 @@ class _MinerScore(Base, MappedAsDataclass):
     validation_passed: Mapped[bool]
     error_message: Mapped[Optional[str]]
     task_type: Mapped[Optional[str]]
+    accuracy_score: Mapped[Optional[float]]
 
     @classmethod
     def from_miner_score(cls, miner_score: MinerScore):
@@ -47,7 +48,8 @@ class _MinerScore(Base, MappedAsDataclass):
             novelty_score=miner_score.novelty_score,
             validation_passed=miner_score.validation_passed,
             error_message=miner_score.error_message,
-            task_type=str(miner_score.task_type.value)
+            task_type=str(miner_score.task_type.value),
+            accuracy_score=miner_score.accuracy_score,
         )
 
     @staticmethod
@@ -75,7 +77,8 @@ class _MinerScore(Base, MappedAsDataclass):
             novelty_score=self.novelty_score,
             validation_passed=self.validation_passed,
             error_message=self.error_message,
-            task_type=TaskType[self.task_type] if self.task_type else TaskType.COLDKEY_SEARCH
+            task_type=TaskType[self.task_type] if self.task_type else TaskType.COLDKEY_SEARCH,
+            accuracy_score=self.accuracy_score
         )
 
 

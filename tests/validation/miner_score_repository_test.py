@@ -55,7 +55,8 @@ async def test_add_score_postgres(clean_pgsql_engine):
         novelty_score=3.5,
         validation_passed=False,
         error_message="Oh dear",
-        task_type=TaskType.HOTKEY_OWNERSHIP
+        task_type=TaskType.HOTKEY_OWNERSHIP,
+        accuracy_score=0.8
     )
 
     await repository.add(miner_score)
@@ -81,6 +82,7 @@ async def test_add_score_postgres(clean_pgsql_engine):
     assert score.validation_passed == False
     assert score.error_message == "Oh dear"
     assert score.task_type == 'HOTKEY_OWNERSHIP'
+    assert score.accuracy_score == 0.8
 
 async def test_find_sum_of_previous_overall_scores(clean_pgsql_engine):
     batch_ids = [uuid.uuid4(), uuid.uuid4()]
