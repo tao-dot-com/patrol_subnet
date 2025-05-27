@@ -43,7 +43,7 @@ def upgrade() -> None:
         sa.Column("hotkey", sa.String, nullable=False),
         sa.Column("coldkey", sa.String, nullable=False),
         sa.Column("transaction_type", sa.String, nullable=False),
-        sa.Column("amount", sa.Float, nullable=False)
+        sa.Column("amount", sa.BigInteger, nullable=False)
     )
 
 

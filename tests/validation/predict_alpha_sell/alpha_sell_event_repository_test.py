@@ -24,7 +24,7 @@ async def clean_pgsql_engine(pgsql_engine):
     return pgsql_engine
 
 async def test_add_events(clean_pgsql_engine):
-    event = ChainStakeEvent(datetime.now(UTC), 5000000, "StakeRemoved", "coldkey1", "hotkey1",500, 72, 1000)
+    event = ChainStakeEvent.stake_removed(datetime.now(UTC), 5000000, 500, 1000, 71, "coldkey1", "hotkey1")
     repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
     await repository.add([event])
 
@@ -34,16 +34,17 @@ async def test_add_events(clean_pgsql_engine):
         result = [dict(it._mapping) for it in row][0]
         assert result["created_at"] == event.created_at
         assert result["block_number"] == event.block_number
-        assert result["event_type"] == event.event_type
+        assert result["event_type"] == event.event_type.name
         assert result["coldkey"] == event.coldkey
-        assert result["hotkey"] == event.hotkey
+        assert result["from_hotkey"] == event.from_hotkey
+        assert result["to_hotkey"] is None
         assert result["rao_amount"] == event.rao_amount
         assert result["net_uid"] == event.net_uid
         assert result["alpha_amount"] == event.alpha_amount
 
 
 async def test_add_event_when_alpha_not_present(clean_pgsql_engine):
-    event = ChainStakeEvent(datetime.now(UTC), 5000000, "StakeRemoved", "coldkey1", "hotkey1",500, 72, alpha_amount=None)
+    event = ChainStakeEvent.stake_removed(datetime.now(UTC), 5000000, 500, None, 72, "coldkey1", "hotkey1")
     repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
     await repository.add([event])
 
@@ -55,11 +56,11 @@ async def test_add_event_when_alpha_not_present(clean_pgsql_engine):
 
 async def test_find_aggregate_stake_movement_by_hotkey(clean_pgsql_engine):
     events = [
-        ChainStakeEvent(datetime.now(UTC), 5000000, "StakeRemoved", "coldkey1", "hotkey1", 400, 72, 1000),
-        ChainStakeEvent(datetime.now(UTC), 5000001, "StakeRemoved", "coldkey1", "hotkey1", 500, 72, 1000),
-        ChainStakeEvent(datetime.now(UTC), 5000001, "StakeRemoved", "coldkey1", "hotkey2", 600, 72, 1000),
-        ChainStakeEvent(datetime.now(UTC), 5000010, "StakeRemoved", "coldkey1", "hotkey1", 700, 72, 1000),
-        ChainStakeEvent(datetime.now(UTC), 5000010, "StakeRemoved", "coldkey2", "hotkey4", 800, 70, 1000),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000000, 400, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000001, 500, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000001, 600, 1000, 72, "coldkey1", "hotkey2"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000010, 700, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000010, 800, 1000, 70, "coldkey2", "hotkey4"),
     ]
     repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
     await repository.add(events)
@@ -68,3 +69,25 @@ async def test_find_aggregate_stake_movement_by_hotkey(clean_pgsql_engine):
     assert stake_removed_events.keys() == {"hotkey1", "hotkey2"}
     assert stake_removed_events['hotkey1'] == 400 + 500
     assert stake_removed_events['hotkey2'] == 600
+
+
+async def test_find_most_recent_block(clean_pgsql_engine):
+    events = [
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000000, 400, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000010, 800, 1000, 70, "coldkey2", "hotkey4"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000001, 500, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000010, 700, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000001, 600, 1000, 72, "coldkey1", "hotkey2"),
+    ]
+    repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
+    await repository.add(events)
+
+    most_recent_block = await repository.find_most_recent_block_collected()
+    assert most_recent_block == 5000010
+
+
+async def test_find_most_recent_block_in_empty_database(clean_pgsql_engine):
+    repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
+
+    most_recent_block = await repository.find_most_recent_block_collected()
+    assert most_recent_block is None

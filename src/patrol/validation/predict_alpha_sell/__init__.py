@@ -3,10 +3,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Iterable
+
 
 class TransactionType(Enum):
     STAKE_REMOVED = "StakeRemoved"
+    STAKE_ADDED = "StakeAdded"
+    STAKE_MOVED = "StakeMoved"
 
 @dataclass(frozen=True)
 class AlphaSellPrediction:
@@ -64,12 +67,52 @@ class AlphaSellChallengeRepository(ABC):
 class ChainStakeEvent:
     created_at: datetime
     block_number: int
-    event_type: str
-    coldkey: str
-    hotkey: str
+    event_type: TransactionType
     rao_amount: int
     net_uid: int
+    coldkey: str
+    to_hotkey: Optional[str] = None
+    from_hotkey: Optional[str] = None
     alpha_amount: Optional[int] = None
+
+    @classmethod
+    def stake_added(cls, created_at: datetime, block_number: int, rao_amount: int, alpha_amount: int, net_uid: int, coldkey: str, hotkey: str):
+        return cls(
+            created_at=created_at,
+            block_number=block_number,
+            event_type=TransactionType.STAKE_ADDED,
+            rao_amount=rao_amount,
+            alpha_amount=alpha_amount,
+            net_uid=net_uid,
+            coldkey=coldkey,
+            to_hotkey=hotkey
+        )
+
+    @classmethod
+    def stake_removed(cls, created_at: datetime, block_number: int, rao_amount: int, alpha_amount: int, net_uid: int, coldkey: str, hotkey: str):
+        return cls(
+            created_at=created_at,
+            block_number=block_number,
+            event_type=TransactionType.STAKE_REMOVED,
+            rao_amount=rao_amount,
+            alpha_amount=alpha_amount,
+            net_uid=net_uid,
+            coldkey=coldkey,
+            from_hotkey=hotkey
+        )
+
+    @classmethod
+    def stake_moved(cls, created_at: datetime, block_number: int, rao_amount: int, net_uid: int, coldkey: str, from_hotkey: str, to_hotkey: str):
+        return cls(
+            created_at=created_at,
+            block_number=block_number,
+            event_type=TransactionType.STAKE_MOVED,
+            rao_amount=rao_amount,
+            net_uid=net_uid,
+            coldkey=coldkey,
+            from_hotkey=from_hotkey,
+            to_hotkey=to_hotkey
+        )
 
 class AlphaSellEventRepository(ABC):
     @abstractmethod
@@ -78,4 +121,8 @@ class AlphaSellEventRepository(ABC):
 
     @abstractmethod
     async def find_aggregate_stake_movement_by_hotkey(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> dict[str, int]:
+        pass
+
+    @abstractmethod
+    async def find_most_recent_block_collected(self):
         pass

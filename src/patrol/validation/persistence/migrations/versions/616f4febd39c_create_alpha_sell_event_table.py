@@ -25,8 +25,9 @@ def upgrade() -> None:
                     sa.Column("block_number", sa.Integer),
                     sa.Column("event_type", sa.String), 
                     sa.Column("coldkey", sa.String), 
-                    sa.Column("hotkey", sa.String),
-                    sa.Column("rao_amount", sa.BigInteger), 
+                    sa.Column("from_hotkey", sa.String),
+                    sa.Column("to_hotkey", sa.String),
+                    sa.Column("rao_amount", sa.BigInteger),
                     sa.Column("net_uid", sa.Integer), 
                     sa.Column("alpha_amount", sa.BigInteger, nullable=True))
     
