@@ -110,4 +110,4 @@ async def test_prune_events(clean_pgsql_engine):
     async with clean_pgsql_engine.connect() as conn:
         min_block = await conn.execute(text("SELECT DISTINCT(block_number) FROM alpha_sell_event"))
         assert min_block.rowcount == 3
-        assert min_block.scalars().all() == [5000002, 5000003, 5000004]
+        assert set(min_block.scalars().all()) == {5000002, 5000003, 5000004}

@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from patrol.constants import TaskType
 from patrol.validation.chain.chain_utils import ChainUtils
-from patrol.validation.config import SCORING_INTERVAL_SECONDS
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
@@ -107,7 +106,7 @@ class AlphaSellScoring:
 def start_scoring(wallet: Wallet, enable_dashboard_syndication: bool):
 
     async def start_scoring_async():
-        from patrol.validation.config import DB_URL, DASHBOARD_BASE_URL, ARCHIVE_SUBTENSOR
+        from patrol.validation.config import DB_URL, DASHBOARD_BASE_URL, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS
         engine = create_async_engine(DB_URL, pool_pre_ping=True)
 
         challenge_repository = DatabaseAlphaSellChallengeRepository(engine)

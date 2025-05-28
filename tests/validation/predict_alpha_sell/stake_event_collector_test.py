@@ -23,7 +23,7 @@ async def test_collect_real_events():
 
     engine = create_async_engine("postgresql+asyncpg://patrol:password@localhost:5432/patrol")
     event_repository = DataBaseAlphaSellEventRepository(engine)
-    event_collector = StakeEventCollector(chain_reader, event_repository)
+    event_collector = StakeEventCollector(chain_reader, event_repository, AsyncMock())
 
     await event_collector.collect_events()
 
@@ -33,14 +33,14 @@ async def test_collect_events():
     events_collected = [
         ChainStakeEvent.stake_removed(datetime.now(), 1000000, 100, 1000, 1, "coldkey1", "hotkey1"),
         ChainStakeEvent.stake_added(datetime.now(), 1000001, 100, 1000, 1, "coldkey1", "hotkey1"),
-        ChainStakeEvent.stake_moved(datetime.now(), 1000002, 100, 1, "coldkey1", "hotkey1", "hotkey2"),
+        ChainStakeEvent.stake_moved(datetime.now(), 1000002, 100, 1, 2, "coldkey1", "hotkey1", "hotkey2"),
     ]
 
     chain_reader.find_stake_events.return_value = events_collected
     chain_reader.get_current_block.return_value = 1000003
 
     event_repository = AsyncMock(AlphaSellEventRepository)
-    event_collector = StakeEventCollector(chain_reader, event_repository)
+    event_collector = StakeEventCollector(chain_reader, event_repository, AsyncMock())
     event_repository.find_most_recent_block_collected.return_value = 1000000 - 500
 
     await event_collector.collect_events()
