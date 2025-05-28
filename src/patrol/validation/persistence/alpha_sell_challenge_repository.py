@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, ForeignKey, select
+from sqlalchemy import JSON, DateTime, ForeignKey, select, func
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
 
@@ -134,4 +134,11 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
             results = await session.scalars(query)
             tasks = [it.task for it in results.unique().all()]
             return tasks
+
+    async def find_earliest_prediction_block(self) -> int:
+        async with self.LocalSession() as session:
+            query = select(func.min(_AlphaSellChallengeBatch.prediction_interval_start))
+            result = await session.scalar(query)
+            return result
+
 

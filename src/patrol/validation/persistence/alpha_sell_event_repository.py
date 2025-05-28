@@ -2,7 +2,7 @@ from patrol.validation.predict_alpha_sell import ChainStakeEvent, AlphaSellEvent
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from patrol.validation.persistence import Base
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import BigInteger
+from sqlalchemy import BigInteger, delete
 from sqlalchemy import DateTime, select, between, func
 from datetime import datetime
 from typing import Optional
@@ -69,3 +69,10 @@ class DataBaseAlphaSellEventRepository(AlphaSellEventRepository):
             query = select(func.max(_ChainStakeEvent.block_number))
             result = await session.execute(query)
             return result.scalar()
+
+    async def delete_events_before_block(self, earliest_block):
+        async with self.LocalSession() as session:
+            query = delete(_ChainStakeEvent).where(_ChainStakeEvent.block_number < earliest_block)
+            deleted = await session.execute(query)
+            await session.commit()
+            return deleted.rowcount

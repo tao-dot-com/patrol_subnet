@@ -92,3 +92,22 @@ async def test_find_most_recent_block_in_empty_database(clean_pgsql_engine):
 
     most_recent_block = await repository.find_most_recent_block_collected()
     assert most_recent_block is None
+
+async def test_prune_events(clean_pgsql_engine):
+    events = [
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000000, 400, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000001, 800, 1000, 70, "coldkey2", "hotkey4"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000002, 500, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000003, 700, 1000, 72, "coldkey1", "hotkey1"),
+        ChainStakeEvent.stake_removed(datetime.now(UTC), 5000004, 600, 1000, 72, "coldkey1", "hotkey2"),
+    ]
+    repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
+    await repository.add(events)
+
+    deleted_count = await repository.delete_events_before_block(5000002)
+    assert deleted_count == 2
+
+    async with clean_pgsql_engine.connect() as conn:
+        min_block = await conn.execute(text("SELECT DISTINCT(block_number) FROM alpha_sell_event"))
+        assert min_block.rowcount == 3
+        assert min_block.scalars().all() == [5000002, 5000003, 5000004]

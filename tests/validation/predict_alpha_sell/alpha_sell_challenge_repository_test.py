@@ -171,3 +171,22 @@ async def test_find_scorable_challenge_batches(clean_pgsql_engine):
     assert len(challenges) == 1
     assert batch_1 in challenges
     assert batch_2 not in challenges
+
+async def test_find_earliest_prediction_block(clean_pgsql_engine):
+    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
+
+    await repository.add(AlphaSellChallengeBatch(
+        uuid.uuid4(),
+        datetime.now(UTC),
+        42, PredictionInterval(100, 120),
+        ["alice", "bob", "carol"],
+    ))
+    await repository.add(AlphaSellChallengeBatch(
+        uuid.uuid4(),
+        datetime.now(UTC),
+        42, PredictionInterval(115, 125),
+        ["alice", "bob", "carol"],
+    ))
+
+    earliest_block = await repository.find_earliest_prediction_block()
+    assert earliest_block == 100

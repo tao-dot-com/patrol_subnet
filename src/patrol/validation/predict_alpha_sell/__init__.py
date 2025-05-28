@@ -62,6 +62,10 @@ class AlphaSellChallengeRepository(ABC):
     async def find_tasks(self, batch_id: UUID) -> list[AlphaSellChallengeTask]:
         pass
 
+    @abstractmethod
+    async def find_earliest_prediction_block(self):
+        pass
+
 
 @dataclass(frozen=True)
 class ChainStakeEvent:
@@ -127,4 +131,8 @@ class AlphaSellEventRepository(ABC):
 
     @abstractmethod
     async def find_most_recent_block_collected(self):
+        pass
+
+    @abstractmethod
+    async def delete_events_before_block(self, earliest_block):
         pass
