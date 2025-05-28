@@ -69,8 +69,9 @@ class ChainStakeEvent:
     block_number: int
     event_type: TransactionType
     rao_amount: int
-    net_uid: int
     coldkey: str
+    from_net_uid: Optional[int] = None
+    to_net_uid: Optional[int] = None
     to_hotkey: Optional[str] = None
     from_hotkey: Optional[str] = None
     alpha_amount: Optional[int] = None
@@ -83,7 +84,7 @@ class ChainStakeEvent:
             event_type=TransactionType.STAKE_ADDED,
             rao_amount=rao_amount,
             alpha_amount=alpha_amount,
-            net_uid=net_uid,
+            to_net_uid=net_uid,
             coldkey=coldkey,
             to_hotkey=hotkey
         )
@@ -96,19 +97,20 @@ class ChainStakeEvent:
             event_type=TransactionType.STAKE_REMOVED,
             rao_amount=rao_amount,
             alpha_amount=alpha_amount,
-            net_uid=net_uid,
+            from_net_uid=net_uid,
             coldkey=coldkey,
             from_hotkey=hotkey
         )
 
     @classmethod
-    def stake_moved(cls, created_at: datetime, block_number: int, rao_amount: int, net_uid: int, coldkey: str, from_hotkey: str, to_hotkey: str):
+    def stake_moved(cls, created_at: datetime, block_number: int, rao_amount: int, from_net_uid: int, to_net_uid: int, coldkey: str, from_hotkey: str, to_hotkey: str):
         return cls(
             created_at=created_at,
             block_number=block_number,
             event_type=TransactionType.STAKE_MOVED,
             rao_amount=rao_amount,
-            net_uid=net_uid,
+            from_net_uid=from_net_uid,
+            to_net_uid=to_net_uid,
             coldkey=coldkey,
             from_hotkey=from_hotkey,
             to_hotkey=to_hotkey

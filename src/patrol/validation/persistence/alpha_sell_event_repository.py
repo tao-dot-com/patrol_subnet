@@ -18,7 +18,8 @@ class _ChainStakeEvent(Base):
     from_hotkey:  Mapped[Optional[str]]
     to_hotkey:  Mapped[Optional[str]]
     rao_amount:  Mapped[int] = mapped_column(BigInteger)
-    net_uid:  Mapped[int]
+    from_net_uid:  Mapped[Optional[int]]
+    to_net_uid:  Mapped[Optional[int]]
     alpha_amount:  Mapped[Optional[int]] = mapped_column(BigInteger)
 
     @classmethod
@@ -31,7 +32,8 @@ class _ChainStakeEvent(Base):
             from_hotkey=event.from_hotkey,
             to_hotkey=event.to_hotkey,
             rao_amount=event.rao_amount,
-            net_uid=event.net_uid,
+            from_net_uid=event.from_net_uid,
+            to_net_uid=event.to_net_uid,
             alpha_amount=event.alpha_amount
         )
 
@@ -53,7 +55,7 @@ class DataBaseAlphaSellEventRepository(AlphaSellEventRepository):
                 group_by,
                 func.sum(_ChainStakeEvent.rao_amount).label("rao_amount"),
             ).filter(
-                _ChainStakeEvent.net_uid == subnet_id,
+                _ChainStakeEvent.from_net_uid == subnet_id,
                 _ChainStakeEvent.event_type == transaction_type.name,
                 _ChainStakeEvent.block_number.between(lower_block, upper_block)
             ).group_by(group_by)

@@ -236,7 +236,8 @@ class ChainReader:
             coldkey=coldkey,
             from_hotkey=source_delegate_hotkey,
             to_hotkey=destination_delegate_hotkey,
-            net_uid=details[2],
+            from_net_uid=details[2],
+            to_net_uid=details[4],
             rao_amount=details[5]
         )
 

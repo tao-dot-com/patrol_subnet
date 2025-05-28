@@ -39,7 +39,8 @@ async def test_add_events(clean_pgsql_engine):
         assert result["from_hotkey"] == event.from_hotkey
         assert result["to_hotkey"] is None
         assert result["rao_amount"] == event.rao_amount
-        assert result["net_uid"] == event.net_uid
+        assert result["from_net_uid"] == event.from_net_uid
+        assert result["to_net_uid"] == event.to_net_uid
         assert result["alpha_amount"] == event.alpha_amount
 
 
