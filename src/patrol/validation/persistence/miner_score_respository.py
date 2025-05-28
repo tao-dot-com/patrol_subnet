@@ -101,11 +101,6 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             do_add(session)
 
 
-    async def add(self, score: MinerScore):
-        async with self.LocalAsyncSession() as session:
-            await self.add_in_session(score, session)
-            await session.commit()
-
     async def find_latest_overall_scores(self, miner: tuple[str, int], task_type: TaskType, batch_count: int = 19) -> Iterable[float]:
         async with self.LocalAsyncSession() as session:
             query = select(_MinerScore.overall_score).filter(
