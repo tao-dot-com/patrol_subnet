@@ -4,7 +4,7 @@ from datetime import datetime, UTC
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
@@ -190,3 +190,38 @@ async def test_find_earliest_prediction_block(clean_pgsql_engine):
 
     earliest_block = await repository.find_earliest_prediction_block()
     assert earliest_block == 100
+
+async def test_mark_task_scored(clean_pgsql_engine):
+    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
+
+    batch_id = uuid.uuid4()
+
+    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
+    batch_1 = AlphaSellChallengeBatch(batch_id, datetime.now(UTC), 42, PredictionInterval(100, 120), ["alice", "bob", "carol"])
+    await repository.add(batch_1)
+
+    task_1 = AlphaSellChallengeTask(
+        batch_id, uuid.uuid4(), datetime.now(UTC), AlphaSellChallengeMiner("miner_hk", "miner_ck", 1), 5.0, predictions=[
+            AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+            AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
+        ])
+    await repository.add_task(task_1)
+
+    task_2 = AlphaSellChallengeTask(
+        batch_id, uuid.uuid4(), datetime.now(UTC), AlphaSellChallengeMiner("miner_hk", "miner_ck", 2), 5.0, predictions=[
+            AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
+            AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 25.0),
+        ])
+    await repository.add_task(task_2)
+
+    scorable_tasks = await repository.find_tasks(batch_id)
+    assert len(scorable_tasks) == 2
+
+    async with async_sessionmaker(clean_pgsql_engine).begin() as session:
+        await repository.mark_task_scored(task_1.task_id, session)
+
+    scorable_tasks = await repository.find_tasks(batch_id)
+    assert len(scorable_tasks) == 1
+    assert task_1 not in scorable_tasks
+    assert task_2 in scorable_tasks
+

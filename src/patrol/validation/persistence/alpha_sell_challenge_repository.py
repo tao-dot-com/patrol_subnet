@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, ForeignKey, select, func
+from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
 
@@ -52,6 +52,7 @@ class _AlphaSellChallengeTask(Base):
     miner_uid: Mapped[int]
     predictions: Mapped[list["_AlphaSellPrediction"]] = relationship(back_populates="task", cascade="all")
     response_time: Mapped[float]
+    is_scored: Mapped[bool] = mapped_column(default=False)
 
     @classmethod
     def from_task(cls, task: AlphaSellChallengeTask):
@@ -127,7 +128,10 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
     async def find_tasks(self, batch_id: UUID) -> list[AlphaSellChallengeTask]:
         async with self.LocalSession() as session:
             query = (select(_AlphaSellChallengeTask)
-                     .filter(_AlphaSellChallengeTask.batch_id == str(batch_id))
+                     .filter(
+                        _AlphaSellChallengeTask.batch_id == str(batch_id),
+                        _AlphaSellChallengeTask.is_scored == False
+                     )
                      .outerjoin(_AlphaSellChallengeTask.predictions)
                      .options(joinedload(_AlphaSellChallengeTask.predictions))
             )
@@ -141,4 +145,9 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
             result = await session.scalar(query)
             return result
 
-
+    async def mark_task_scored(self, task_id, session):
+        query = (update(_AlphaSellChallengeTask)
+            .where(_AlphaSellChallengeTask.id == str(task_id))
+            .values(is_scored=True)
+         )
+        await session.execute(query)

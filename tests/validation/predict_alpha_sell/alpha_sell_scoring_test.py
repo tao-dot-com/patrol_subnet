@@ -1,10 +1,13 @@
 import uuid
 from datetime import datetime, UTC, timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, ANY
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from patrol.constants import TaskType
 from patrol.validation.chain.chain_utils import ChainUtils
 from patrol.validation.dashboard import DashboardClient
+from patrol.validation.persistence.transaction_helper import TransactionHelper
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, AlphaSellEventRepository, \
     AlphaSellChallengeBatch, PredictionInterval, AlphaSellChallengeTask, AlphaSellChallengeMiner, \
     AlphaSellPrediction, TransactionType
@@ -51,8 +54,16 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     validator = AsyncMock(AlphaSellValidator)
     validator.score_miner_accuracy.return_value = 0.8
 
+    transaction_helper = AsyncMock(TransactionHelper)
+    mock_session = AsyncMock(AsyncSession)
+    async def side_effect(func):
+        await func(mock_session)
+
+    transaction_helper.do_in_transaction = AsyncMock(side_effect=side_effect)
+
     scoring = AlphaSellScoring(
-        challenge_repository, scoring_repository, chain_utils, event_repository, validator, dashboard_client
+        challenge_repository, scoring_repository, chain_utils, event_repository, validator, dashboard_client,
+        transaction_helper,
     )
     await scoring.score_miners()
 
@@ -77,4 +88,7 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     assert score_1.task_type == TaskType.PREDICT_ALPHA_SELL
     assert score_1.overall_score == expected_overall_score
     assert score_1.accuracy_score == expected_accuracy_score
+
+    scoring_repository.add.assert_awaited_once_with(ANY, mock_session)
+    challenge_repository.mark_task_scored.assert_awaited_once_with(task_id, mock_session)
 

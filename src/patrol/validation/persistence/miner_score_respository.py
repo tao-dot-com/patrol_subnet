@@ -1,6 +1,6 @@
 from patrol.constants import TaskType
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine, AsyncSession
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass
 from sqlalchemy import DateTime, select, func
 from datetime import datetime, UTC
@@ -87,10 +87,23 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
     def __init__(self, engine: AsyncEngine):
         self.LocalAsyncSession = async_sessionmaker(bind=engine)
 
+    async def add(self, score: MinerScore, session: AsyncSession = None):
+
+        def do_add(sess):
+            obj = _MinerScore.from_miner_score(score)
+            sess.add(obj)
+
+        if session is None:
+            async with self.LocalAsyncSession() as session:
+                do_add(session)
+                await session.commit()
+        else:
+            do_add(session)
+
+
     async def add(self, score: MinerScore):
         async with self.LocalAsyncSession() as session:
-            obj = _MinerScore.from_miner_score(score)
-            session.add(obj)
+            await self.add_in_session(score, session)
             await session.commit()
 
     async def find_latest_overall_scores(self, miner: tuple[str, int], task_type: TaskType, batch_count: int = 19) -> Iterable[float]:

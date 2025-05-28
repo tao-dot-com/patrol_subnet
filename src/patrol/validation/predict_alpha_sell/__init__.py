@@ -66,6 +66,10 @@ class AlphaSellChallengeRepository(ABC):
     async def find_earliest_prediction_block(self):
         pass
 
+    @abstractmethod
+    async def mark_task_scored(self, task_id, session):
+        pass
+
 
 @dataclass(frozen=True)
 class ChainStakeEvent:

@@ -17,6 +17,7 @@ from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
+from patrol.validation.persistence.transaction_helper import TransactionHelper
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeTask, AlphaSellChallengeRepository, \
     AlphaSellEventRepository, AlphaSellChallengeBatch, TransactionType
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellValidator
@@ -34,6 +35,7 @@ class AlphaSellScoring:
             alpha_sell_event_repository: AlphaSellEventRepository,
             alpha_sell_validator: AlphaSellValidator,
             dashboard_client: DashboardClient | None,
+            transaction_helper: TransactionHelper,
     ):
         self.challenge_repository = challenge_repository
         self.miner_score_repository = miner_score_repository
@@ -41,6 +43,7 @@ class AlphaSellScoring:
         self.alpha_sell_event_repository = alpha_sell_event_repository
         self.alpha_sell_validator = alpha_sell_validator
         self.dashboard_client = dashboard_client
+        self.transaction_helper = transaction_helper
 
     async def score_miners(self):
         upper_block = (await self.chain_utils.get_current_block()) - 1
@@ -72,7 +75,12 @@ class AlphaSellScoring:
         accuracy = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
         miner_score = self._make_miner_score(task, accuracy)
 
-        await self.miner_score_repository.add(miner_score)
+        async def add_score(session):
+            await self.miner_score_repository.add(miner_score, session)
+            await self.challenge_repository.mark_task_scored(task.task_id, session)
+
+        await self.transaction_helper.do_in_transaction(add_score)
+
         logger.info("Scored miner", extra=dataclasses.asdict(miner_score))
 
         if self.dashboard_client:

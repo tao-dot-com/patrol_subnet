@@ -41,7 +41,7 @@ class MinerScore:
 class MinerScoreRepository(ABC):
 
     @abstractmethod
-    async def add(self, score: MinerScore):
+    async def add(self, score: MinerScore, session = None):
         pass
 
     @abstractmethod
