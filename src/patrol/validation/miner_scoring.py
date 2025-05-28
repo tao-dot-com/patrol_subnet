@@ -111,9 +111,8 @@ class MinerScoring:
         )
 
     async def calculate_zero_score(self, batch_id, uid, coldkey, hotkey, error_message):
-        previous_overall_scores = await self.miner_score_repository.find_latest_overall_scores(
-            (hotkey, uid), self.moving_average_denominator - 1
-        )
+
+        overall_score_moving_average = await self._moving_average(0.0, (hotkey, uid))
 
         return MinerScore(
             id=uuid.uuid4(),
@@ -122,7 +121,7 @@ class MinerScoring:
             uid=uid,
             coldkey=coldkey,
             hotkey=hotkey,
-            overall_score_moving_average=(sum(previous_overall_scores) + 0) / self.moving_average_denominator,
+            overall_score_moving_average=overall_score_moving_average,
             overall_score=0,
             volume_score=0,
             volume=0,
