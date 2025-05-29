@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import logging
 import multiprocessing
 import uuid
@@ -75,7 +76,6 @@ class AlphaSellMinerChallenge:
                     created_at=now,
                     task_id=task_id,
                     predictions=synapse.predictions,
-                    response_time_seconds=0.0,
                     miner=AlphaSellChallengeMiner(miner.axon_info.hotkey, miner.axon_info.coldkey, miner.uid),
                 )
                 yield task
@@ -125,9 +125,13 @@ class AlphaSellMinerChallengeProcess:
         subnets = await self.subtensor.get_subnets()
         batches = [await self._make_batch(prediction_interval, net_uid) for net_uid in subnets]
 
+        for batch in batches:
+            await self.challenge_repository.add(batch)
+
         for miner in miners_to_challenge:
             async for task in self.miner_challenge.execute_challenge(miner, batches):
-                await self.challenge_repository.add(task)
+                await self.challenge_repository.add_task(task)
+                logger.info("Received task response from miner", extra={'miner': miner.axon_info})
 
         logger.info("Miner Challenges complete.")
 
@@ -138,10 +142,9 @@ class AlphaSellMinerChallengeProcess:
         return AlphaSellChallengeBatch(batch_id, datetime.now(UTC), net_uid, prediction_interval, hotkeys_ss58)
 
 
-async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor):
-    from patrol.validation.config import DB_URL
+async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
 
-    engine = create_async_engine(DB_URL)
+    engine = create_async_engine(db_url)
     challenge_repository = DatabaseAlphaSellChallengeRepository(engine)
     dendrite = bt.Dendrite(wallet)
     miner_client = AlphaSellMinerClient(dendrite)
@@ -152,22 +155,24 @@ async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor):
     while True:
         try:
             await process.challenge_miners()
-            await asyncio.sleep(3600)
         except Exception as ex:
             logger.exception("Unexpected error")
+        finally:
+            await asyncio.sleep(3600)
 
-async def run(wallet: Wallet, subtensor: AsyncSubtensor):
+async def run(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
     if subtensor:
-        await run_forever(wallet, subtensor)
+        await run_forever(wallet, subtensor, db_url)
     else:
         from patrol.validation.config import ARCHIVE_SUBTENSOR
         async with AsyncSubtensor(ARCHIVE_SUBTENSOR) as st:
-            await run_forever(wallet, st)
+            await run_forever(wallet, st, db_url)
 
 
-def start_process(wallet: Wallet, subtensor: AsyncSubtensor | None = None):
+def start_process(wallet: Wallet, subtensor: AsyncSubtensor | None = None, db_url: str | None = None):
     def run_async():
-        asyncio.run(run(wallet, subtensor))
+        from patrol.validation.config import DB_URL
+        asyncio.run(run(wallet, subtensor, db_url if db_url else DB_URL))
 
     process = multiprocessing.Process(target=run_async, daemon=True)
     process.start()

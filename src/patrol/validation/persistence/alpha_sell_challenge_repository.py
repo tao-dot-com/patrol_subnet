@@ -51,7 +51,7 @@ class _AlphaSellChallengeTask(Base):
     miner_coldkey: Mapped[str]
     miner_uid: Mapped[int]
     predictions: Mapped[list["_AlphaSellPrediction"]] = relationship(back_populates="task", cascade="all")
-    response_time: Mapped[float]
+    response_time: Mapped[float] = mapped_column(default=0.0)
     is_scored: Mapped[bool] = mapped_column(default=False)
 
     @classmethod
@@ -63,15 +63,14 @@ class _AlphaSellChallengeTask(Base):
             miner_hotkey=task.miner.hotkey,
             miner_coldkey=task.miner.coldkey,
             miner_uid=task.miner.uid,
-            predictions=[_AlphaSellPrediction.from_prediction(prediction) for prediction in task.predictions],
-            response_time=task.response_time_seconds,
+            predictions=[] if not task.predictions else [_AlphaSellPrediction.from_prediction(prediction) for prediction in task.predictions],
         )
 
     @property
     def task(self):
         return AlphaSellChallengeTask(
             UUID(self.batch_id), UUID(self.id), self.created_at,
-            AlphaSellChallengeMiner(self.miner_hotkey, self.miner_coldkey, self.miner_uid), self.response_time,
+            AlphaSellChallengeMiner(self.miner_hotkey, self.miner_coldkey, self.miner_uid),
             [it.prediction for it in self.predictions]
         )
 

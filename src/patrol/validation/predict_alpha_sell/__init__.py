@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
-from typing import Optional, Iterable
+from typing import Optional
 
 
 class TransactionType(Enum):
@@ -46,12 +46,15 @@ class AlphaSellChallengeTask:
     task_id: UUID
     created_at: datetime
     miner: AlphaSellChallengeMiner
-    response_time_seconds: float
     predictions: list[AlphaSellPrediction]
 
 class AlphaSellChallengeRepository(ABC):
     @abstractmethod
-    async def add(self, challenge):
+    async def add(self, challenge: AlphaSellChallengeBatch):
+        pass
+
+    @abstractmethod
+    async def add_task(self, challenge: AlphaSellChallengeTask):
         pass
 
     @abstractmethod

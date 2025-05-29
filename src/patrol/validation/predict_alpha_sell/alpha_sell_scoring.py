@@ -88,21 +88,21 @@ class AlphaSellScoring:
 
 
     def _make_miner_score(self, task: AlphaSellChallengeTask, accuracy: float) -> MinerScore:
-        responsiveness_score = 2 / (2 + task.response_time_seconds)
+        #responsiveness_score = 2 / (2 + task.response_time_seconds)
         accuracy_score = accuracy # FIXME: this is wrong
 
-        overall_score = (9 * accuracy_score + responsiveness_score) / 10
+        overall_score = accuracy_score # + responsiveness_score) / 10
 
         return MinerScore(
             id=task.task_id, batch_id=task.batch_id, created_at=datetime.now(UTC),
             uid=task.miner.uid,
             coldkey=task.miner.coldkey,
             hotkey=task.miner.hotkey,
-            responsiveness_score=responsiveness_score,
+            responsiveness_score=0.0,
             accuracy_score=accuracy_score,
             volume=0,
             volume_score=0.0,
-            response_time_seconds=task.response_time_seconds,
+            response_time_seconds=0.0,
             novelty_score=0.0,
             validation_passed=True,
             error_message=None,

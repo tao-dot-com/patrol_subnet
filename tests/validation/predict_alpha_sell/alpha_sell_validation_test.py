@@ -26,7 +26,6 @@ def make_task(batch_id: uuid.UUID, predictions: list[AlphaSellPrediction]):
         created_at=datetime.now(UTC) - timedelta(days=1),
         miner=AlphaSellChallengeMiner("miner_1", "miner", 2),
         predictions=predictions,
-        response_time_seconds=2.0
     )
 
 async def test_validate_exact_predictions(batch):

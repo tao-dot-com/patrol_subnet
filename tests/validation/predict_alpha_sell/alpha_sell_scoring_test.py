@@ -39,7 +39,6 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     challenge_repository.find_tasks.return_value = [
         AlphaSellChallengeTask(batch_id=batch_id, task_id=task_id, created_at=task_created_at,
                                miner=AlphaSellChallengeMiner("miner", "miner_ck", 42),
-                               response_time_seconds=2.0,
                                predictions=[
                                    AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 100),
                                    AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 20),
@@ -68,8 +67,7 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     await scoring.score_miners()
 
     expected_accuracy_score = 0.8
-    expected_responsiveness_score = 0.5
-    expected_overall_score = (9 * expected_accuracy_score + expected_responsiveness_score) / 10
+    expected_overall_score = expected_accuracy_score
 
     score_1: MinerScore = scoring_repository.add.mock_calls[0].args[0]
     assert score_1.id == task_id
@@ -79,9 +77,9 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     assert score_1.hotkey == "miner"
     assert score_1.volume == 0
     assert score_1.novelty_score == 0.0
-    assert score_1.responsiveness_score == expected_responsiveness_score
+    assert score_1.responsiveness_score == 0.0
     assert score_1.created_at == now
-    assert score_1.response_time_seconds == 2.0
+    assert score_1.response_time_seconds == 0.0
     assert score_1.validation_passed
     assert score_1.error_message is None
     assert score_1.overall_score_moving_average == 0.0
