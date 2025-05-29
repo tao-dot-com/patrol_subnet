@@ -1,4 +1,5 @@
-import time
+import asyncio
+from uuid import UUID
 
 import aiohttp
 from bittensor import AxonInfo, Dendrite
@@ -12,33 +13,26 @@ class AlphaSellMinerClient:
         self._dendrite = dendrite
         self._timeout_seconds = timeout_seconds
 
-    async def execute_task(self, miner: AxonInfo, synapse: AlphaSellSynapse) -> tuple[AlphaSellSynapse, float]:
+    async def execute_tasks(self, miner: AxonInfo, synapses: list[AlphaSellSynapse]) -> list[tuple[UUID, UUID, AlphaSellSynapse]]:
 
+        async with aiohttp.ClientSession(base_url=f"http://{miner.ip}:{miner.port}") as session:
+            tasks = [self._execute_task(session, miner, synapse) for synapse in synapses]
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
+
+    async def _execute_task(self, session, miner: AxonInfo, synapse: AlphaSellSynapse) -> tuple[UUID, UUID, AlphaSellSynapse]:
         processed_synapse = self._dendrite.preprocess_synapse_for_request(miner, synapse)
-        url = f"http://{miner.ip}:{miner.port}/{synapse.name}"
+
+        uri = f"/{synapse.name}"
         headers = processed_synapse.to_headers()
         json_body = processed_synapse.model_dump()
 
-        trace_config = aiohttp.TraceConfig()
-        timings = {}
-
-        @trace_config.on_request_chunk_sent.append
-        async def on_request_start(sess, ctx, params):
-            timings['request_start'] = time.perf_counter()
-
-        @trace_config.on_response_chunk_received.append
-        async def on_response_end(sess, ctx, params):
-            if 'response_received' not in timings:
-                timings['response_received'] = time.perf_counter()
-
         try:
-            async with aiohttp.ClientSession(trace_configs=[trace_config]) as session:
-                response = await session.post(url, headers=headers, json=json_body, timeout=self._timeout_seconds, ssl=False)
-                if not response.ok:
-                    raise MinerTaskException(f"Error: {response.reason}; status {response.status}")
-                response_synapse = AlphaSellSynapse.model_validate_json(await response.text())
-                response_time = timings['response_received'] - timings['request_start']
-                return response_synapse, response_time
+            response = await session.post(uri, headers=headers, json=json_body, timeout=self._timeout_seconds, ssl=False)
+            if not response.ok:
+                raise MinerTaskException(f"Error: {response.reason}; status {response.status}")
+            response_synapse = AlphaSellSynapse.model_validate_json(await response.text())
+            return UUID(synapse.batch_id), UUID(synapse.task_id), response_synapse
         except TimeoutError:
             raise MinerTaskException("Timeout")
         except Exception as ex:

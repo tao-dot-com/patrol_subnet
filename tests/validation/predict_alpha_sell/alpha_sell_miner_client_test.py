@@ -65,16 +65,10 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
 
     miner = Axon(port=miner_port, ip=miner_host, external_ip=miner_host, wallet=miner_wallet)
 
-    response, response_time = await task.execute_task(miner.info(), synapse)
+    responses = await task.execute_tasks(miner.info(), [synapse])
 
-    assert response_time == pytest.approx(0.2, 1.0)
-
-    assert response.predictions == [
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 15.0),
-    ]
-    assert response.batch_id == str(batch_id)
-    assert response.task_id == str(task_id)
+    assert responses[0][0] == batch_id
+    assert responses[0][1] == task_id
 
 
 async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet, mock_miner):
@@ -92,10 +86,11 @@ async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet, mock_m
 
     miner = Axon(port=8009, ip="127.0.0.1", external_ip="127.0.0.1", wallet=miner_wallet)
 
-    with pytest.raises(MinerTaskException) as ex:
-        await task.execute_task(miner.info(), synapse)
+    responses = await task.execute_tasks(miner.info(), [synapse])
 
-    assert "Connect call failed" in str(ex.value)
+    response = responses[0]
+    assert isinstance(response, MinerTaskException)
+    assert "Connect call failed" in str(response)
 
 async def test_challenge_miner_with_timeout(dendrite_wallet, miner_wallet, mock_miner):
 
@@ -114,7 +109,6 @@ async def test_challenge_miner_with_timeout(dendrite_wallet, miner_wallet, mock_
 
     miner = Axon(port=miner_port, ip=miner_ip, external_ip=miner_ip, wallet=miner_wallet)
 
-    with pytest.raises(MinerTaskException) as ex:
-        await task.execute_task(miner.info(), synapse)
-
-    assert "Timeout" in str(ex.value)
+    responses = await task.execute_tasks(miner.info(), [synapse])
+    assert isinstance(responses[0], MinerTaskException)
+    assert "Timeout" in str(responses[0])

@@ -122,6 +122,7 @@ def start_scoring(wallet: Wallet, enable_dashboard_syndication: bool):
         alpha_sell_validator = AlphaSellValidator()
         miner_score_repository = DatabaseMinerScoreRepository(engine)
         dashboard_client = HttpDashboardClient(wallet, DASHBOARD_BASE_URL) if enable_dashboard_syndication else None
+        transaction_helper = TransactionHelper(engine)
 
         async with AsyncSubstrateInterface(ARCHIVE_SUBTENSOR) as substrate:
             chain_utils = ChainUtils(substrate)
@@ -131,7 +132,8 @@ def start_scoring(wallet: Wallet, enable_dashboard_syndication: bool):
                 chain_utils,
                 alpha_sell_event_repository,
                 alpha_sell_validator,
-                dashboard_client
+                dashboard_client,
+                transaction_helper
             )
 
             go = True

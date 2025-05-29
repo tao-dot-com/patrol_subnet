@@ -7,6 +7,6 @@ class TransactionHelper:
 
     async def do_in_transaction(self, func):
         async with self.LocalSession() as session:
-            with session.begin():
+            async with session.begin():
                 return await func(session)
 
