@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeTask, AlphaSellChallengeBatch, PredictionInterval, \
-    TransactionType, AlphaSellPrediction, AlphaSellEventRepository, AlphaSellChallengeMiner
+    TransactionType, AlphaSellPrediction, AlphaSellChallengeMiner
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellValidator
 from patrol.validation.scoring import MinerScoreRepository
 
@@ -19,13 +19,14 @@ def batch():
         created_at=datetime.now(UTC),
     )
 
-def make_task(batch_id: uuid.UUID, predictions: list[AlphaSellPrediction]):
+def make_task(batch_id: uuid.UUID, predictions: list[AlphaSellPrediction], has_error: bool = False):
     return AlphaSellChallengeTask(
         batch_id=batch_id,
         task_id=uuid.uuid4(),
         created_at=datetime.now(UTC) - timedelta(days=1),
         miner=AlphaSellChallengeMiner("miner_1", "miner", 2),
         predictions=predictions,
+        has_error=has_error,
     )
 
 async def test_validate_exact_predictions(batch):
@@ -78,3 +79,18 @@ async def test_validate_where_no_predictions_made(batch):
 
     accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
     assert accuracy == 1 / (1 + (100 ** 2 + 200 ** 2) / 2)
+
+async def test_validate_failed_task(batch):
+
+    predictions=[]
+    task = make_task(batch.batch_id, predictions, has_error=True)
+
+    score_repo = AsyncMock(MinerScoreRepository)
+    score_repo.find_latest_overall_scores.return_value = []
+
+    stake_removals = {"alice": 100, "bob": 200}
+
+    alpha_sell_validator = AlphaSellValidator()
+
+    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    assert accuracy == 0.0

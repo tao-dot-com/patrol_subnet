@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from time import sleep
 
 from sqlalchemy.ext.asyncio import create_async_engine
 from patrol.chain_data.substrate_client import SubstrateClient
@@ -73,8 +72,8 @@ class StakeEventCollector:
                 logger.exception("Unexpected error")
 
 
-def start():
-    from patrol.validation.config import DB_URL, ARCHIVE_SUBTENSOR
+def start(db_url: str):
+    from patrol.validation.config import ARCHIVE_SUBTENSOR
 
     async def async_start():
         runtime_versions = RuntimeVersions()
@@ -83,7 +82,7 @@ def start():
         substrate_client = SubstrateClient(active_versions, ARCHIVE_SUBTENSOR)
         await substrate_client.initialize()
 
-        engine = create_async_engine(DB_URL)
+        engine = create_async_engine(db_url)
         event_repository = DataBaseAlphaSellEventRepository(engine)
         chain_reader = ChainReader(substrate_client, runtime_versions)
 
@@ -94,17 +93,12 @@ def start():
 
     asyncio.run(async_start())
 
-def start_process():
-    import multiprocessing
-    p = multiprocessing.Process(target=start, daemon=True)
-    p.start()
 
-    try:
-        while True:
-            sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Stopping StakeEventCollector process")
-        p.terminate()
+def start_process(db_url: str):
+    import multiprocessing
+    p = multiprocessing.Process(target=start, args=[db_url], daemon=True)
+    p.start()
+    return p
 
 if __name__ == "__main__":
-    start_process()
+    start_process("postgresql+asyncpg://patrol:password@localhost:5432/patrol")

@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import logging
 import multiprocessing
 import uuid
@@ -13,6 +12,7 @@ from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet import Wallet
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from patrol.validation.error import MinerTaskException
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, \
@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 class AlphaSellValidator:
 
     def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, float]) -> float:
+        if task.has_error:
+            return 0.0
+
         predictions_by_hotkey = {p.wallet_hotkey_ss58: p.amount for p in task.predictions}
 
         all_hotkeys = set(predictions_by_hotkey.keys() | stake_removals.keys())
@@ -64,10 +67,18 @@ class AlphaSellMinerChallenge:
 
         responses = await self.miner_client.execute_tasks(miner.axon_info, synapses)
         for response in responses:
-            if isinstance(response, Exception):
-                # TODO: Handle exception by assigning an immediate zero score
+            if isinstance(response, MinerTaskException):
                 logger.warning("Exception during challenge execution: %s", response)
-                pass
+                now = datetime.now(UTC)
+                task = AlphaSellChallengeTask(
+                    has_error=True,
+                    error_message=str(response),
+                    batch_id=response.batch_id,
+                    created_at=now,
+                    task_id=response.task_id,
+                    predictions=[],
+                    miner=AlphaSellChallengeMiner(miner.axon_info.hotkey, miner.axon_info.coldkey, miner.uid),
+                )
             else:
                 batch_id, task_id, synapse = response
                 now = datetime.now(UTC)
@@ -78,7 +89,8 @@ class AlphaSellMinerChallenge:
                     predictions=synapse.predictions,
                     miner=AlphaSellChallengeMiner(miner.axon_info.hotkey, miner.axon_info.coldkey, miner.uid),
                 )
-                yield task
+
+            yield task
 
 class AlphaSellMinerChallengeProcess:
 

@@ -47,6 +47,8 @@ class AlphaSellChallengeTask:
     created_at: datetime
     miner: AlphaSellChallengeMiner
     predictions: list[AlphaSellPrediction]
+    has_error: bool = False
+    error_message: Optional[str] = None
 
 class AlphaSellChallengeRepository(ABC):
     @abstractmethod

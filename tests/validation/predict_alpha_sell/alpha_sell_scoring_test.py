@@ -12,7 +12,7 @@ from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, A
     AlphaSellChallengeBatch, PredictionInterval, AlphaSellChallengeTask, AlphaSellChallengeMiner, \
     AlphaSellPrediction, TransactionType
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellValidator
-from patrol.validation.predict_alpha_sell.alpha_sell_scoring import AlphaSellScoring
+from patrol.validation.predict_alpha_sell.alpha_sell_scoring import AlphaSellScoring, make_miner_score
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 
 
@@ -90,3 +90,17 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     scoring_repository.add.assert_awaited_once_with(ANY, mock_session)
     challenge_repository.mark_task_scored.assert_awaited_once_with(task_id, mock_session)
 
+
+def test_failed_task_score():
+    task = AlphaSellChallengeTask(
+        uuid.uuid4(), uuid.uuid4(), datetime.now(UTC),
+        AlphaSellChallengeMiner("miner", "miner_ck", 42),
+        predictions=[],
+        has_error=True, error_message="Nope"
+    )
+
+    score = make_miner_score(task, 0)
+    assert score.overall_score == 0
+    assert score.accuracy_score == 0
+    assert not score.validation_passed
+    assert score.error_message == "Nope"

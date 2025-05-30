@@ -26,6 +26,31 @@ from patrol.validation.scoring import MinerScore, MinerScoreRepository
 logger = logging.getLogger(__name__)
 
 
+def make_miner_score(task: AlphaSellChallengeTask, accuracy: float) -> MinerScore:
+    #responsiveness_score = 2 / (2 + task.response_time_seconds)
+    accuracy_score = accuracy # FIXME: this is wrong
+
+    overall_score = accuracy_score # + responsiveness_score) / 10
+
+    return MinerScore(
+        id=task.task_id, batch_id=task.batch_id, created_at=datetime.now(UTC),
+        uid=task.miner.uid,
+        coldkey=task.miner.coldkey,
+        hotkey=task.miner.hotkey,
+        responsiveness_score=0.0,
+        accuracy_score=accuracy_score,
+        volume=0,
+        volume_score=0.0,
+        response_time_seconds=0.0,
+        novelty_score=0.0,
+        validation_passed=not task.has_error,
+        error_message=task.error_message,
+        task_type=TaskType.PREDICT_ALPHA_SELL,
+        overall_score=overall_score,
+        overall_score_moving_average=0.0,
+    )
+
+
 class AlphaSellScoring:
 
     def __init__(
@@ -73,7 +98,7 @@ class AlphaSellScoring:
 
         logger.info("Scoring task [%s]", extra=miner_log_context)
         accuracy = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-        miner_score = self._make_miner_score(task, accuracy)
+        miner_score = make_miner_score(task, accuracy)
 
         async def add_score(session):
             await self.miner_score_repository.add(miner_score, session)
@@ -87,35 +112,11 @@ class AlphaSellScoring:
             await self.dashboard_client.send_score(miner_score)
 
 
-    def _make_miner_score(self, task: AlphaSellChallengeTask, accuracy: float) -> MinerScore:
-        #responsiveness_score = 2 / (2 + task.response_time_seconds)
-        accuracy_score = accuracy # FIXME: this is wrong
-
-        overall_score = accuracy_score # + responsiveness_score) / 10
-
-        return MinerScore(
-            id=task.task_id, batch_id=task.batch_id, created_at=datetime.now(UTC),
-            uid=task.miner.uid,
-            coldkey=task.miner.coldkey,
-            hotkey=task.miner.hotkey,
-            responsiveness_score=0.0,
-            accuracy_score=accuracy_score,
-            volume=0,
-            volume_score=0.0,
-            response_time_seconds=0.0,
-            novelty_score=0.0,
-            validation_passed=True,
-            error_message=None,
-            task_type=TaskType.PREDICT_ALPHA_SELL,
-            overall_score=overall_score,
-            overall_score_moving_average=0.0,
-        )
-
-def start_scoring(wallet: Wallet, enable_dashboard_syndication: bool):
+def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool):
 
     async def start_scoring_async():
-        from patrol.validation.config import DB_URL, DASHBOARD_BASE_URL, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS
-        engine = create_async_engine(DB_URL, pool_pre_ping=True)
+        from patrol.validation.config import DASHBOARD_BASE_URL, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS
+        engine = create_async_engine(db_url, pool_pre_ping=True)
 
         challenge_repository = DatabaseAlphaSellChallengeRepository(engine)
         alpha_sell_event_repository = DataBaseAlphaSellEventRepository(engine)
@@ -151,9 +152,10 @@ def start_scoring(wallet: Wallet, enable_dashboard_syndication: bool):
 
     asyncio.run(start_scoring_async())
 
-def start_scoring_process(wallet: Wallet, enable_dashboard_syndication: bool = False):
-    process = multiprocessing.Process(target=start_scoring, args=[wallet, enable_dashboard_syndication], daemon=True)
+def start_scoring_process(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool = False):
+    process = multiprocessing.Process(target=start_scoring, args=[wallet, db_url, enable_dashboard_syndication], daemon=True)
     process.start()
+    return process
 
 if __name__ == "__main__":
     with TemporaryDirectory() as tmp:

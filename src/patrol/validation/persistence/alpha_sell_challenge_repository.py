@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update
@@ -53,6 +54,8 @@ class _AlphaSellChallengeTask(Base):
     predictions: Mapped[list["_AlphaSellPrediction"]] = relationship(back_populates="task", cascade="all")
     response_time: Mapped[float] = mapped_column(default=0.0)
     is_scored: Mapped[bool] = mapped_column(default=False)
+    has_error: Mapped[bool] = mapped_column(default=False)
+    error_message: Mapped[Optional[str]]
 
     @classmethod
     def from_task(cls, task: AlphaSellChallengeTask):
@@ -64,6 +67,8 @@ class _AlphaSellChallengeTask(Base):
             miner_coldkey=task.miner.coldkey,
             miner_uid=task.miner.uid,
             predictions=[] if not task.predictions else [_AlphaSellPrediction.from_prediction(prediction) for prediction in task.predictions],
+            has_error=task.has_error,
+            error_message=task.error_message,
         )
 
     @property

@@ -45,14 +45,14 @@ async def test_challenge_sends_correct_synapse(mock_uuid):
 
 
 @patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.datetime")
-@patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.uuid.uuid4")
+@patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.uuid")
 async def test_challenge_miner(mock_uuid, mock_datetime):
 
     now = datetime.now(UTC)
     task_id = uuid.uuid4()
 
     mock_datetime.now.return_value = now
-    mock_uuid.return_value = task_id
+    mock_uuid.uuid4.return_value = task_id
 
     batch_id = uuid.uuid4()
     subnet_uid = 42

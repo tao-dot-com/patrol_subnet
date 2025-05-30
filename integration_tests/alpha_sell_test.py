@@ -8,7 +8,7 @@ from bittensor import AsyncSubtensor, AxonInfo
 from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet import Wallet
 
-from patrol.validation.predict_alpha_sell import alpha_sell_miner_challenge, AlphaSellPrediction, TransactionType
+from patrol.validation.predict_alpha_sell import alpha_sell_miner_challenge, alpha_sell_scoring, stake_event_collector, AlphaSellPrediction, TransactionType
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 
 DB_URL = "postgresql+asyncpg://patrol:password@localhost:5432/patrol"
@@ -58,11 +58,11 @@ def mock_miner():
         miner_wallet = Wallet(name="miner", hotkey="miner", path=tmp)
         miner_wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
 
-        def verify(synapse: AlphaSellSynapse) -> None:
+        def verify_fn(synapse: AlphaSellSynapse) -> None:
             pass
 
         miner = bt.Axon(miner_wallet, port=9000, ip="0.0.0.0", external_ip="127.0.0.1")
-        miner.attach(forward_fn=alpha_sell_synapse_handler, verify_fn=verify)
+        miner.attach(forward_fn=alpha_sell_synapse_handler, verify_fn=verify_fn)
         miner.start()
 
         yield miner
@@ -75,5 +75,25 @@ def challenge_process(mock_miner, validator_wallet: Wallet, mock_subtensor: Asyn
     process.terminate()
     process.join()
 
-async def test_challenge(challenge_process):
-    await asyncio.sleep(100)
+@pytest.fixture
+def scoring_process(validator_wallet: Wallet):
+    process = alpha_sell_scoring.start_scoring_process(validator_wallet, DB_URL, enable_dashboard_syndication=False)
+    yield process
+    process.terminate()
+    process.join()
+
+@pytest.fixture
+def event_process():
+    process = stake_event_collector.start_process(DB_URL)
+    yield process
+    process.terminate()
+    process.join()
+
+async def test_challenge_process(challenge_process):
+    await asyncio.sleep(10)
+
+async def test_scoring_process(scoring_process):
+    await asyncio.sleep(10)
+
+async def test_event_process(event_process):
+    await asyncio.sleep(60)

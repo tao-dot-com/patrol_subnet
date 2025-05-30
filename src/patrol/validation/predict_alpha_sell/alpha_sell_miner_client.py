@@ -30,10 +30,14 @@ class AlphaSellMinerClient:
         try:
             response = await session.post(uri, headers=headers, json=json_body, timeout=self._timeout_seconds, ssl=False)
             if not response.ok:
-                raise MinerTaskException(f"Error: {response.reason}; status {response.status}")
+                raise MinerTaskException(
+                    f"Error: {response.reason}; status {response.status}",
+                    UUID(synapse.task_id),
+                    UUID(synapse.batch_id)
+                )
             response_synapse = AlphaSellSynapse.model_validate_json(await response.text())
             return UUID(synapse.batch_id), UUID(synapse.task_id), response_synapse
         except TimeoutError:
-            raise MinerTaskException("Timeout")
+            raise MinerTaskException("Timeout", UUID(synapse.task_id), UUID(synapse.batch_id))
         except Exception as ex:
-            raise MinerTaskException(str(ex))
+            raise MinerTaskException(str(ex), UUID(synapse.task_id), UUID(synapse.batch_id))
