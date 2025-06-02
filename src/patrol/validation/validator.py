@@ -386,10 +386,22 @@ def boot():
     try:
         hooks.invoke(HookType.BEFORE_START)
 
-        from patrol.validation.config import DB_URL
+        from patrol.validation.config import DB_URL, ENABLE_DASHBOARD_SYNDICATION, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH
         migrate_db(DB_URL)
-        asyncio.run(start())
-        logger.info("Service Terminated.")
+
+        from patrol.validation.predict_alpha_sell import stake_event_collector, alpha_sell_miner_challenge, alpha_sell_scoring
+        wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
+        stake_event_collector.start_process(DB_URL)
+        alpha_sell_miner_challenge.start_process(wallet, DB_URL)
+        alpha_sell_scoring.start_scoring_process(wallet, DB_URL, ENABLE_DASHBOARD_SYNDICATION)
+
+        while True:
+            time.sleep(1)
+
+        # FIXME: Run the old process.
+        # asyncio.run(start())
+        # logger.info("Service Terminated.")
+
     except KeyboardInterrupt as ex:
         logger.info("Exiting")
 

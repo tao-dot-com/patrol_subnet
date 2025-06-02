@@ -134,7 +134,10 @@ class AlphaSellScoring:
         logger.info("Scored miner", extra=dataclasses.asdict(miner_score))
 
         if self.dashboard_client:
-            await self.dashboard_client.send_score(miner_score)
+            try:
+                await self.dashboard_client.send_score(miner_score)
+            except Exception:
+                logger.exception("Error sending score to dashboard")
 
 
 def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool):
