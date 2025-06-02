@@ -75,6 +75,14 @@ class AlphaSellChallengeRepository(ABC):
     async def mark_task_scored(self, task_id, session):
         pass
 
+    @abstractmethod
+    async def remove_if_fully_scored(self, batch_id):
+        pass
+
+    @abstractmethod
+    async def mark_batches_ready_for_scoring(self, batch_ids: list[UUID]):
+        pass
+
 
 @dataclass(frozen=True)
 class ChainStakeEvent:

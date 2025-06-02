@@ -160,6 +160,8 @@ class AlphaSellMinerChallengeProcess:
                 #    tasks_to_syndicate.append(task)
             # TODO: Send to API if OK
 
+        await self.challenge_repository.mark_batches_ready_for_scoring([b.batch_id for b in batches])
+
         logger.info("Miner Challenges complete.")
 
     async def _make_batch(self, prediction_interval: PredictionInterval, net_uid: int):

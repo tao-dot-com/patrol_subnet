@@ -121,10 +121,12 @@ class AlphaSellScoring:
         for task in scorable_tasks:
             await self._score_task(task, stake_removals)
 
+        await self.challenge_repository.remove_if_fully_scored(batch.batch_id)
+
     async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict):
         miner_log_context = dataclasses.asdict(task.miner)
 
-        logger.info("Scoring task [%s]", extra=miner_log_context)
+        logger.info("Scoring task [%s]", task.task_id, extra=miner_log_context)
         accuracy = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
         miner_score = make_miner_score(task, accuracy)
 

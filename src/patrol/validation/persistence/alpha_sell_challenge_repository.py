@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update
+from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update, delete
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
 
@@ -20,6 +20,7 @@ class _AlphaSellChallengeBatch(Base):
     hotkeys_ss58_json: Mapped[list[str]] = mapped_column(type_=JSON)
     prediction_interval_start: Mapped[int] = mapped_column()
     prediction_interval_end: Mapped[int] = mapped_column()
+    is_ready_for_scoring: Mapped[bool] = mapped_column(default=False)
 
     prediction_interval: Mapped[PredictionInterval] = composite(
         PredictionInterval,
@@ -74,9 +75,13 @@ class _AlphaSellChallengeTask(Base):
     @property
     def task(self):
         return AlphaSellChallengeTask(
-            UUID(self.batch_id), UUID(self.id), self.created_at,
-            AlphaSellChallengeMiner(self.miner_hotkey, self.miner_coldkey, self.miner_uid),
-            [it.prediction for it in self.predictions]
+            batch_id=UUID(self.batch_id),
+            task_id=UUID(self.id),
+            created_at=self.created_at,
+            miner=AlphaSellChallengeMiner(self.miner_hotkey, self.miner_coldkey, self.miner_uid),
+            predictions=[it.prediction for it in self.predictions],
+            has_error=self.has_error,
+            error_message=self.error_message,
         )
 
 
@@ -123,8 +128,9 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
 
     async def find_scorable_challenges(self, upper_block: int) -> list[AlphaSellChallengeBatch]:
         async with self.LocalSession() as session:
-            query = (select(_AlphaSellChallengeBatch)
-                     .where(_AlphaSellChallengeBatch.prediction_interval_end <= upper_block)
+            query = select(_AlphaSellChallengeBatch).filter(
+                _AlphaSellChallengeBatch.prediction_interval_end <= upper_block,
+                _AlphaSellChallengeBatch.is_ready_for_scoring == True,
             )
             results = await session.scalars(query)
             return [it.batch for it in results]
@@ -155,3 +161,30 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
             .values(is_scored=True)
          )
         await session.execute(query)
+
+    async def remove_if_fully_scored(self, batch_id: UUID):
+        async with self.LocalSession() as session:
+            query = select(func.count()).select_from(_AlphaSellChallengeTask).filter(
+                _AlphaSellChallengeTask.is_scored == False,
+                _AlphaSellChallengeTask.batch_id == str(batch_id)
+            )
+            unscored_count = await session.scalar(query)
+
+            if unscored_count == 0:
+                query = delete(_AlphaSellChallengeBatch).filter(
+                    _AlphaSellChallengeBatch.id == str(batch_id),
+                    _AlphaSellChallengeBatch.is_ready_for_scoring == True
+                )
+                await session.execute(query)
+                await session.commit()
+
+    async def mark_batches_ready_for_scoring(self, batch_ids: list[UUID]):
+        async with self.LocalSession() as session:
+            query = (update(_AlphaSellChallengeBatch)
+                .where(_AlphaSellChallengeBatch.id.in_([str(b) for b in batch_ids]))
+                .values(is_ready_for_scoring=True)
+            )
+
+            await session.execute(query)
+            await session.commit()
+

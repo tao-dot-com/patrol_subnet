@@ -9,7 +9,7 @@ from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 
 
 class AlphaSellMinerClient:
-    def __init__(self, dendrite: Dendrite, timeout_seconds: float=60.0):
+    def __init__(self, dendrite: Dendrite, timeout_seconds: float=16.0):
         self._dendrite = dendrite
         self._timeout_seconds = timeout_seconds
 
