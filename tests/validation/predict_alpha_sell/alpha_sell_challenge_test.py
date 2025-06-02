@@ -4,16 +4,21 @@ from unittest.mock import AsyncMock, patch
 
 from bittensor import AxonInfo
 
+from patrol.constants import TaskType
+from patrol.validation.dashboard import DashboardClient
+from patrol.validation.error import MinerTaskException
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellMinerChallenge
 from patrol.validation.predict_alpha_sell import TransactionType, PredictionInterval, AlphaSellPrediction, AlphaSellChallengeBatch
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
+from patrol.validation.scoring import MinerScore
 
 
 @patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.uuid")
 async def test_challenge_sends_correct_synapse(mock_uuid):
     miner_client = AsyncMock(AlphaSellMinerClient)
+    dashboard_client = AsyncMock(DashboardClient)
 
     axon_info = AxonInfo(0, "0.0.0.0", 0, 4, "hk", "ck")
     miner = Miner(axon_info, 123)
@@ -29,7 +34,7 @@ async def test_challenge_sends_correct_synapse(mock_uuid):
         created_at=datetime.now(UTC),
     )
 
-    challenge = AlphaSellMinerChallenge(miner_client)
+    challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
 
     expected_synapse = AlphaSellSynapse(
         batch_id=str(batch_id), task_id=str(task_id), subnet_uid=42,
@@ -42,6 +47,41 @@ async def test_challenge_sends_correct_synapse(mock_uuid):
 
     miner_client.execute_tasks.assert_awaited_once_with(axon_info, [expected_synapse])
     miner_client.execute_tasks.assert_awaited_once_with(axon_info, [expected_synapse])
+
+    dashboard_client.send_score.assert_not_awaited()
+
+@patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.uuid")
+async def test_challenge_sends_failed_score_to_dashboard(mock_uuid):
+    miner_client = AsyncMock(AlphaSellMinerClient)
+    dashboard_client = AsyncMock(DashboardClient)
+
+    axon_info = AxonInfo(0, "0.0.0.0", 0, 4, "hk", "ck")
+    miner = Miner(axon_info, 123)
+    batch_id = uuid.uuid4()
+
+    task_id = uuid.uuid4()
+    mock_uuid.uuid4.return_value = task_id
+
+    batch = AlphaSellChallengeBatch(
+        batch_id=batch_id, subnet_uid=42,
+        prediction_interval=PredictionInterval(5_000_000, 5_000_7200),
+        hotkeys_ss58=["alice", "bob"],
+        created_at=datetime.now(UTC),
+    )
+
+    miner_client.execute_tasks.return_value = [MinerTaskException("Nope!", task_id, batch_id)]
+
+    challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
+
+    async for _ in challenge.execute_challenge(miner, [batch]):
+        pass
+
+    dashboard_client.send_score.assert_awaited_once()
+    score: MinerScore = dashboard_client.send_score.mock_calls[0][1][0]
+    assert score.accuracy_score == 0
+    assert not score.validation_passed
+    assert "Nope!" in score.error_message
+    assert score.task_type == TaskType.PREDICT_ALPHA_SELL
 
 
 @patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.datetime")
@@ -64,6 +104,7 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
     ]
 
     miner_client = AsyncMock(AlphaSellMinerClient)
+    dashboard_client = AsyncMock(DashboardClient)
 
     miner_client.execute_tasks.return_value = [(batch_id, task_id, AlphaSellSynapse(
         batch_id=str(batch_id), task_id=str(task_id), subnet_uid=subnet_uid, prediction_interval=prediction_interval,
@@ -76,7 +117,7 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
 
     batch = AlphaSellChallengeBatch(batch_id, now, subnet_uid, prediction_interval, hotkeys)
 
-    challenge = AlphaSellMinerChallenge(miner_client)
+    challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
     tasks = [it async for it in challenge.execute_challenge(miner, [batch])]
     task = tasks[0]
 

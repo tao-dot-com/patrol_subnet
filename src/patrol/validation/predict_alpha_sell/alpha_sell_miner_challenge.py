@@ -12,6 +12,8 @@ from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet import Wallet
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from patrol.constants import TaskType
+from patrol.validation.dashboard import DashboardClient
 from patrol.validation.error import MinerTaskException
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
@@ -19,42 +21,19 @@ from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, \
     AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner, PredictionInterval
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
-
+from patrol.validation.scoring import MinerScore
 
 logger = logging.getLogger(__name__)
-
-class AlphaSellValidator:
-
-    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, float]) -> float:
-        if task.has_error:
-            return 0.0
-
-        predictions_by_hotkey = {p.wallet_hotkey_ss58: p.amount for p in task.predictions}
-
-        all_hotkeys = set(predictions_by_hotkey.keys() | stake_removals.keys())
-
-        square_deltas = []
-        total_actual = []
-
-        for hk in all_hotkeys:
-            predicted = predictions_by_hotkey.get(hk, 0.0)
-            actual_amount = stake_removals.get(hk, 0.0)
-            total_actual.append(actual_amount)
-            delta = (predicted - actual_amount) ** 2
-            square_deltas.append(delta)
-
-        mean_square_deltas = sum(square_deltas) / len(square_deltas)
-
-        accuracy = 1 / (1 + mean_square_deltas)
-        return accuracy
 
 
 class AlphaSellMinerChallenge:
 
     def __init__(self,
                  miner_client: AlphaSellMinerClient,
+                 dashboard_client: DashboardClient
     ):
         self.miner_client = miner_client
+        self.dashboard_client = dashboard_client
 
     async def execute_challenge(self, miner: Miner, batches: list[AlphaSellChallengeBatch]) -> AsyncGenerator[AlphaSellChallengeTask]:
         synapses = [AlphaSellSynapse(
@@ -66,6 +45,7 @@ class AlphaSellMinerChallenge:
         ) for batch in batches]
 
         responses = await self.miner_client.execute_tasks(miner.axon_info, synapses)
+        miner = AlphaSellChallengeMiner(miner.axon_info.hotkey, miner.axon_info.coldkey, miner.uid)
         for response in responses:
             if isinstance(response, MinerTaskException):
                 logger.warning("Exception during challenge execution: %s", response)
@@ -77,8 +57,14 @@ class AlphaSellMinerChallenge:
                     created_at=now,
                     task_id=response.task_id,
                     predictions=[],
-                    miner=AlphaSellChallengeMiner(miner.axon_info.hotkey, miner.axon_info.coldkey, miner.uid),
+                    miner=miner,
                 )
+                try:
+                    if self.dashboard_client:
+                        await self.send_zero_score_to_dashboard(task)
+                except Exception:
+                    logger.exception("Error sending zero score to dashboard")
+
             else:
                 batch_id, task_id, synapse = response
                 now = datetime.now(UTC)
@@ -87,10 +73,31 @@ class AlphaSellMinerChallenge:
                     created_at=now,
                     task_id=task_id,
                     predictions=synapse.predictions,
-                    miner=AlphaSellChallengeMiner(miner.axon_info.hotkey, miner.axon_info.coldkey, miner.uid),
+                    miner=miner,
                 )
 
             yield task
+
+    async def send_zero_score_to_dashboard(self, task: AlphaSellChallengeTask):
+        await self.dashboard_client.send_score(MinerScore(
+            id=task.task_id,
+            batch_id=task.batch_id,
+            created_at=datetime.now(UTC),
+            uid=task.miner.uid,
+            coldkey=task.miner.coldkey,
+            hotkey=task.miner.hotkey,
+            overall_score_moving_average=0,
+            overall_score=0,
+            volume_score=0,
+            volume=0,
+            responsiveness_score=0,
+            response_time_seconds=0,
+            novelty_score=0,
+            validation_passed=not task.has_error,
+            error_message=task.error_message,
+            accuracy_score=0,
+            task_type=TaskType.PREDICT_ALPHA_SELL
+        ))
 
 class AlphaSellMinerChallengeProcess:
 
@@ -141,9 +148,15 @@ class AlphaSellMinerChallengeProcess:
             await self.challenge_repository.add(batch)
 
         for miner in miners_to_challenge:
+            #tasks_to_syndicate = []
             async for task in self.miner_challenge.execute_challenge(miner, batches):
+                # TODO tolerate a failure to persist?
                 await self.challenge_repository.add_task(task)
                 logger.info("Received task response from miner", extra={'miner': miner.axon_info})
+
+                #if not task.has_error:
+                #    tasks_to_syndicate.append(task)
+            # TODO: Send to API if OK
 
         logger.info("Miner Challenges complete.")
 

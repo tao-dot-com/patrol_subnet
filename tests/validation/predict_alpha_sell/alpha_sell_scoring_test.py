@@ -11,8 +11,8 @@ from patrol.validation.persistence.transaction_helper import TransactionHelper
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, AlphaSellEventRepository, \
     AlphaSellChallengeBatch, PredictionInterval, AlphaSellChallengeTask, AlphaSellChallengeMiner, \
     AlphaSellPrediction, TransactionType
-from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellValidator
-from patrol.validation.predict_alpha_sell.alpha_sell_scoring import AlphaSellScoring, make_miner_score
+from patrol.validation.predict_alpha_sell.alpha_sell_scoring import AlphaSellScoring, make_miner_score, \
+    AlphaSellValidator
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 
 

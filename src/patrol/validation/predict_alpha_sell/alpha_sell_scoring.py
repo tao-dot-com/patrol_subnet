@@ -20,7 +20,6 @@ from patrol.validation.persistence.miner_score_respository import DatabaseMinerS
 from patrol.validation.persistence.transaction_helper import TransactionHelper
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeTask, AlphaSellChallengeRepository, \
     AlphaSellEventRepository, AlphaSellChallengeBatch, TransactionType
-from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellValidator
 from patrol.validation.scoring import MinerScore, MinerScoreRepository
 
 logger = logging.getLogger(__name__)
@@ -49,6 +48,32 @@ def make_miner_score(task: AlphaSellChallengeTask, accuracy: float) -> MinerScor
         overall_score=overall_score,
         overall_score_moving_average=0.0,
     )
+
+
+class AlphaSellValidator:
+
+    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, float]) -> float:
+        if task.has_error:
+            return 0.0
+
+        predictions_by_hotkey = {p.wallet_hotkey_ss58: p.amount for p in task.predictions}
+
+        all_hotkeys = set(predictions_by_hotkey.keys() | stake_removals.keys())
+
+        square_deltas = []
+        total_actual = []
+
+        for hk in all_hotkeys:
+            predicted = predictions_by_hotkey.get(hk, 0.0)
+            actual_amount = stake_removals.get(hk, 0.0)
+            total_actual.append(actual_amount)
+            delta = (predicted - actual_amount) ** 2
+            square_deltas.append(delta)
+
+        mean_square_deltas = sum(square_deltas) / len(square_deltas)
+
+        accuracy = 1 / (1 + mean_square_deltas)
+        return accuracy
 
 
 class AlphaSellScoring:

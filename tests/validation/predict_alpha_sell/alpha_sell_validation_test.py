@@ -6,7 +6,7 @@ import pytest
 
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeTask, AlphaSellChallengeBatch, PredictionInterval, \
     TransactionType, AlphaSellPrediction, AlphaSellChallengeMiner
-from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import AlphaSellValidator
+from patrol.validation.predict_alpha_sell.alpha_sell_scoring import AlphaSellValidator
 from patrol.validation.scoring import MinerScoreRepository
 
 
