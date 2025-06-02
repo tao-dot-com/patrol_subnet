@@ -162,6 +162,10 @@ async def test_find_scorable_challenge_batches(clean_pgsql_engine):
     await repository.add(batch_2)
 
     challenges = await repository.find_scorable_challenges(130)
+    assert len(challenges) == 0
+
+    await repository.mark_batches_ready_for_scoring([batch_1.batch_id, batch_2.batch_id])
+    challenges = await repository.find_scorable_challenges(130)
     assert len(challenges) == 2
     assert batch_1 in challenges
     assert batch_2 in challenges

@@ -1,6 +1,7 @@
 from typing import NamedTuple
 
-from bt_decode.bt_decode import AxonInfo
+from bittensor import AxonInfo
+
 
 class Miner(NamedTuple):
     axon_info: AxonInfo
