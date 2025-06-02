@@ -1,4 +1,9 @@
 import os
+from typing import Optional
+from unittest.mock import AsyncMock
+
+from bittensor import AxonInfo
+from bittensor.core.metagraph import AsyncMetagraph
 
 from patrol.constants import TaskType
 
@@ -31,3 +36,41 @@ TASK_WEIGHTS: dict[TaskType, int] = {
     TaskType.COLDKEY_SEARCH: COLDKEY_SEARCH_TASK_WEIGHT,
     TaskType.HOTKEY_OWNERSHIP: HOTKEY_OWNERSHIP_TASK_WEIGHT,
 }
+
+
+class StaticAsyncMetagraph(AsyncMetagraph):
+
+    def __init__(self, axons: list[AxonInfo]):
+        super().__init__(netuid=81, sync=False)
+        self.axons = axons
+
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    async def sync(
+        self,
+        block: Optional[int] = None,
+        lite: Optional[bool] = None,
+        subtensor = None,
+    ):
+        pass
+
+
+def patrol_metagraph():
+    json_mg = os.getenv('PATROL_AXONS_JSON')
+    if json_mg is None:
+        return None
+
+    import json
+    mg = json.loads(json_mg)
+    axons = [AxonInfo(**it) for it in mg]
+    return StaticAsyncMetagraph(axons)
+
+PATROL_METAGRAPH: AsyncMetagraph | None = patrol_metagraph()
+
+ENABLE_ALPHA_SELL_TASK = bool(os.getenv('ENABLE_ALPHA_SELL_TASK', "0") == "1")
+ENABLE_LEGACY_TASKS = bool(os.getenv('ENABLE_LEGACY_TASKS', "0") == "1")
+ALPHA_SELL_PREDICTION_WINDOW_BLOCKS = int(os.getenv('ALPHA_SELL_PREDICTION_WINDOW_BLOCKS', 7200))

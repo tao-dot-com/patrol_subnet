@@ -14,6 +14,7 @@ from patrol.chain_data.runtime_groupings import load_versions
 from patrol.validation import auto_update, hooks
 from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.chain.runtime_versions import RuntimeVersions
+from patrol.validation.config import ENABLE_LEGACY_TASKS
 from patrol.validation.graph_validation.event_checker import EventChecker
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hooks import HookType
@@ -386,21 +387,22 @@ def boot():
     try:
         hooks.invoke(HookType.BEFORE_START)
 
-        from patrol.validation.config import DB_URL, ENABLE_DASHBOARD_SYNDICATION, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH
+        from patrol.validation.config import DB_URL, ENABLE_DASHBOARD_SYNDICATION, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH, ENABLE_ALPHA_SELL_TASK
         migrate_db(DB_URL)
 
-        from patrol.validation.predict_alpha_sell import stake_event_collector, alpha_sell_miner_challenge, alpha_sell_scoring
-        wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
-        stake_event_collector.start_process(DB_URL)
-        alpha_sell_miner_challenge.start_process(wallet, DB_URL)
-        alpha_sell_scoring.start_scoring_process(wallet, DB_URL, ENABLE_DASHBOARD_SYNDICATION)
+        if ENABLE_ALPHA_SELL_TASK:
+            from patrol.validation.predict_alpha_sell import stake_event_collector, alpha_sell_miner_challenge, alpha_sell_scoring
+            wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
+            stake_event_collector.start_process(DB_URL)
+            alpha_sell_miner_challenge.start_process(wallet, db_url=DB_URL)
+            alpha_sell_scoring.start_scoring_process(wallet, DB_URL, ENABLE_DASHBOARD_SYNDICATION)
 
-        while True:
-            time.sleep(1)
-
-        # FIXME: Run the old process.
-        # asyncio.run(start())
-        # logger.info("Service Terminated.")
+        if ENABLE_LEGACY_TASKS:
+            asyncio.run(start())
+            logger.info("Service Terminated.")
+        else:
+            while True:
+                time.sleep(1)
 
     except KeyboardInterrupt as ex:
         logger.info("Exiting")

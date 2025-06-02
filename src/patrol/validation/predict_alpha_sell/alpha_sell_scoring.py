@@ -52,7 +52,7 @@ def make_miner_score(task: AlphaSellChallengeTask, accuracy: float) -> MinerScor
 
 class AlphaSellValidator:
 
-    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, float]) -> float:
+    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, int]) -> float:
         if task.has_error:
             return 0.0
 
@@ -64,11 +64,14 @@ class AlphaSellValidator:
         total_actual = []
 
         for hk in all_hotkeys:
-            predicted = predictions_by_hotkey.get(hk, 0.0)
-            actual_amount = stake_removals.get(hk, 0.0)
+            predicted = predictions_by_hotkey.get(hk, 0)
+            actual_amount = stake_removals.get(hk, 0)
             total_actual.append(actual_amount)
             delta = (predicted - actual_amount) ** 2
             square_deltas.append(delta)
+
+        if len(square_deltas) == 0:
+            return 0.0
 
         mean_square_deltas = sum(square_deltas) / len(square_deltas)
 

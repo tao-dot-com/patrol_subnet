@@ -16,6 +16,7 @@ from patrol.constants import TaskType
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.error import MinerTaskException
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
+from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, \
     AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner, PredictionInterval
@@ -30,7 +31,7 @@ class AlphaSellMinerChallenge:
 
     def __init__(self,
                  miner_client: AlphaSellMinerClient,
-                 dashboard_client: DashboardClient
+                 dashboard_client: DashboardClient | None
     ):
         self.miner_client = miner_client
         self.dashboard_client = dashboard_client
@@ -121,10 +122,11 @@ class AlphaSellMinerChallengeProcess:
                      challenge_repository: AlphaSellChallengeRepository,
                      miner_challenge: AlphaSellMinerChallenge,
                      subtensor: AsyncSubtensor,
+                     patrol_metagraph: AsyncMetagraph | None,
                      interval_window_blocks: int = 7200,
                      start_block_offset: int = 5,
     ):
-        patrol_metagraph = await subtensor.metagraph(81)
+        patrol_metagraph = await subtensor.metagraph(81) if patrol_metagraph is None else patrol_metagraph
         return cls(challenge_repository, miner_challenge, subtensor, patrol_metagraph,
                    interval_window_blocks=interval_window_blocks,
                    start_block_offset=start_block_offset
@@ -132,7 +134,7 @@ class AlphaSellMinerChallengeProcess:
 
     async def challenge_miners(self):
 
-        logger.info("Executing Miner Challenges")
+        logger.info("Executing Miner Challenges for prediction window: %s blocks", self.interval_window_blocks)
 
         current_block = await self.subtensor.get_current_block()
         start_block = current_block + 5
@@ -174,8 +176,15 @@ async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
     dendrite = bt.Dendrite(wallet)
     miner_client = AlphaSellMinerClient(dendrite)
 
-    miner_challenge = AlphaSellMinerChallenge(miner_client)
-    process = await AlphaSellMinerChallengeProcess.create(challenge_repository, miner_challenge, subtensor)
+    from patrol.validation.config import DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION, PATROL_METAGRAPH, ALPHA_SELL_PREDICTION_WINDOW_BLOCKS
+    dashboard_client = HttpDashboardClient(wallet, DASHBOARD_BASE_URL) if ENABLE_DASHBOARD_SYNDICATION else None
+
+    miner_challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
+
+    process = await AlphaSellMinerChallengeProcess.create(
+        challenge_repository, miner_challenge, subtensor, PATROL_METAGRAPH,
+        interval_window_blocks=ALPHA_SELL_PREDICTION_WINDOW_BLOCKS
+    )
 
     while True:
         try:
