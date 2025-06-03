@@ -16,7 +16,7 @@ dependencies = [
     "async_lru",
     "greenlet>=3.2.1",
     "networkx",
-    "async-substrate-interface==1.0.9"
+    "async-substrate-interface==1.2.1"
 ]
 
 [project.optional-dependencies]
