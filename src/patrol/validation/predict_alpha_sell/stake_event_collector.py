@@ -96,7 +96,7 @@ def start(db_url: str):
 
 def start_process(db_url: str):
     import multiprocessing
-    p = multiprocessing.Process(target=start, args=[db_url], daemon=True)
+    p = multiprocessing.Process(target=start, name="Event Collector", args=[db_url], daemon=True)
     p.start()
     return p
 

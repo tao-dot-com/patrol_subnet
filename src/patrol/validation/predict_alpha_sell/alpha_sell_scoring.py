@@ -186,7 +186,7 @@ def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: boo
     asyncio.run(start_scoring_async())
 
 def start_scoring_process(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool = False):
-    process = multiprocessing.Process(target=start_scoring, args=[wallet, db_url, enable_dashboard_syndication], daemon=True)
+    process = multiprocessing.Process(target=start_scoring, name="Scoring", args=[wallet, db_url, enable_dashboard_syndication], daemon=True)
     process.start()
     return process
 

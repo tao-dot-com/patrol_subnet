@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeTask, AlphaSellChallengeBatch, PredictionInterval, \
-    TransactionType, AlphaSellPrediction, AlphaSellChallengeMiner
+    TransactionType, AlphaSellPrediction, AlphaSellChallengeMiner, WalletIdentifier
 from patrol.validation.predict_alpha_sell.alpha_sell_scoring import AlphaSellValidator
 from patrol.validation.scoring import MinerScoreRepository
 
@@ -15,7 +15,7 @@ def batch():
     return AlphaSellChallengeBatch(
         batch_id=uuid.uuid4(),
         subnet_uid=12, prediction_interval=PredictionInterval(100, 120),
-        hotkeys_ss58=["alice", "bob"],
+        wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
         created_at=datetime.now(UTC),
     )
 
@@ -32,8 +32,8 @@ def make_task(batch_id: uuid.UUID, predictions: list[AlphaSellPrediction], has_e
 async def test_validate_exact_predictions(batch):
 
     predictions=[
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 100.0),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 200.0),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 100),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 200),
     ]
     task = make_task(batch.batch_id, predictions)
 

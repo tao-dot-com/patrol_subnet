@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema."""
     op.create_table("alpha_sell_event", 
-                    sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+                    sa.Column("id", sa.BigInteger, primary_key=True, autoincrement=True),
                     sa.Column("created_at", sa.DateTime(timezone=True)), 
                     sa.Column("block_number", sa.Integer),
                     sa.Column("event_type", sa.String), 

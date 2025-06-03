@@ -19,7 +19,7 @@ from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, \
-    AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner, PredictionInterval
+    AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner, PredictionInterval, WalletIdentifier
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 from patrol.validation.scoring import MinerScore
@@ -42,7 +42,7 @@ class AlphaSellMinerChallenge:
             task_id=str(uuid.uuid4()),
             subnet_uid=batch.subnet_uid,
             prediction_interval=batch.prediction_interval,
-            wallet_hotkeys_ss58=batch.hotkeys_ss58,
+            wallets=batch.wallets,
         ) for batch in batches]
 
         responses = await self.miner_client.execute_tasks(miner.axon_info, synapses)
@@ -166,9 +166,10 @@ class AlphaSellMinerChallengeProcess:
 
     async def _make_batch(self, prediction_interval: PredictionInterval, net_uid: int):
         metagraph = await self.subtensor.metagraph(net_uid)
-        hotkeys_ss58 = metagraph.hotkeys
+        wallets = [WalletIdentifier(i.coldkey, i.hotkey) for i in metagraph.axons]
+
         batch_id = uuid.uuid4()
-        return AlphaSellChallengeBatch(batch_id, datetime.now(UTC), net_uid, prediction_interval, hotkeys_ss58)
+        return AlphaSellChallengeBatch(batch_id, datetime.now(UTC), net_uid, prediction_interval, wallets)
 
 
 async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
@@ -210,7 +211,7 @@ def start_process(wallet: Wallet, subtensor: AsyncSubtensor | None = None, db_ur
         from patrol.validation.config import DB_URL
         asyncio.run(run(wallet, subtensor, db_url if db_url else DB_URL))
 
-    process = multiprocessing.Process(target=run_async, daemon=True)
+    process = multiprocessing.Process(target=run_async, name="Challenge", daemon=True)
     process.start()
     return process
 

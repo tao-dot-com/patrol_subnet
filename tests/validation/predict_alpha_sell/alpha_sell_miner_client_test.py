@@ -8,7 +8,7 @@ from bittensor import Axon, Dendrite
 from bittensor_wallet import Wallet
 
 from patrol.validation.error import MinerTaskException
-from patrol.validation.predict_alpha_sell import TransactionType
+from patrol.validation.predict_alpha_sell import TransactionType, WalletIdentifier
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse, AlphaSellPrediction, PredictionInterval
 
@@ -30,8 +30,8 @@ def miner_wallet():
 async def synapse_handler(request: AlphaSellSynapse):
     await asyncio.sleep(0.2)
     request.predictions=[
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
-        AlphaSellPrediction("bob", "bob_ck",  TransactionType.STAKE_REMOVED, 15.0)
+        AlphaSellPrediction("alice", "a", TransactionType.STAKE_REMOVED, 25),
+        AlphaSellPrediction("bob", "b",  TransactionType.STAKE_REMOVED, 15)
     ]
     return request
 
@@ -57,7 +57,7 @@ async def test_challenge_miner(dendrite_wallet, miner_wallet, mock_miner):
         batch_id=str(batch_id),
         task_id=str(task_id),
         subnet_uid=42,
-        wallet_hotkeys_ss58=["alice", "bob"],
+        wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
         prediction_interval=PredictionInterval(5000000, 50007200),
     )
 
@@ -79,7 +79,7 @@ async def test_challenge_unavailable_miner(dendrite_wallet, miner_wallet, mock_m
         task_id=str(uuid.uuid4()),
         subnet_uid=42,
         prediction_interval=PredictionInterval(5000000, 50007200),
-        wallet_hotkeys_ss58=["alice", "bob"]
+        wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
     )
 
     task = AlphaSellMinerClient(dendrite)
@@ -102,7 +102,7 @@ async def test_challenge_miner_with_timeout(dendrite_wallet, miner_wallet, mock_
         task_id=str(uuid.uuid4()),
         subnet_uid=42,
         prediction_interval=PredictionInterval(5000000, 50007200),
-        wallet_hotkeys_ss58=["alice", "bob"]
+        wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
     )
 
     task = AlphaSellMinerClient(dendrite, 0.01)

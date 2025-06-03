@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from patrol.validation.predict_alpha_sell import ChainStakeEvent, AlphaSellEventRepository, TransactionType
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from patrol.validation.persistence import Base
@@ -62,7 +64,7 @@ class DataBaseAlphaSellEventRepository(AlphaSellEventRepository):
 
             results = (await session.execute(query)).all()
             results_dict = dict(results)
-            return results_dict
+            return {k: int(v) for k, v in results_dict.items()}
 
     async def find_most_recent_block_collected(self) -> int:
         async with self.LocalSession() as session:

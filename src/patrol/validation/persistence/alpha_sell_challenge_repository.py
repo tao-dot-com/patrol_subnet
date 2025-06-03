@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -8,7 +9,8 @@ from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joine
 
 from patrol.validation.persistence import Base
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, PredictionInterval, \
-    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch, TransactionType, AlphaSellChallengeMiner
+    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch, TransactionType, AlphaSellChallengeMiner, \
+    WalletIdentifier
 
 
 class _AlphaSellChallengeBatch(Base):
@@ -17,7 +19,7 @@ class _AlphaSellChallengeBatch(Base):
     id: Mapped[str] = mapped_column(primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     subnet_uid: Mapped[int]
-    hotkeys_ss58_json: Mapped[list[str]] = mapped_column(type_=JSON)
+    wallets_json: Mapped[list[dict]] = mapped_column(type_=JSON)
     prediction_interval_start: Mapped[int] = mapped_column()
     prediction_interval_end: Mapped[int] = mapped_column()
     is_ready_for_scoring: Mapped[bool] = mapped_column(default=False)
@@ -33,14 +35,15 @@ class _AlphaSellChallengeBatch(Base):
             id=str(batch.batch_id),
             created_at=batch.created_at,
             subnet_uid=batch.subnet_uid,
-            hotkeys_ss58_json=batch.hotkeys_ss58,
+            wallets_json=[dataclasses.asdict(it) for it in batch.wallets],
             prediction_interval=batch.prediction_interval,
         )
 
     @property
     def batch(self) -> AlphaSellChallengeBatch:
         return AlphaSellChallengeBatch(
-            UUID(self.id), self.created_at, self.subnet_uid, self.prediction_interval, self.hotkeys_ss58_json,
+            UUID(self.id), self.created_at, self.subnet_uid, self.prediction_interval,
+            [WalletIdentifier(**data) for data in self.wallets_json],
         )
 
 class _AlphaSellChallengeTask(Base):
@@ -91,7 +94,7 @@ class _AlphaSellPrediction(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     task_id: Mapped[str] = mapped_column(ForeignKey(_AlphaSellChallengeTask.id, ondelete="CASCADE"))
     transaction_type: Mapped[str]
-    amount: Mapped[float]
+    amount: Mapped[int]
     hotkey: Mapped[str]
     coldkey: Mapped[str]
     task: Mapped[_AlphaSellChallengeTask] = relationship(back_populates="predictions")

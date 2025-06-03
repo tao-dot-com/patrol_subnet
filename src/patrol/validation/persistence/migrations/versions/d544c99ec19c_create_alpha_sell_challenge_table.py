@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.Column('id', sa.String, primary_key=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('subnet_uid', sa.Integer, nullable=False),
-        sa.Column('hotkeys_ss58_json', sa.JSON, nullable=False),
+        sa.Column('wallets_json', sa.JSON, nullable=False),
         sa.Column('prediction_interval_start', sa.Integer, nullable=False),
         sa.Column('prediction_interval_end', sa.Integer, nullable=False),
     )
@@ -38,7 +38,7 @@ def upgrade() -> None:
         sa.Column('response_time', sa.Float, nullable=False),
     )
     op.create_table("alpha_sell_prediction",
-        sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+        sa.Column("id", sa.BigInteger, primary_key=True, autoincrement=True),
         sa.Column("task_id", sa.String, ForeignKey("alpha_sell_challenge_task.id", ondelete="CASCADE"), nullable=False),
         sa.Column("hotkey", sa.String, nullable=False),
         sa.Column("coldkey", sa.String, nullable=False),

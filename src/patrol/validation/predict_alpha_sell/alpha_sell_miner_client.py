@@ -5,6 +5,7 @@ import aiohttp
 from bittensor import AxonInfo, Dendrite
 
 from patrol.validation.error import MinerTaskException
+from patrol.validation.predict_alpha_sell import WalletIdentifier
 from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 
 
@@ -36,13 +37,13 @@ class AlphaSellMinerClient:
                     UUID(synapse.batch_id)
                 )
             response_synapse = AlphaSellSynapse.model_validate_json(await response.text())
-            self._remove_unrequested_hotkey_predictions(response_synapse, synapse.wallet_hotkeys_ss58)
+            self._remove_unrequested_hotkey_predictions(response_synapse, synapse.wallets)
             return UUID(synapse.batch_id), UUID(synapse.task_id), response_synapse
         except TimeoutError:
             raise MinerTaskException("Timeout", UUID(synapse.task_id), UUID(synapse.batch_id))
         except Exception as ex:
             raise MinerTaskException(str(ex), UUID(synapse.task_id), UUID(synapse.batch_id))
 
-    def _remove_unrequested_hotkey_predictions(self, synapse: AlphaSellSynapse, hotkeys: list[str]):
-        predictions = [p for p in synapse.predictions if p.wallet_hotkey_ss58 in hotkeys]
+    def _remove_unrequested_hotkey_predictions(self, synapse: AlphaSellSynapse, wallets: list[WalletIdentifier]):
+        predictions = [p for p in synapse.predictions if WalletIdentifier(p.wallet_coldkey_ss58, p.wallet_hotkey_ss58) in wallets]
         synapse.predictions = predictions

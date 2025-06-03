@@ -10,7 +10,7 @@ from patrol.validation.dashboard import DashboardClient
 from patrol.validation.persistence.transaction_helper import TransactionHelper
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, AlphaSellEventRepository, \
     AlphaSellChallengeBatch, PredictionInterval, AlphaSellChallengeTask, AlphaSellChallengeMiner, \
-    AlphaSellPrediction, TransactionType
+    AlphaSellPrediction, TransactionType, WalletIdentifier
 from patrol.validation.predict_alpha_sell.alpha_sell_scoring import AlphaSellScoring, make_miner_score, \
     AlphaSellValidator
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
@@ -31,8 +31,11 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     task_created_at = datetime.now(UTC) - timedelta(hours=24)
 
     challenge_repository.find_scorable_challenges.return_value = [
-        AlphaSellChallengeBatch(batch_id=batch_id, created_at=task_created_at, subnet_uid=42,
-                                prediction_interval=PredictionInterval(100, 120), hotkeys_ss58=["alice", "bob"])
+        AlphaSellChallengeBatch(
+            batch_id=batch_id, created_at=task_created_at, subnet_uid=42,
+            prediction_interval=PredictionInterval(100, 120),
+            wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
+        )
     ]
 
     task_id = uuid.uuid4()

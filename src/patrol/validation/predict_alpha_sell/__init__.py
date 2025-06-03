@@ -12,11 +12,16 @@ class TransactionType(Enum):
     STAKE_MOVED = "StakeMoved"
 
 @dataclass(frozen=True)
+class WalletIdentifier:
+    coldkey: str
+    hotkey: str
+
+@dataclass(frozen=True)
 class AlphaSellPrediction:
     wallet_hotkey_ss58: str
     wallet_coldkey_ss58: str
     transaction_type: TransactionType
-    amount: float
+    amount: int
 
 
 @dataclass(frozen=True)
@@ -38,7 +43,7 @@ class AlphaSellChallengeBatch:
     created_at: datetime
     subnet_uid: int
     prediction_interval: PredictionInterval
-    hotkeys_ss58: list[str]
+    wallets: list[WalletIdentifier]
 
 @dataclass(frozen=True)
 class AlphaSellChallengeTask:
