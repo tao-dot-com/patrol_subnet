@@ -98,11 +98,11 @@ async def test_fetch_subnets_and_owners(monkeypatch):
 @pytest.mark.asyncio
 async def test_query_metagraph_direct(monkeypatch):
     # stub get_version_for_block
-    monkeypatch.setattr(
-        htg,
-        "get_version_for_block",
-        lambda block, curr, rv: "VER"
-    )
+    # monkeypatch.setattr(
+    #     htg,
+    #     "get_version_for_block",
+    #     lambda block, curr, rv: "VER"
+    # )
     # async def fake_query(method, *args, **kwargs):
     #     if method == "get_block_hash":
     #         return "BH"

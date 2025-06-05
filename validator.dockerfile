@@ -18,7 +18,7 @@ FROM base AS build
 
 WORKDIR /build
 
-COPY src/patrol/validation ./src/patrol/validation
+COPY validator/src/patrol/validation ./src/patrol/validation
 COPY src/patrol/chain_data ./src/patrol/chain_data
 COPY src/patrol/constants.py ./src/patrol/constants.py
 COPY src/patrol/protocol.py ./src/patrol/protocol.py

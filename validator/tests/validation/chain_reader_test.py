@@ -1,16 +1,16 @@
 import asyncio
 import os
 from datetime import datetime, UTC
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 import pytest
 from async_substrate_interface import AsyncSubstrateInterface
 
-from patrol.chain_data.patrol_websocket import PatrolWebsocket
-from patrol.chain_data.substrate_client import SubstrateClient
+#from patrol.chain_data.patrol_websocket import PatrolWebsocket
+#from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.validation.chain import ChainEvent
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.chain.runtime_versions import RuntimeVersions
+#from patrol.validation.chain.runtime_versions import RuntimeVersions
 
 runtime_mappings = {
     "150": {
@@ -154,11 +154,6 @@ async def test_find_events_in_batches_of_1000(substrate):
     events = list(await chain_reader.find_block_events(runtime_version, list(range(current_block + 1000, current_block + 2000))))
     assert len(events) == 107
 
-@pytest.mark.skip
-async def test_get_current_block(substrate):
-    chain_reader = ChainReader(substrate)
-    assert await chain_reader.get_current_block() > 5707601
-
 
 @pytest.mark.skip
 async def test_find_stake_events(substrate):
@@ -175,3 +170,18 @@ async def test_find_recent_stake_events(substrate):
     events = await chain_reader.find_stake_events(range(recent_block, recent_block + 10))
 
     assert len(events) == 43
+
+async def test_get_current_block():
+
+    raw_block = {
+        'header': {
+            'number': 5649525
+        }
+    }
+
+    mock_substrate = AsyncMock(AsyncSubstrateInterface)
+    mock_substrate.get_block = AsyncMock(return_value=raw_block)
+
+    chain_utils = ChainReader(mock_substrate)
+    current_block = await chain_utils.get_current_block()
+    assert current_block == 5649525

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Optional, Iterable
 from datetime import datetime
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 
 
 @dataclass(frozen=True)

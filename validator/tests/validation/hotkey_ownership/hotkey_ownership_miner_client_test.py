@@ -7,7 +7,7 @@ import pytest
 from bittensor import Axon, Dendrite
 from bittensor_wallet import Wallet
 
-from patrol.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
+from patrol_common.protocol import HotkeyOwnershipSynapse, GraphPayload, Node, Edge, HotkeyOwnershipEvidence
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import MinerTaskException, HotkeyOwnershipMinerClient
 
 

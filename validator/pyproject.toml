@@ -1,8 +1,8 @@
 [project]
-name = "patrol-subnet"
+name = "patrol-validator"
 dynamic = ["version"]
-description = "Patrol Subnet"
-requires-python = ">=3.11"
+description = "Patrol Subnet Validator"
+requires-python = ">=3.12"
 dependencies = [
     "bittensor==9.7.0",
     "aiochclient[aiohttp]",
@@ -16,7 +16,7 @@ dependencies = [
     "async_lru",
     "greenlet>=3.2.1",
     "networkx",
-    #"async-substrate-interface==1.0.9"
+    "patrol_common"
 ]
 
 [project.optional-dependencies]
@@ -40,5 +40,6 @@ testpaths = ['test']
 #addopts = ['--strict-config', '-ra']
 
 [tool.setuptools_scm]
+root = "../"
 version_scheme = "no-guess-dev"
 local_scheme = "node-and-date"

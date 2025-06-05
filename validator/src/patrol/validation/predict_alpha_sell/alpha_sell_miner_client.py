@@ -6,7 +6,7 @@ from bittensor import AxonInfo, Dendrite
 
 from patrol.validation.error import MinerTaskException
 from patrol.validation.predict_alpha_sell import WalletIdentifier
-from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
+from patrol_common.protocol import AlphaSellSynapse
 
 
 class AlphaSellMinerClient:

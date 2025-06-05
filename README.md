@@ -52,8 +52,8 @@ In the near future we plan to provide a Public API for developers interested in 
 ### Coldkey search task
 
 #### Validator selects target wallet to cover
-The flow of the subnet begins with validators selecting target wallets to submit to miners.  These targets are randomly selected from the chain. The [validator](src/patrol/validation/validator.py) then sends a target to each [miner](src/patrol/mining/miner.py). 
-[See full target selection code here](src/patrol/validation/target_generation.py)
+The flow of the subnet begins with validators selecting target wallets to submit to miners.  These targets are randomly selected from the chain. The [validator](validator/src/patrol/validation/validator.py) then sends a target to each [miner](src/patrol/mining/miner.py). 
+[See full target selection code here](validator/src/patrol/validation/target_generation.py)
 
 #### Miner builds subgraph for target wallet
 [Miners](src/patrol/mining/miner.py) receive the target from the validator and begin their search for related data.  Miners construct a *subgraph* of relational data for the target, and follow the data trace to expand their subgraph to N degrees of separation from the original target. 
@@ -81,7 +81,7 @@ These subgraphs are then submitted to the validator for evaluation.
 
 #### Validator verifies miner’s subgraph
 
-Once miners submit their subgraphs, [Validators](src/patrol/validation/validator.py) will [verify](src/patrol/validation/graph_validation/bittensor_validation_mechanism.py) the data by checking the *evidence* against the *node* and *edge* data submitted by the miners. This validation is pass/fail, failing will result in a score of 0 for that submission. This verification process currently supports the following node and edges types:
+Once miners submit their subgraphs, [Validators](validator/src/patrol/validation/validator.py) will [verify](validator/src/patrol/validation/graph_validation/bittensor_validation_mechanism.py) the data by checking the *evidence* against the *node* and *edge* data submitted by the miners. This validation is pass/fail, failing will result in a score of 0 for that submission. This verification process currently supports the following node and edges types:
 
 Nodes:
 - Wallet nodes: Contains wallet addresses and types.

@@ -10,7 +10,7 @@ from bittensor_wallet import Wallet
 
 from pydantic import BaseModel
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.scoring import MinerScore
 

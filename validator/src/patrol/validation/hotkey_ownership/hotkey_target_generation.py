@@ -4,9 +4,12 @@ import random
 from async_substrate_interface import AsyncSubstrateInterface
 from bittensor.core.chain_data.utils import decode_account_id
 
-from patrol.chain_data.substrate_client import SubstrateClient
-from patrol.chain_data.runtime_groupings import get_version_for_block
-from patrol.constants import Constants
+from patrol.validation import Constants
+
+
+#from patrol.chain_data.substrate_client import SubstrateClient
+##rom patrol.chain_data.runtime_groupings import get_version_for_block
+#from patrol.constants import Constants
 
 class HotkeyTargetGenerator:
     def __init__(self, substrate: AsyncSubstrateInterface):

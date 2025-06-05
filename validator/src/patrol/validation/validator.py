@@ -87,8 +87,8 @@ def boot():
             alpha_sell_scoring.start_scoring_process(wallet, DB_URL, ENABLE_DASHBOARD_SYNDICATION)
 
         if ENABLE_HOTKEY_OWNERSHIP_TASK:
-            from patrol.validation.hotkey_ownership import hotkey_ownership_challenge
-            hotkey_ownership_challenge.start_process(wallet, db_url=DB_URL, enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION)
+            from patrol.validation.hotkey_ownership import hotkey_ownership_batch
+            hotkey_ownership_batch.start_process(wallet, db_url=DB_URL, enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION)
 
         asyncio.run(start())
         logger.info("Service Terminated.")

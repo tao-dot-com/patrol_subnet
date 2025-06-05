@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, patch, ANY
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from patrol.constants import TaskType
-from patrol.validation.chain.chain_utils import ChainUtils
+from patrol.validation import TaskType
+from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.persistence.transaction_helper import TransactionHelper
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, AlphaSellEventRepository, \
@@ -20,7 +20,7 @@ from patrol.validation.scoring import MinerScoreRepository, MinerScore
 async def test_score_miner_tasks(mock_datetime: datetime):
     scoring_repository = AsyncMock(MinerScoreRepository)
     challenge_repository = AsyncMock(AlphaSellChallengeRepository)
-    chain_utils = AsyncMock(ChainUtils)
+    chain_reader = AsyncMock(ChainReader)
     event_repository = AsyncMock(AlphaSellEventRepository)
     dashboard_client = AsyncMock(DashboardClient)
 
@@ -48,7 +48,7 @@ async def test_score_miner_tasks(mock_datetime: datetime):
                                ]
         )]
 
-    chain_utils.get_current_block.return_value = 120
+    chain_reader.get_current_block.return_value = 120
     event_repository.find_aggregate_stake_movement_by_hotkey.return_value = {
         "alice": 400
     }
@@ -64,7 +64,7 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     transaction_helper.do_in_transaction = AsyncMock(side_effect=side_effect)
 
     scoring = AlphaSellScoring(
-        challenge_repository, scoring_repository, chain_utils, event_repository, validator, dashboard_client,
+        challenge_repository, scoring_repository, chain_reader, event_repository, validator, dashboard_client,
         transaction_helper,
     )
     await scoring.score_miners()

@@ -1,4 +1,4 @@
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.scoring import MinerScoreRepository, MinerScore
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine, AsyncSession
 from sqlalchemy.orm import mapped_column, Mapped, MappedAsDataclass

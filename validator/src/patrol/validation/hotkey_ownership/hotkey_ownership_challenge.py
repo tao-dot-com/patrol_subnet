@@ -7,19 +7,17 @@ import uuid
 from typing import Optional
 from uuid import UUID
 
-from patrol.constants import TaskType
-from patrol.protocol import HotkeyOwnershipSynapse, Edge, Node
-from patrol.validation import Miner, ValidationException
+from patrol.validation import Miner, ValidationException, Constants, TaskType
 from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient, \
     MinerTaskException
-from patrol.constants import Constants
 
 import networkx as nx
 
 from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
 from patrol.validation.scoring import MinerScore, MinerScoreRepository
+from patrol_common.protocol import HotkeyOwnershipSynapse, Node, Edge
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository, _MinerScore
 from patrol.validation.scoring import MinerScore

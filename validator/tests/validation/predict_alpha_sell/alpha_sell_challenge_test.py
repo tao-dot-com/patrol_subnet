@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 
 from bittensor import AxonInfo
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.error import MinerTaskException
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
@@ -12,7 +12,7 @@ from patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge import Alph
 from patrol.validation.predict_alpha_sell import TransactionType, PredictionInterval, AlphaSellPrediction, \
     AlphaSellChallengeBatch, WalletIdentifier
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
-from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
+from patrol_common.protocol import AlphaSellSynapse
 from patrol.validation.scoring import MinerScore
 
 

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.miner_scoring import MinerScoring, normalize_scores
 from patrol.validation.scoring import MinerScoreRepository, ValidationResult
 

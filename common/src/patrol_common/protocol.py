@@ -2,7 +2,7 @@ import bittensor as bt
 from dataclasses import dataclass, field
 from typing import Optional, Union, List
 
-from patrol.common import WalletIdentifier, PredictionInterval, AlphaSellPrediction
+from patrol_common import WalletIdentifier, PredictionInterval, AlphaSellPrediction
 
 
 @dataclass(slots=True)

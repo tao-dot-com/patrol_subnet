@@ -57,7 +57,7 @@ This rewards both speed and reliability while allowing some flexibility for slow
 
 Each component (Volume, Responsiveness) is normalized between 0.0 and 1.0, and can be combined via weighted averaging or other aggregation logic to produce a final incentive score per payload.
 
-[View the full score calculation here](../src/patrol/validation/miner_scoring.py).
+[View the full score calculation here](../validator/src/patrol/validation/miner_scoring.py).
 
 ⸻
 

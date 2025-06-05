@@ -2,9 +2,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet.bittensor_wallet import Wallet
-from more_itertools.more import side_effect
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.scoring import MinerScoreRepository
 from patrol.validation.weight_setter import WeightSetter
 from bittensor.core.async_subtensor import AsyncSubtensor

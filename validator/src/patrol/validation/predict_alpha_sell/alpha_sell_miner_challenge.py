@@ -11,7 +11,7 @@ from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet import Wallet
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.error import MinerTaskException
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
@@ -20,8 +20,8 @@ from patrol.validation.persistence.alpha_sell_challenge_repository import Databa
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, \
     AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner, PredictionInterval, WalletIdentifier
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
-from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
 from patrol.validation.scoring import MinerScore
+from patrol_common.protocol import AlphaSellSynapse
 
 logger = logging.getLogger(__name__)
 

@@ -8,9 +8,8 @@ import pytest
 from aiohttp import web
 from aiohttp.web_request import Request
 from bittensor_wallet import Keypair, Wallet
-from bittensor_wallet.mock import MockWallet
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.scoring import MinerScore
 

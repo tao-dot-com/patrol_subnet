@@ -6,12 +6,10 @@ from typing import Iterable, Any
 
 import bittensor.core.chain_data
 
-from patrol.chain_data.substrate_client import SubstrateClient
 from bittensor.core.async_subtensor import AsyncSubstrateInterface
 from patrol.validation.predict_alpha_sell import ChainStakeEvent, TransactionType
 
 from patrol.validation.chain import ChainEvent
-from patrol.validation.chain.runtime_versions import RuntimeVersions
 from bittensor.core.chain_data.utils import decode_account_id
 
 import logging
@@ -143,7 +141,6 @@ class ChainReader:
 
     async def get_current_block(self) -> int:
         current_block = await self.substrate.get_block()
-        #current_block = await self._substrate_client.query("get_block", None)
         return current_block["header"]["number"]
 
     async def _get_block_hash(self, block_number: int) -> tuple[int, str]: #, runtime_version: int) -> tuple[int, str]:

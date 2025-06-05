@@ -2,16 +2,14 @@ import asyncio
 import dataclasses
 import logging
 import multiprocessing
-import time
 from datetime import datetime, UTC
-from tempfile import TemporaryDirectory
 
 from async_substrate_interface import AsyncSubstrateInterface
 from bittensor_wallet import Wallet
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from patrol.constants import TaskType
-from patrol.validation.chain.chain_utils import ChainUtils
+from patrol.validation import TaskType
+from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
@@ -89,7 +87,7 @@ class AlphaSellScoring:
     def __init__(
             self, challenge_repository: AlphaSellChallengeRepository,
             miner_score_repository: MinerScoreRepository,
-            chain_utils: ChainUtils,
+            chain_reader: ChainReader,
             alpha_sell_event_repository: AlphaSellEventRepository,
             alpha_sell_validator: AlphaSellValidator,
             dashboard_client: DashboardClient | None,
@@ -97,14 +95,14 @@ class AlphaSellScoring:
     ):
         self.challenge_repository = challenge_repository
         self.miner_score_repository = miner_score_repository
-        self.chain_utils = chain_utils
+        self.chain_reader = chain_reader
         self.alpha_sell_event_repository = alpha_sell_event_repository
         self.alpha_sell_validator = alpha_sell_validator
         self.dashboard_client = dashboard_client
         self.transaction_helper = transaction_helper
 
     async def score_miners(self):
-        upper_block = (await self.chain_utils.get_current_block()) - 1
+        upper_block = (await self.chain_reader.get_current_block()) - 1
         scorable_batches = await self.challenge_repository.find_scorable_challenges(upper_block)
 
         if len(scorable_batches) == 0:
@@ -164,7 +162,7 @@ def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: boo
         transaction_helper = TransactionHelper(engine)
 
         async with AsyncSubstrateInterface(ARCHIVE_SUBTENSOR) as substrate:
-            chain_utils = ChainUtils(substrate)
+            chain_utils = ChainReader(substrate)
             scoring = AlphaSellScoring(
                 challenge_repository,
                 miner_score_repository,

@@ -2,8 +2,8 @@ import time
 import aiohttp
 from bittensor import AxonInfo, Dendrite
 
-from patrol.protocol import HotkeyOwnershipSynapse
 from patrol.validation.error import MinerTaskException
+from patrol_common.protocol import HotkeyOwnershipSynapse
 
 
 class HotkeyOwnershipMinerClient:

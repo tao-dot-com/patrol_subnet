@@ -10,7 +10,8 @@ from bittensor_wallet import Wallet
 from patrol.validation.error import MinerTaskException
 from patrol.validation.predict_alpha_sell import TransactionType, WalletIdentifier
 from patrol.validation.predict_alpha_sell.alpha_sell_miner_client import AlphaSellMinerClient
-from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse, AlphaSellPrediction, PredictionInterval
+from patrol_common import AlphaSellPrediction, PredictionInterval
+from patrol_common.protocol import AlphaSellSynapse
 
 
 @pytest.fixture

@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from patrol.validation.persistence import migrate_db
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
-from patrol.validation.predict_alpha_sell import PredictionInterval, AlphaSellPrediction, \
-    TransactionType, AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner, WalletIdentifier
+from patrol_common import PredictionInterval, AlphaSellPrediction, TransactionType
+from patrol.validation.predict_alpha_sell import AlphaSellChallengeBatch, AlphaSellChallengeTask, AlphaSellChallengeMiner, WalletIdentifier
 
 
 @pytest.fixture
@@ -76,8 +76,8 @@ async def test_add_challenge_task(clean_pgsql_engine):
         created_at=now,
         miner=AlphaSellChallengeMiner("miner_hk", "miner_ck", 1),
         predictions=[
-            AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
-            AlphaSellPrediction("carol", "carol_ck", TransactionType.STAKE_REMOVED, 15.0),
+            AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25),
+            AlphaSellPrediction("carol", "carol_ck", TransactionType.STAKE_REMOVED, 15),
         ],
     )
 
@@ -156,7 +156,6 @@ async def test_find_tasks_for_batch(clean_pgsql_engine):
 
 
 async def test_find_scorable_challenge_batches(clean_pgsql_engine):
-    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
 
     batch_id_1 = uuid.uuid4()
     batch_id_2 = uuid.uuid4()

@@ -4,9 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.chain.runtime_versions import RuntimeVersions
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
 from patrol.validation.predict_alpha_sell import AlphaSellEventRepository, ChainStakeEvent
 from patrol.validation.predict_alpha_sell.stake_event_collector import StakeEventCollector

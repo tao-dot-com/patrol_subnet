@@ -2,7 +2,7 @@ import logging
 
 from bittensor_wallet.bittensor_wallet import Wallet
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 from patrol.validation.scoring import MinerScoreRepository
 from bittensor.core.async_subtensor import AsyncSubtensor
 

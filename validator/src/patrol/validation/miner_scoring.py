@@ -5,8 +5,8 @@ import uuid
 from datetime import datetime, UTC
 from uuid import UUID
 
+from patrol.validation import Constants, TaskType
 from patrol.validation.scoring import MinerScore, MinerScoreRepository, ValidationResult
-from patrol.constants import Constants, TaskType
 
 logger = logging.getLogger(__name__)
 

@@ -8,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
 
 from patrol.validation.persistence import Base
-from patrol.validation.predict_alpha_sell import AlphaSellChallengeRepository, PredictionInterval, \
-    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch, TransactionType, AlphaSellChallengeMiner, \
-    WalletIdentifier
+from patrol.validation.predict_alpha_sell import (AlphaSellChallengeRepository,
+    AlphaSellPrediction, AlphaSellChallengeTask, AlphaSellChallengeBatch, AlphaSellChallengeMiner,
+    TransactionType, PredictionInterval, WalletIdentifier)
 
 
 class _AlphaSellChallengeBatch(Base):
