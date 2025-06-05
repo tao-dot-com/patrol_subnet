@@ -52,6 +52,9 @@ def make_miner_score(task: AlphaSellChallengeTask, accuracy: float) -> MinerScor
 
 class AlphaSellValidator:
 
+    def __init__(self, noise_floor: float = 1):
+        self.noise_floor = noise_floor
+
     def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, int]) -> float:
         if task.has_error:
             return 0.0
@@ -61,21 +64,23 @@ class AlphaSellValidator:
         all_hotkeys = set(predictions_by_hotkey.keys() | stake_removals.keys())
 
         square_deltas = []
-        total_actual = []
 
         for hk in all_hotkeys:
-            predicted = predictions_by_hotkey.get(hk, 0)
-            actual_amount = stake_removals.get(hk, 0)
-            total_actual.append(actual_amount)
-            delta = (predicted - actual_amount) ** 2
-            square_deltas.append(delta)
+            predicted_rao = predictions_by_hotkey.get(hk, 0)
+            predicted_tao = predicted_rao / 1e9
+
+            actual_rao = stake_removals.get(hk, 0)
+            actual_tao = actual_rao / 1e9
+
+            relative_delta = ((predicted_tao - actual_tao) / (actual_tao + self.noise_floor)) ** 2
+            square_deltas.append(relative_delta)
 
         if len(square_deltas) == 0:
             return 0.0
 
         mean_square_deltas = sum(square_deltas) / len(square_deltas)
 
-        accuracy = 1 / (1 + mean_square_deltas)
+        accuracy = max(0.0, 1.0 - mean_square_deltas)
         return accuracy
 
 
@@ -189,11 +194,3 @@ def start_scoring_process(wallet: Wallet, db_url: str, enable_dashboard_syndicat
     process = multiprocessing.Process(target=start_scoring, name="Scoring", args=[wallet, db_url, enable_dashboard_syndication], daemon=True)
     process.start()
     return process
-
-if __name__ == "__main__":
-    with TemporaryDirectory() as tmp:
-        my_wallet = Wallet(name="vali", hotkey="vali", path=tmp)
-        my_wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
-        start_scoring_process(my_wallet, False)
-        while True:
-            time.sleep(1)

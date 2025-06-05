@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from patrol.validation.predict_alpha_sell import ChainStakeEvent, AlphaSellEventRepository, TransactionType
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncEngine
 from patrol.validation.persistence import Base

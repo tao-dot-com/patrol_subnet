@@ -37,7 +37,7 @@ async def test_collect_events():
     ]
 
     chain_reader.find_stake_events.return_value = events_collected
-    chain_reader.get_current_block.return_value = 1000003
+    chain_reader.get_last_finalized_block.return_value = 1000003
 
     event_repository = AsyncMock(AlphaSellEventRepository)
     event_collector = StakeEventCollector(chain_reader, event_repository, AsyncMock())

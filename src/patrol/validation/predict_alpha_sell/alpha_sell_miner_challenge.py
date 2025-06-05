@@ -4,7 +4,6 @@ import multiprocessing
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, UTC
-from tempfile import TemporaryDirectory
 
 import bittensor as bt
 from bittensor import AsyncSubtensor
@@ -134,21 +133,24 @@ class AlphaSellMinerChallengeProcess:
 
     async def challenge_miners(self):
 
-        logger.info("Executing Miner Challenges for prediction window: %s blocks", self.interval_window_blocks)
+        logger.info("Preparing Miner Challenges for prediction window: %s blocks", self.interval_window_blocks)
 
         current_block = await self.subtensor.get_current_block()
         start_block = current_block + 5
         prediction_interval = PredictionInterval(start_block, start_block + self.interval_window_blocks)
 
         await self.patrol_metagraph.sync()
+        logger.info("Metagraph synced")
         miners_to_challenge = [Miner(axon, idx) for idx, axon in enumerate(self.patrol_metagraph.axons) if axon.is_serving]
 
         subnets = await self.subtensor.get_subnets()
         batches = [await self._make_batch(prediction_interval, net_uid) for net_uid in subnets]
 
+        logger.info("Challenge batch preparation for %s subnets", len(batches))
         for batch in batches:
             await self.challenge_repository.add(batch)
 
+        logger.info("Executing Miner Challenges for prediction window: %s blocks", self.interval_window_blocks)
         for miner in miners_to_challenge:
             #tasks_to_syndicate = []
             async for task in self.miner_challenge.execute_challenge(miner, batches):
@@ -179,7 +181,9 @@ async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
     dendrite = bt.Dendrite(wallet)
     miner_client = AlphaSellMinerClient(dendrite)
 
-    from patrol.validation.config import DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION, PATROL_METAGRAPH, ALPHA_SELL_PREDICTION_WINDOW_BLOCKS
+    from patrol.validation.config import DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION, PATROL_METAGRAPH, ALPHA_SELL_PREDICTION_WINDOW_BLOCKS, \
+        ALPHA_SELL_TASK_INTERVAL_SECONDS
+
     dashboard_client = HttpDashboardClient(wallet, DASHBOARD_BASE_URL) if ENABLE_DASHBOARD_SYNDICATION else None
 
     miner_challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
@@ -195,7 +199,7 @@ async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
         except Exception as ex:
             logger.exception("Unexpected error")
         finally:
-            await asyncio.sleep(3600)
+            await asyncio.sleep(ALPHA_SELL_TASK_INTERVAL_SECONDS)
 
 async def run(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
     if subtensor:
@@ -207,6 +211,7 @@ async def run(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
 
 
 def start_process(wallet: Wallet, subtensor: AsyncSubtensor | None = None, db_url: str | None = None):
+
     def run_async():
         from patrol.validation.config import DB_URL
         asyncio.run(run(wallet, subtensor, db_url if db_url else DB_URL))
@@ -214,10 +219,3 @@ def start_process(wallet: Wallet, subtensor: AsyncSubtensor | None = None, db_ur
     process = multiprocessing.Process(target=run_async, name="Challenge", daemon=True)
     process.start()
     return process
-
-
-if __name__ == "__main__":
-    with TemporaryDirectory() as tmp:
-        my_wallet = Wallet(name="vali", hotkey="vali", path=tmp)
-        my_wallet.create_if_non_existent(coldkey_use_password=False, suppress=True)
-        start_process(my_wallet)

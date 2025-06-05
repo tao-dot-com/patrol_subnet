@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "Patrol Subnet"
 requires-python = ">=3.11"
 dependencies = [
-    "bittensor==9.1.0",
+    "bittensor==9.7.0",
     "aiochclient[aiohttp]",
     "aiohttp",
     "sqlalchemy",
@@ -16,7 +16,7 @@ dependencies = [
     "async_lru",
     "greenlet>=3.2.1",
     "networkx",
-    "async-substrate-interface==1.0.9"
+    #"async-substrate-interface==1.0.9"
 ]
 
 [project.optional-dependencies]

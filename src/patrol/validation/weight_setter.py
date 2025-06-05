@@ -66,6 +66,3 @@ class WeightSetter:
         tempo = await self.subtensor.tempo(self.net_uid)
 
         return blocks_since_last_update > tempo
-
-
-

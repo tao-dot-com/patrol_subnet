@@ -1,8 +1,10 @@
+import asyncio
 import os
 from datetime import datetime, UTC
 from unittest.mock import patch
 
 import pytest
+from async_substrate_interface import AsyncSubstrateInterface
 
 from patrol.chain_data.patrol_websocket import PatrolWebsocket
 from patrol.chain_data.substrate_client import SubstrateClient
@@ -49,19 +51,25 @@ runtime_mappings = {
     },
 }
 
-# @pytest.fixture(scope="module")
-# def event_loop():
-#     loop = asyncio.new_event_loop()
-#     yield loop
-#     loop.close()
-
 ARCHIVE_NODE = os.environ.get('ARCHIVE_NODE')
 
-@pytest.fixture#(scope="module")
+@pytest.fixture(scope="module")
+def event_loop():
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture
 async def substrate_client():
     substrate_client = SubstrateClient(runtime_mappings, ARCHIVE_NODE, PatrolWebsocket(ARCHIVE_NODE))
     await substrate_client.initialize()
     return substrate_client
+
+
+@pytest.fixture
+async def substrate():
+    async with AsyncSubstrateInterface("wss://archive.chain.opentensor.ai:443") as substrate:
+        yield substrate
 
 
 @pytest.mark.skip()
@@ -94,12 +102,12 @@ async def test_read_neuron_registered_events(mock_datetime, substrate_client):
 
 @pytest.mark.skip()
 @patch("patrol.validation.chain.chain_reader.datetime")
-async def test_read_coldkey_swap_events(mock_datetime, substrate_client):
+async def test_read_coldkey_swap_events(mock_datetime, substrate):
 
     now = datetime.now(UTC)
     mock_datetime.now.return_value = now
 
-    chain_reader = ChainReader(substrate_client, RuntimeVersions())
+    chain_reader = ChainReader(substrate)
 
     current_block = 4905251
     runtime_version = RuntimeVersions().runtime_version_for_block(current_block)
@@ -120,11 +128,11 @@ async def test_read_coldkey_swap_events(mock_datetime, substrate_client):
     assert await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251 + 57_445) == "5CAwB3dSiMC5jJfpvVU47zT3Gyz5ZDoiyHMaYZUuNs5hFh2P"
     assert await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251 + 57_445 + 1) == "5HNEheHMipyfrJGfYnKgCfvGsoJnZS2BXQjNz5299jGWZhwg"
 
-@pytest.mark.skip()
-async def test_find_hotkey_owner(substrate_client):
+@pytest.mark.skip
+async def test_find_hotkey_owner(substrate):
     hotkey_swapped = "5HK5tp6t2S59DywmHRWPBVJeJ86T61KjurYqeooqj8sREpeN"
 
-    chain_reader = ChainReader(substrate_client, RuntimeVersions())
+    chain_reader = ChainReader(substrate)
     owner = await chain_reader.get_hotkey_owner(hotkey_swapped, 4905251 + 57_445)
     assert owner == "5CAwB3dSiMC5jJfpvVU47zT3Gyz5ZDoiyHMaYZUuNs5hFh2P"
 
@@ -133,15 +141,37 @@ async def test_find_hotkey_owner(substrate_client):
 
 
 @pytest.mark.skip()
-async def test_find_events_in_batches_of_1000(substrate_client):
-    chain_reader = ChainReader(substrate_client, RuntimeVersions())
+async def test_find_events_in_batches_of_1000(substrate):
+    chain_reader = ChainReader(substrate) #_client, RuntimeVersions())
 
     #current_block = 3_139_365
     current_block = 5_000_000
-    runtime_version = RuntimeVersions().runtime_version_for_block(current_block)
+    #runtime_version = RuntimeVersions().runtime_version_for_block(current_block)
 
     events = list(await chain_reader.find_block_events(runtime_version, list(range(current_block, current_block + 1000))))
-    #assert len(events) == 94
+    assert len(events) == 94
 
     events = list(await chain_reader.find_block_events(runtime_version, list(range(current_block + 1000, current_block + 2000))))
-    #assert len(events) == 107
+    assert len(events) == 107
+
+@pytest.mark.skip
+async def test_get_current_block(substrate):
+    chain_reader = ChainReader(substrate)
+    assert await chain_reader.get_current_block() > 5707601
+
+
+@pytest.mark.skip
+async def test_find_stake_events(substrate):
+    chain_reader = ChainReader(substrate)
+    events = await chain_reader.find_stake_events(range(5000000, 5000005))
+
+    assert len(events) == 43
+
+@pytest.mark.skip
+async def test_find_recent_stake_events(substrate):
+    head = await substrate.get_block()
+    recent_block = head['header']['number'] - 20
+    chain_reader = ChainReader(substrate)
+    events = await chain_reader.find_stake_events(range(recent_block, recent_block + 10))
+
+    assert len(events) == 43

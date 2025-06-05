@@ -1,16 +1,15 @@
 import asyncio
 import logging
 
+from async_substrate_interface import AsyncSubstrateInterface
 from sqlalchemy.ext.asyncio import create_async_engine
-from patrol.chain_data.substrate_client import SubstrateClient
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.chain.runtime_versions import RuntimeVersions
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
 from patrol.validation.predict_alpha_sell import AlphaSellEventRepository, AlphaSellChallengeRepository
 
 batch_size = 1000
-max_back_off = 12
+back_off = 12
 max_block_retardation = 10
 prune_interval = 60
 
@@ -26,19 +25,22 @@ class StakeEventCollector:
         self.alpha_sell_challenge_repository = alpha_sell_challenge_repository
 
     async def collect_events(self) -> int:
-        previous_block = await self.chain_reader.get_current_block() - 1
-        most_recent_block = await self.alpha_sell_event_repository.find_most_recent_block_collected()
+        last_finalized_block = await self.chain_reader.get_last_finalized_block()
+        most_recent_block_collected = await self.alpha_sell_event_repository.find_most_recent_block_collected()
+        block_deficit = max(0, last_finalized_block - most_recent_block_collected)
 
-        starting_block = most_recent_block + 1 if most_recent_block else previous_block - 10
+        logger.info("Most recent block collected = %s; latest finalized block = %s; deficit = %s",
+                    most_recent_block_collected, last_finalized_block, block_deficit
+        )
 
-        retardation = previous_block - starting_block
-        if retardation < max_block_retardation:
-            logger.info("Skipping event collection because the events are within [%s] blocks of the current block", retardation)
-            return max_back_off
+        if block_deficit == 0:
+            logger.info("Skipping event collection because the events are within [%s] blocks of the last finalized block", block_deficit)
+            return back_off
 
-        logger.info("Collecting stake events from block %s - %s", starting_block, previous_block)
+        starting_block = most_recent_block_collected + 1 if most_recent_block_collected else last_finalized_block - 10
+        logger.info("Collecting stake events from block %s - %s inclusive", starting_block, last_finalized_block)
 
-        blocks_to_collect = range(starting_block, previous_block)
+        blocks_to_collect = range(starting_block, last_finalized_block + 1)
 
         def block_batches():
             for i in range(0, len(blocks_to_collect), batch_size):
@@ -47,8 +49,9 @@ class StakeEventCollector:
         for batch in block_batches():
             events = await self.chain_reader.find_stake_events(batch)
             await self.alpha_sell_event_repository.add(events)
+            logger.info("Collected %s events from %s block(s)", len(events), len(batch))
 
-        return 0
+        return back_off
 
     async def prune_events(self):
         earliest_block = await self.alpha_sell_challenge_repository.find_earliest_prediction_block()
@@ -72,33 +75,29 @@ class StakeEventCollector:
                 logger.exception("Unexpected error")
 
 
-def start(db_url: str):
+async def start(db_url: str):
     from patrol.validation.config import ARCHIVE_SUBTENSOR
 
-    async def async_start():
-        runtime_versions = RuntimeVersions()
-        active_versions = {k: v for k, v in runtime_versions.versions.items() if int(k) >= 261}
+    #runtime_versions = RuntimeVersions()
+    #active_versions = {k: v for k, v in runtime_versions.versions.items() if int(k) >= 261}
 
-        substrate_client = SubstrateClient(active_versions, ARCHIVE_SUBTENSOR)
-        await substrate_client.initialize()
-
+    async with AsyncSubstrateInterface(ARCHIVE_SUBTENSOR) as substrate:
         engine = create_async_engine(db_url)
         event_repository = DataBaseAlphaSellEventRepository(engine)
-        chain_reader = ChainReader(substrate_client, runtime_versions)
+        chain_reader = ChainReader(substrate)
 
         alpha_sell_challenge_repository = DatabaseAlphaSellChallengeRepository(engine)
 
         collector = StakeEventCollector(chain_reader, event_repository, alpha_sell_challenge_repository)
         await collector.collect_events_forever()
 
-    asyncio.run(async_start())
-
 
 def start_process(db_url: str):
+
+    def start_async():
+        asyncio.run(start(db_url))
+
     import multiprocessing
-    p = multiprocessing.Process(target=start, name="Event Collector", args=[db_url], daemon=True)
+    p = multiprocessing.Process(target=start_async, name="Event Collector", daemon=True)
     p.start()
     return p
-
-if __name__ == "__main__":
-    start_process("postgresql+asyncpg://patrol:password@localhost:5432/patrol")

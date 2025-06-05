@@ -96,4 +96,4 @@ async def test_scoring_process(scoring_process):
     await asyncio.sleep(10)
 
 async def test_event_process(event_process):
-    await asyncio.sleep(60)
+    await asyncio.sleep(120)

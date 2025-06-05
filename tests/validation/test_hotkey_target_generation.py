@@ -6,8 +6,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import patrol.validation.hotkey_ownership.hotkey_target_generation as htg
 from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
-from patrol.constants import Constants
-
 
 def test_format_address_success(monkeypatch):
     # simulate decode_account_id working
@@ -47,29 +45,48 @@ async def test_generate_random_block_numbers(monkeypatch):
 @pytest.mark.asyncio
 async def test_fetch_subnets_and_owners(monkeypatch):
     # Setup a fake substrate_client.query
-    async def fake_query(method, *args, **kwargs):
-        if method == "get_block_hash":
-            return "fake_hash"
-        elif method == "query_map":
-            class Exists:
-                def __init__(self, v): self.value = v
-            async def gen():
-                yield (1, Exists(True))
-                yield (2, Exists(False))
-                yield (3, Exists(True))
-            return gen()
-        elif method == "query":
-            # args = (ver, module, name, [netuid])
-            netuid = args[3][0]
-            return f"owner{netuid}"
-        else:
-            raise RuntimeError(f"unexpected {method!r}")
+    # async def fake_query(method, *args, **kwargs):
+    #     if method == "get_block_hash":
+    #         return "fake_hash"
+    #     elif method == "query_map":
+    #         class Exists:
+    #             def __init__(self, v): self.value = v
+    #         async def gen():
+    #             yield (1, Exists(True))
+    #             yield (2, Exists(False))
+    #             yield (3, Exists(True))
+    #         return gen()
+    #     elif method == "query":
+    #         # args = (ver, module, name, [netuid])
+    #         netuid = args[3][0]
+    #         return f"owner{netuid}"
+    #     else:
+    #         raise RuntimeError(f"unexpected {method!r}")
 
     mock_client = MagicMock()
-    mock_client.query = AsyncMock(side_effect=fake_query)
-    mock_client.return_runtime_versions = MagicMock(return_value={
-        '261': {'block_number_min': 99, 'block_hash_min': 'test', 'block_number_max': 201, 'block_hash_max': 'test'}
-    })
+    #mock_client.query = AsyncMock(side_effect=fake_query)
+    mock_client.get_block_hash = AsyncMock(return_value="fake_hash")
+
+    async def mock_query_map(*args, **kwargs):
+        class Exists:
+            def __init__(self, v): self.value = v
+        async def gen():
+            yield (1, Exists(True))
+            yield (2, Exists(False))
+            yield (3, Exists(True))
+        return gen()
+
+    mock_client.query_map = AsyncMock(side_effect=mock_query_map)
+
+    async def mock_query(*args, **kwargs):
+        netuid = args[2][0]
+        return f"owner{netuid}"
+
+    mock_client.query = AsyncMock(side_effect=mock_query)
+
+    # mock_client.return_runtime_versions = MagicMock(return_value={
+    #     '261': {'block_number_min': 99, 'block_hash_min': 'test', 'block_number_max': 201, 'block_hash_max': 'test'}
+    # })
     gen = HotkeyTargetGenerator(mock_client)
 
     subnets, owners = await gen.fetch_subnets_and_owners(block=100, current_block=200)
@@ -86,18 +103,21 @@ async def test_query_metagraph_direct(monkeypatch):
         "get_version_for_block",
         lambda block, curr, rv: "VER"
     )
-    async def fake_query(method, *args, **kwargs):
-        if method == "get_block_hash":
-            return "BH"
-        elif method == "runtime_call":
-            # return raw bytes
-            return b"hello_neurons"
-        else:
-            raise RuntimeError()
+    # async def fake_query(method, *args, **kwargs):
+    #     if method == "get_block_hash":
+    #         return "BH"
+    #     elif method == "runtime_call":
+    #         # return raw bytes
+    #         return b"hello_neurons"
+    #     else:
+    #         raise RuntimeError()
 
     mock_client = MagicMock()
-    mock_client.query = AsyncMock(side_effect=fake_query)
-    mock_client.return_runtime_versions = AsyncMock(return_value=None)
+    # mock_client.query = AsyncMock(side_effect=fake_query)
+    # mock_client.return_runtime_versions = AsyncMock(return_value=None)
+    mock_client.get_block_hash = AsyncMock(return_value="BH")
+    mock_client.runtime_call = AsyncMock(return_value=b"hello_neurons")
+
     gen = HotkeyTargetGenerator(mock_client)
 
     out = await gen.query_metagraph_direct(block_number=42, netuid=7, current_block=100)

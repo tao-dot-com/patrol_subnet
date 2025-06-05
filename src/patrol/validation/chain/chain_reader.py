@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, UTC
 from collections import namedtuple
+from itertools import chain
 from typing import Iterable, Any
 
 import bittensor.core.chain_data
@@ -21,9 +22,10 @@ PreprocessedTuple = namedtuple("PreprocessedTuple", ["block_number", "block_hash
 
 
 class ChainReader:
-    def __init__(self, substrate_client: SubstrateClient, runtime_versions: RuntimeVersions):
-        self._substrate_client = substrate_client
-        self._runtime_versions = runtime_versions
+    def __init__(self, substrate: AsyncSubstrateInterface):
+        self.substrate = substrate
+        #self._substrate_client = substrate_client
+        #self._runtime_versions = runtime_versions
 
     @staticmethod
     def _format_address(addr: list) -> str:
@@ -49,50 +51,58 @@ class ChainReader:
             storage_function="Events"
         ))
 
-    async def find_block_events(self, runtime_version: int, block_numbers: list[int]) -> Iterable[Any]:
-
-        logger.info("Querying blockchain for events in blocks %s to %s", block_numbers[0], block_numbers[-1])
-
-        preprocessed_tasks = [self._preprocess_system_events(runtime_version, it) for it in block_numbers]
-        preprocessed_events = await asyncio.gather(*preprocessed_tasks)
-
-        block_numbers_by_hash = {it.block_hash: it.block_number for it in preprocessed_events}
-
-        def make_payload(preprocessed: PreprocessedTuple):
-            return AsyncSubstrateInterface.make_payload(
-                preprocessed.block_hash,
-                preprocessed.event.method,
-                [preprocessed.event.params[0], preprocessed.block_hash]
-            )
-
-        rpc_request_payloads = [make_payload(it) for it in preprocessed_events]
-        value_scale_type = preprocessed_events[0].event.value_scale_type
-        storage_item = preprocessed_events[0].event.storage_item
-
-        raw_events = await self._substrate_client.query(
-                "_make_rpc_request",
-                runtime_version,
-                rpc_request_payloads,
-                value_scale_type,
-                storage_item
-            )
-
-        events = await self._chain_events_for(raw_events, block_numbers_by_hash)
-        logger.info("Found %s events in blocks %s to %s", len(events), block_numbers[0], block_numbers[-1])
-        return events
+    # async def find_block_events(self, runtime_version: int, block_numbers: list[int]) -> Iterable[Any]:
+    #
+    #     logger.info("Querying blockchain for events in blocks %s to %s", block_numbers[0], block_numbers[-1])
+    #
+    #     preprocessed_tasks = [self._preprocess_system_events(runtime_version, it) for it in block_numbers]
+    #     preprocessed_events = await asyncio.gather(*preprocessed_tasks)
+    #
+    #     block_numbers_by_hash = {it.block_hash: it.block_number for it in preprocessed_events}
+    #
+    #     def make_payload(preprocessed: PreprocessedTuple):
+    #         return AsyncSubstrateInterface.make_payload(
+    #             preprocessed.block_hash,
+    #             preprocessed.event.method,
+    #             [preprocessed.event.params[0], preprocessed.block_hash]
+    #         )
+    #
+    #     rpc_request_payloads = [make_payload(it) for it in preprocessed_events]
+    #     value_scale_type = preprocessed_events[0].event.value_scale_type
+    #     storage_item = preprocessed_events[0].event.storage_item
+    #
+    #     raw_events = await self._substrate_client.query(
+    #             "_make_rpc_request",
+    #             runtime_version,
+    #             rpc_request_payloads,
+    #             value_scale_type,
+    #             storage_item
+    #         )
+    #
+    #     events = await self._chain_events_for(raw_events, block_numbers_by_hash)
+    #     logger.info("Found %s events in blocks %s to %s", len(events), block_numbers[0], block_numbers[-1])
+    #     return events
     
     async def find_stake_events(self, block_numbers: Iterable[int]) -> list[ChainStakeEvent]:
-        grouped_block_numbers = {}
-        for block_number in block_numbers:
-            runtime_version = self._runtime_versions.runtime_version_for_block(block_number)
-            grouped_block_numbers.setdefault(runtime_version, []).append(block_number)
 
-        stake_events = []
-        for runtime_version, block_numbers in grouped_block_numbers.items():
-            events = await self._find_stake_events(runtime_version, block_numbers)
-            stake_events.extend(events)
+        target_events = {"StakeAdded", "StakeRemoved", "StakeMoved"}
 
-        return stake_events
+        def is_staking_event(event):
+            ev = event['event']
+            module = ev["module_id"]
+            name = ev["event_id"]
+            return module == "SubtensorModule" and name in target_events
+
+        async def events_task(block_number: int):
+            block_hash = await self.substrate.get_block_hash(block_number)
+            events = await self.substrate.get_events(block_hash)
+            return [self._make_chain_event_for_staking(block_number, event) for event in filter(is_staking_event, events)]
+
+        tasks = [events_task(block_number) for block_number in block_numbers]
+        stake_events = await asyncio.gather(*tasks)
+        all_stake_events = list(chain.from_iterable(stake_events))
+        return all_stake_events
+
 
     async def _find_stake_events(self, runtime_version: int, block_numbers: list[int]) -> Iterable[ChainStakeEvent]:
 
@@ -114,45 +124,52 @@ class ChainReader:
         value_scale_type = preprocessed_events[0].event.value_scale_type
         storage_item = preprocessed_events[0].event.storage_item
 
-        raw_events = await self._substrate_client.query(
-                "_make_rpc_request",
-                runtime_version,
-                rpc_request_payloads,
-                value_scale_type,
-                storage_item
-            )
+        raw_events = await self.substrate._make_rpc_request(
+            rpc_request_payloads,
+            value_scale_type,
+            storage_item
+        )
+        # raw_events = await self._substrate_client.query(
+        #         "_make_rpc_request",
+        #         runtime_version,
+        #         rpc_request_payloads,
+        #         value_scale_type,
+        #         storage_item
+        #     )
 
         events = await self._chain_events_for_staking(raw_events, block_numbers_by_hash)
         logger.info("Found %s events in blocks %s to %s", len(events), block_numbers[0], block_numbers[-1])
         return events
 
     async def get_current_block(self) -> int:
-        current_block = await self._substrate_client.query("get_block", None)
+        current_block = await self.substrate.get_block()
+        #current_block = await self._substrate_client.query("get_block", None)
         return current_block["header"]["number"]
 
-    async def _get_block_hash(self, block_number: int, runtime_version: int) -> tuple[int, str]:
-        return block_number, await self._substrate_client.query(
-            "get_block_hash",
-            runtime_version,
-            block_number
-        )
+    async def _get_block_hash(self, block_number: int) -> tuple[int, str]: #, runtime_version: int) -> tuple[int, str]:
+        return block_number, await self.substrate.get_block_hash(block_number)
+        # return block_number, await self._substrate_client.query(
+        #     "get_block_hash",
+        #     runtime_version,
+        #     block_number
+        # )
 
-    async def _chain_events_for(self, raw_events: dict[str, list[tuple[dict]]], block_numbers: dict[str, int]):
-
-        def transform(event_tuple: tuple):
-            return [it['event'] for it in event_tuple]
-
-        event_data = (((k, transform(v[0])) for k, v in raw_events.items()))
-
-        chain_event_builders = []
-
-        for block_hash, events in event_data:
-            block_number = block_numbers[block_hash]
-            for event in events:
-                chain_event_builders.append(self.make_chain_event_for(block_number, event))
-
-        chain_events = await asyncio.gather(*chain_event_builders)
-        return list(filter(lambda it: it is not None, chain_events))
+    # async def _chain_events_for(self, raw_events: dict[str, list[tuple[dict]]], block_numbers: dict[str, int]):
+    #
+    #     def transform(event_tuple: tuple):
+    #         return [it['event'] for it in event_tuple]
+    #
+    #     event_data = (((k, transform(v[0])) for k, v in raw_events.items()))
+    #
+    #     chain_event_builders = []
+    #
+    #     for block_hash, events in event_data:
+    #         block_number = block_numbers[block_hash]
+    #         for event in events:
+    #             chain_event_builders.append(self._make_chain_event_for(block_number, event))
+    #
+    #     chain_events = await asyncio.gather(*chain_event_builders)
+    #     return list(filter(lambda it: it is not None, chain_events))
     
     async def _chain_events_for_staking(self, raw_events: dict[str, list[tuple[dict]]], block_numbers: dict[str, int]):
 
@@ -166,12 +183,12 @@ class ChainReader:
         for block_hash, events in event_data:
             block_number = block_numbers[block_hash]
             for event in events:
-                chain_event_builders.append(self.make_chain_event_for_staking(block_number, event))
+                chain_event_builders.append(self._make_chain_event_for_staking(block_number, event))
 
         chain_events = await asyncio.gather(*chain_event_builders)
         return list(filter(lambda it: it is not None, chain_events))
 
-    async def make_chain_event_for(self, block_number: int, event: dict):
+    async def _make_chain_event_for(self, block_number: int, event: dict):
         if "SubtensorModule" in event:
             if "NeuronRegistered" in event["SubtensorModule"][0]:
                 return await self._make_neuron_registered_event(event, block_number)
@@ -180,55 +197,51 @@ class ChainReader:
             else:
                 return None
     
-    async def make_chain_event_for_staking(self, block_number: int, event: dict):
-        # Handle SubtensorModule stake related events
-        if "SubtensorModule" in event:
-            event_data = event["SubtensorModule"][0]
-            
-            if TransactionType.STAKE_ADDED.value in event_data:
-                return await self._make_stake_added_event(event, block_number)
-            if TransactionType.STAKE_REMOVED.value in event_data:
-                return await self._make_stake_removed_event(event, block_number)
-            elif TransactionType.STAKE_MOVED.value in event_data:
-                return await self._make_stake_moved_event(event, block_number)
-            
+    def _make_chain_event_for_staking(self, block_number: int, event: dict):
+        event_id = event['event']['event_id']
+        attributes = event['event']['attributes']
+
+        if event_id == TransactionType.STAKE_ADDED.value:
+            return self._make_stake_added_event(attributes, block_number)
+        if event_id == TransactionType.STAKE_REMOVED.value:
+            return self._make_stake_removed_event(attributes, block_number)
+        if event_id == TransactionType.STAKE_MOVED.value:
+            return self._make_stake_moved_event(attributes, block_number)
+
         return None
-    
-    async def _make_stake_added_event(self, event, block_number):
-        details = event["SubtensorModule"][0][TransactionType.STAKE_ADDED.value]
-        coldkey = self._format_address(details[0])
-        delegate_hotkey = self._format_address(details[1])
+
+    def _make_stake_added_event(self, attributes, block_number):
+        coldkey = self._format_address(attributes[0])
+        delegate_hotkey = self._format_address(attributes[1])
 
         return ChainStakeEvent.stake_added(
             created_at=datetime.now(UTC),
             block_number=block_number,
             coldkey=coldkey,
             hotkey=delegate_hotkey,
-            rao_amount=details[2],
-            alpha_amount=details[3],
-            net_uid=details[4],
+            rao_amount=attributes[2],
+            alpha_amount=attributes[3],
+            net_uid=attributes[4],
         )
 
-    async def _make_stake_removed_event(self, event, block_number):
-        details = event["SubtensorModule"][0][TransactionType.STAKE_REMOVED.value]
-        coldkey = self._format_address(details[0])
-        delegate_hotkey = self._format_address(details[1])
+    def _make_stake_removed_event(self, attributes, block_number):
+        coldkey = self._format_address(attributes[0])
+        delegate_hotkey = self._format_address(attributes[1])
 
         return ChainStakeEvent.stake_removed(
             created_at=datetime.now(UTC),
             block_number=block_number,
             coldkey=coldkey,
             hotkey=delegate_hotkey,
-            rao_amount=details[2],
-            alpha_amount=details[3],
-            net_uid=details[4]
+            rao_amount=attributes[2],
+            alpha_amount=attributes[3],
+            net_uid=attributes[4]
         )
 
-    async def _make_stake_moved_event(self, event, block_number):
-        details = event["SubtensorModule"][0][TransactionType.STAKE_MOVED.value]
-        coldkey = self._format_address(details[0])
-        source_delegate_hotkey = self._format_address(details[1])
-        destination_delegate_hotkey = self._format_address(details[3])
+    def _make_stake_moved_event(self, attributes, block_number):
+        coldkey = self._format_address(attributes[0])
+        source_delegate_hotkey = self._format_address(attributes[1])
+        destination_delegate_hotkey = self._format_address(attributes[3])
 
         return ChainStakeEvent.stake_moved(
             created_at=datetime.now(UTC),
@@ -236,9 +249,9 @@ class ChainReader:
             coldkey=coldkey,
             from_hotkey=source_delegate_hotkey,
             to_hotkey=destination_delegate_hotkey,
-            from_net_uid=details[2],
-            to_net_uid=details[4],
-            rao_amount=details[5]
+            from_net_uid=attributes[2],
+            to_net_uid=attributes[4],
+            rao_amount=attributes[5]
         )
 
     async def _make_neuron_registered_event(self, event, block_number: int):
@@ -278,14 +291,26 @@ class ChainReader:
         if block_number is None:
             block_number = self.get_current_block()
 
-        runtime_version = self._runtime_versions.runtime_version_for_block(block_number)
-        _, block_hash = await self._get_block_hash(block_number, runtime_version)
+        #runtime_version = self._runtime_versions.runtime_version_for_block(block_number)
+        _, block_hash = await self._get_block_hash(block_number)#, runtime_version)
 
-        return await self._substrate_client.query(
-            "query",
-            runtime_version,
+        return await self.substrate.query(
             "SubtensorModule",
             "Owner",
             [hotkey],
             block_hash=block_hash
         )
+        # return await self._substrate_client.query(
+        #     "query",
+        #     runtime_version,
+        #     "SubtensorModule",
+        #     "Owner",
+        #     [hotkey],
+        #     block_hash=block_hash
+        # )
+
+    async def get_last_finalized_block(self):
+        last_finalized_hash = await self.substrate.get_chain_finalised_head()
+        block_header = await self.substrate.get_block_header(block_hash=last_finalized_hash)
+        last_finalized_block = block_header["header"]["number"]
+        return last_finalized_block

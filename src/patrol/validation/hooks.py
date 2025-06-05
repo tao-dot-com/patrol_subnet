@@ -1,12 +1,12 @@
 import logging
+from enum import Enum
 from typing import Callable
 
 from sqlalchemy.ext.asyncio import AsyncEngine
-from statemachine.states import EnumType
 
 logger = logging.getLogger(__name__)
 
-class HookType(EnumType):
+class HookType(Enum):
     BEFORE_START = "before-start"
     ON_CREATE_DB_ENGINE = "on-create-db-engine"
 
