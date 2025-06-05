@@ -5,26 +5,32 @@ LABEL maintainer="richard@tensora.com"
 LABEL maintainer="jack@tensora.com"
 LABEL bittensor.subnet="81"
 
-WORKDIR /build
+WORKDIR /build/validator
+
 
 RUN apt-get update
 RUN pip install --upgrade pip
 
-COPY pyproject.toml .
-ENV PSEUDO_VERSION="0.0.0"
+COPY common/ ../common/
+RUN ls -al ../common
+
+ARG PSEUDO_VERSION="0.0.0"
+RUN SETUPTOOLS_SCM_PRETEND_VERSION=${PSEUDO_VERSION} pip install -e ../common
+
+COPY validator/pyproject.toml .
 RUN SETUPTOOLS_SCM_PRETEND_VERSION=${PSEUDO_VERSION} pip install -e .
 
 FROM base AS build
 
-WORKDIR /build
 
-COPY validator/src/patrol/validation ./src/patrol/validation
-COPY src/patrol/chain_data ./src/patrol/chain_data
-COPY src/patrol/constants.py ./src/patrol/constants.py
-COPY src/patrol/protocol.py ./src/patrol/protocol.py
-COPY src/patrol/__init__.py ./src/patrol/__init__.py
-COPY tests/validation ./tests/validation
-COPY src/patrol/logging.ini ./src/patrol/logging.ini
+COPY validator/src/ ./src/
+
+#COPY src/patrol/chain_data ./src/patrol/chain_data
+#COPY src/patrol/constants.py ./src/patrol/constants.py
+#COPY src/patrol/protocol.py ./src/patrol/protocol.py
+#COPY src/patrol/__init__.py ./src/patrol/__init__.py
+COPY validator/tests/ ./tests/
+#COPY src/patrol/logging.ini ./src/patrol/logging.ini
 
 ARG SETUPTOOLS_SCM_PRETEND_VERSION="0.0.0"
 RUN SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION} pip install -e '.[test]'
@@ -36,8 +42,8 @@ FROM base AS final
 
 WORKDIR /patrol
 
-COPY --from=build /build/src/ .
-COPY src/logging.ini .
+COPY --from=build /build/validator/src/ .
+#COPY src/patrol/logging.ini .
 ENV PYTHONUNBUFFERED=1
 
 CMD ["python", "-m", "patrol.validation.validator"]

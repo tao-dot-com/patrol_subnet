@@ -1,11 +1,10 @@
 import os
 from typing import Optional
-from unittest.mock import AsyncMock
 
 from bittensor import AxonInfo
 from bittensor.core.metagraph import AsyncMetagraph
 
-from patrol.constants import TaskType
+from patrol.validation import TaskType
 
 NETWORK = os.getenv('NETWORK', "finney")
 NET_UID = int(os.getenv('NET_UID', "81"))

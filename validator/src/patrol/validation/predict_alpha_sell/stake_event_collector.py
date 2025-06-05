@@ -27,6 +27,9 @@ class StakeEventCollector:
     async def collect_events(self) -> int:
         last_finalized_block = await self.chain_reader.get_last_finalized_block()
         most_recent_block_collected = await self.alpha_sell_event_repository.find_most_recent_block_collected()
+
+        most_recent_block_collected = last_finalized_block - 2 if most_recent_block_collected is None else most_recent_block_collected
+
         block_deficit = max(0, last_finalized_block - most_recent_block_collected)
 
         logger.info("Most recent block collected = %s; latest finalized block = %s; deficit = %s",
@@ -37,7 +40,7 @@ class StakeEventCollector:
             logger.info("Skipping event collection because the events are within [%s] blocks of the last finalized block", block_deficit)
             return back_off
 
-        starting_block = most_recent_block_collected + 1 if most_recent_block_collected else last_finalized_block - 10
+        starting_block = most_recent_block_collected + 1
         logger.info("Collecting stake events from block %s - %s inclusive", starting_block, last_finalized_block)
 
         blocks_to_collect = range(starting_block, last_finalized_block + 1)
@@ -77,9 +80,6 @@ class StakeEventCollector:
 
 async def start(db_url: str):
     from patrol.validation.config import ARCHIVE_SUBTENSOR
-
-    #runtime_versions = RuntimeVersions()
-    #active_versions = {k: v for k, v in runtime_versions.versions.items() if int(k) >= 261}
 
     async with AsyncSubstrateInterface(ARCHIVE_SUBTENSOR) as substrate:
         engine = create_async_engine(db_url)
