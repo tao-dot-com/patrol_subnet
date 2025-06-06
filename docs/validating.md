@@ -30,16 +30,15 @@ The database is configured using a URL e.g.
 The validator is configured using environment variables. Example docker-compose.yml files are given below.  
 The following environment variables can be used to configure the validator by including them in the validator environment in the docker compose file.
 
-| Variable               | Default                                 | Description                                                      |
-|------------------------|-----------------------------------------|------------------------------------------------------------------|
-| NETWORK                | finney                                  | a subtensor network                                              |
-| NET_UID                | 81                                      | the net UID                                                      | 
-| DB_DIR                 | /var/patrol/sqlite                      | The database directory - only used for SQLite if DB_URL is unset |
-| DB_URL                 | sqlite+aiosqlite:///${DB_DIR}/patrol.db | The database URL                                                 |
-| WALLET_NAME            | default                                 | your wallet coldkey name                                         |
-| HOTKEY_NAME            | default                                 | your wallet hotkey name                                          |                            
-| ENABLE_WEIGHT_SETTING  | 1                                       | Enables weight settting                                          |
-| ARCHIVE_SUBTENSOR      | wss://archive.chain.opentensor.ai:443   | An archive subtensor node                                        |
+| Variable               | Default                                             | Description                |
+|------------------------|-----------------------------------------------------|----------------------------|
+| NETWORK                | finney                                              | a subtensor network        |
+| NET_UID                | 81                                                  | the net UID                | 
+| DB_URL                 | postgresql+asyncpg://patrol:password@db:5432/patrol | The database URL           |
+| WALLET_NAME            | default                                             | your wallet coldkey name   |
+| HOTKEY_NAME            | default                                             | your wallet hotkey name    |                            
+| ENABLE_WEIGHT_SETTING  | 1                                                   | Enables weight setting     |
+| ARCHIVE_SUBTENSOR      | wss://archive.chain.opentensor.ai:443               | An archive subtensor node  |
 
 Use any of the following templates. Paste the contents into a file named `docker-compose.yml`.
 

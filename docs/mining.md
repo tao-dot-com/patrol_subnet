@@ -51,14 +51,19 @@ HARDWARE REQUIREMENTS:
 
 For both tasks, we strongly suggest setting up your own archive node, which will allow you to avoid any rate limits and/or competing for resources when querying the opentensor archive node. A guide to help you set up your own archive node can be found [here](https://docs.bittensor.com/subtensor-nodes/).
 
-To aid with optimising for both tasks, we have provided some local_dev resource, which allow you to test your miner offline (without the need for testnet). Please see [here](../src/local_dev/local_development.md).
+To aid with optimizing for both tasks, we have provided some local_dev resource, which allow you to test your miner offline (without the need for testnet). Please see [here](../src/miner/local_dev/local_development.md).
 
-Task 1: Coldkey Search
+#### Task 1: Coldkey Search
 
 You will at the very least need to optimize your miner's performance by adjusting the *max_future_events*, *max_past_events* and *event_batch_size* parameters.
 
-As the subnet gets more competitive, you will need to enhance and optimise the miner code, so that it can fetch larger subgraphs in less time. Here is an in depth overview of the [incentive](incentive.md) mechanism to help.
+As the subnet gets more competitive, you will need to enhance and optimize the miner code, so that it can fetch larger subgraphs in less time. Here is an in depth overview of the [incentive](coldkey_search.md#incentive-mechanism) mechanism to help.
 
-Task 2: Hotkey Ownership Search
+#### Task 2: Hotkey Ownership Search
 
-There are no standard hyperparamters for changing the performance of your miner on this task. You will likely frind benefits from pursuing caching in some form. 
+There are no standard hyperparamters for changing the performance of your miner on this task. You will likely find benefits from pursuing caching in some form. 
+
+#### Task 3: Stake Prediction
+
+The reference miner will predict zero stake movement by default. It is completely up to miners to
+optimize the prediction mechanism to improve accuracy.
