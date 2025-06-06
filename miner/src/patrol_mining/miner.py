@@ -10,14 +10,14 @@ import bittensor as bt
 from bittensor import AsyncSubtensor
 from bittensor.utils.networking import get_external_ip
 
-from patrol.protocol import PatrolSynapse, HotkeyOwnershipSynapse
-from patrol.chain_data.event_fetcher import EventFetcher
-from patrol.chain_data.coldkey_finder import ColdkeyFinder
-from patrol.chain_data.event_processor import EventProcessor
-from patrol.mining.subgraph_generator import SubgraphGenerator
-from patrol.chain_data.substrate_client import SubstrateClient
-from patrol.mining.hotkey_owner_finder import HotkeyOwnerFinder
-from patrol.chain_data.runtime_groupings import load_versions
+from patrol_common.protocol import PatrolSynapse, HotkeyOwnershipSynapse
+from patrol_mining.chain_data.event_fetcher import EventFetcher
+from patrol_mining.chain_data.coldkey_finder import ColdkeyFinder
+from patrol_mining.chain_data.event_processor import EventProcessor
+from patrol_mining.subgraph_generator import SubgraphGenerator
+from patrol_mining.chain_data.substrate_client import SubstrateClient
+from patrol_mining.hotkey_owner_finder import HotkeyOwnerFinder
+from patrol_mining.chain_data.runtime_groupings import load_versions
 
 def get_event_loop():
     loop = asyncio.new_event_loop()

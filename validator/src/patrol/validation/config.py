@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 
+import numpy as np
 from bittensor import AxonInfo
 from bittensor.core.metagraph import AsyncMetagraph
 
@@ -46,6 +47,7 @@ class StaticAsyncMetagraph(AsyncMetagraph):
     def __init__(self, axons: list[AxonInfo]):
         super().__init__(netuid=81, sync=False)
         self.axons = axons
+        self.uids = np.array(list(range(4, 4 + len(axons))))
 
     async def __aenter__(self):
         pass
@@ -74,8 +76,8 @@ def patrol_metagraph():
 
 PATROL_METAGRAPH: AsyncMetagraph | None = patrol_metagraph()
 
-ENABLE_ALPHA_SELL_TASK = bool(os.getenv('ENABLE_ALPHA_SELL_TASK', "0") == "1")
-ENABLE_HOTKEY_OWNERSHIP_TASK = bool(os.getenv('ENABLE_HOTKEY_OWNERSHIP_TASK', "0") == "1")
+ENABLE_ALPHA_SELL_TASK = bool(os.getenv('ENABLE_ALPHA_SELL_TASK', "1") == "1")
+ENABLE_HOTKEY_OWNERSHIP_TASK = bool(os.getenv('ENABLE_HOTKEY_OWNERSHIP_TASK', "1") == "1")
 
 ALPHA_SELL_PREDICTION_WINDOW_BLOCKS = int(os.getenv('ALPHA_SELL_PREDICTION_WINDOW_BLOCKS', "7200"))
 ALPHA_SELL_TASK_INTERVAL_SECONDS = int(os.getenv('ALPHA_SELL_TASK_INTERVAL_SECONDS', "3600"))

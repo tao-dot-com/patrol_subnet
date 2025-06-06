@@ -75,7 +75,7 @@ def boot():
         hooks.invoke(HookType.BEFORE_START)
 
         from patrol.validation.config import DB_URL, ENABLE_DASHBOARD_SYNDICATION, WALLET_NAME, HOTKEY_NAME, \
-            BITTENSOR_PATH, ENABLE_ALPHA_SELL_TASK, ENABLE_HOTKEY_OWNERSHIP_TASK
+            BITTENSOR_PATH, ENABLE_ALPHA_SELL_TASK, ENABLE_HOTKEY_OWNERSHIP_TASK, PATROL_METAGRAPH
         migrate_db(DB_URL)
 
         wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
@@ -83,12 +83,14 @@ def boot():
         if ENABLE_ALPHA_SELL_TASK:
             from patrol.validation.predict_alpha_sell import stake_event_collector, alpha_sell_miner_challenge, alpha_sell_scoring
             stake_event_collector.start_process(DB_URL)
-            alpha_sell_miner_challenge.start_process(wallet, db_url=DB_URL)
+            alpha_sell_miner_challenge.start_process(wallet, db_url=DB_URL, enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION,
+                                                     patrol_metagraph=PATROL_METAGRAPH)
             alpha_sell_scoring.start_scoring_process(wallet, DB_URL, ENABLE_DASHBOARD_SYNDICATION)
 
         if ENABLE_HOTKEY_OWNERSHIP_TASK:
             from patrol.validation.hotkey_ownership import hotkey_ownership_batch
-            hotkey_ownership_batch.start_process(wallet, db_url=DB_URL, enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION)
+            hotkey_ownership_batch.start_process(wallet, db_url=DB_URL, enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION,
+                                                 patrol_metagraph=PATROL_METAGRAPH)
 
         asyncio.run(start())
         logger.info("Service Terminated.")

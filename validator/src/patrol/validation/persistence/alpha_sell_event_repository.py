@@ -70,7 +70,7 @@ class DataBaseAlphaSellEventRepository(AlphaSellEventRepository):
             result = await session.execute(query)
             return result.scalar()
 
-    async def delete_events_before_block(self, earliest_block):
+    async def delete_events_before_block(self, earliest_block: int):
         async with self.LocalSession() as session:
             query = delete(_ChainStakeEvent).where(_ChainStakeEvent.block_number < earliest_block)
             deleted = await session.execute(query)

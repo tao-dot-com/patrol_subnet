@@ -8,10 +8,8 @@ from patrol.validation.persistence.alpha_sell_challenge_repository import Databa
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
 from patrol.validation.predict_alpha_sell import AlphaSellEventRepository, AlphaSellChallengeRepository
 
-batch_size = 1000
+batch_size = 100
 back_off = 12
-max_block_retardation = 10
-prune_interval = 60
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +22,16 @@ class StakeEventCollector:
         self.alpha_sell_event_repository = alpha_sell_event_repository
         self.alpha_sell_challenge_repository = alpha_sell_challenge_repository
 
-    async def collect_events(self) -> int:
+    async def collect_events(self):
         last_finalized_block = await self.chain_reader.get_last_finalized_block()
         most_recent_block_collected = await self.alpha_sell_event_repository.find_most_recent_block_collected()
 
-        most_recent_block_collected = last_finalized_block - 2 if most_recent_block_collected is None else most_recent_block_collected
+        earliest_block_required = await self.alpha_sell_challenge_repository.find_earliest_prediction_block()
+        if (earliest_block_required is None) or (earliest_block_required > last_finalized_block):
+            logger.info("Earliest block required [%s] is after current block [%s]- skipping", earliest_block_required, last_finalized_block)
+            return
+
+        most_recent_block_collected = last_finalized_block - 5 if most_recent_block_collected is None else most_recent_block_collected
 
         block_deficit = max(0, last_finalized_block - most_recent_block_collected)
 
@@ -38,7 +41,7 @@ class StakeEventCollector:
 
         if block_deficit == 0:
             logger.info("Skipping event collection because the events are within [%s] blocks of the last finalized block", block_deficit)
-            return back_off
+            return
 
         starting_block = most_recent_block_collected + 1
         logger.info("Collecting stake events from block %s - %s inclusive", starting_block, last_finalized_block)
@@ -54,26 +57,20 @@ class StakeEventCollector:
             await self.alpha_sell_event_repository.add(events)
             logger.info("Collected %s events from %s block(s)", len(events), len(batch))
 
-        return back_off
 
     async def prune_events(self):
         earliest_block = await self.alpha_sell_challenge_repository.find_earliest_prediction_block()
         if earliest_block:
             events_deleted = await self.alpha_sell_event_repository.delete_events_before_block(earliest_block)
             logger.info("Deleted [%s] events before block [%s]", events_deleted, earliest_block)
-        else:
-            events_deleted = await self.alpha_sell_event_repository.delete_events_before_block(10_000_000)
-            logger.info("Deleted [%s] events before block [%s]", events_deleted, earliest_block)
 
     async def collect_events_forever(self):
         logger.info("Starting StakeEventCollector")
         while True:
             try:
-                back_off = await asyncio.create_task(self.collect_events())
+                await asyncio.create_task(self.collect_events())
                 await asyncio.sleep(back_off)
-                if back_off > 0:
-                    await asyncio.create_task(self.prune_events())
-
+                await asyncio.create_task(self.prune_events())
             except Exception as e:
                 logger.exception("Unexpected error")
 

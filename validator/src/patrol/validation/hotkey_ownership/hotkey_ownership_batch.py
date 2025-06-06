@@ -55,6 +55,7 @@ class HotkeyOwnershipBatch:
             lambda m: m.axon_info.is_serving,
             (Miner(axon, uids[idx]) for idx, axon in enumerate(axons))
         ))
+        logger.info("Challenging %s miners", len(miners))
 
         target_hotkeys = await self.target_generator.generate_targets(max_block_number, len(miners))
         miner_target_hotkeys = {miner.uid: target_hotkeys.pop() for miner in miners}
@@ -75,8 +76,8 @@ class HotkeyOwnershipBatch:
 
         return batch_id
 
-async def run_forever(wallet: Wallet, patrol_subtensor: AsyncSubtensor, db_url: str, enable_dashboard_syndication: bool):
-    from patrol.validation.config import DASHBOARD_BASE_URL, NETWORK, NET_UID, BATCH_CONCURRENCY, ARCHIVE_SUBTENSOR
+async def run_forever(wallet: Wallet, db_url: str, patrol_subtensor: AsyncSubtensor, patrol_metagraph: AsyncMetagraph, enable_dashboard_syndication: bool):
+    from patrol.validation.config import DASHBOARD_BASE_URL, NET_UID, BATCH_CONCURRENCY, ARCHIVE_SUBTENSOR
 
     engine = create_async_engine(db_url)
     archive_subtensor = AsyncSubtensor(ARCHIVE_SUBTENSOR)
@@ -98,7 +99,7 @@ async def run_forever(wallet: Wallet, patrol_subtensor: AsyncSubtensor, db_url: 
     )
 
     target_generator = HotkeyTargetGenerator(archive_subtensor.substrate)
-    patrol_metagraph = await patrol_subtensor.metagraph(NET_UID)
+    patrol_metagraph = await patrol_subtensor.metagraph(NET_UID) if patrol_metagraph is None else patrol_metagraph
 
     batch = HotkeyOwnershipBatch(
         challenge=challenge,
@@ -112,25 +113,29 @@ async def run_forever(wallet: Wallet, patrol_subtensor: AsyncSubtensor, db_url: 
         try:
             await batch.challenge_miners()
         finally:
-            await asyncio.sleep(500)
+            await asyncio.sleep(600)
 
 
-async def run(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str, enable_dashboard_syndication: bool):
+async def run(wallet: Wallet, db_url: str, subtensor: AsyncSubtensor, enable_dashboard_syndication: bool,
+              patrol_metagraph: AsyncMetagraph | None):
     if subtensor:
-        await run_forever(wallet, subtensor, db_url, enable_dashboard_syndication)
+        await run_forever(wallet, db_url, subtensor, patrol_metagraph, enable_dashboard_syndication)
     else:
         from patrol.validation.config import ARCHIVE_SUBTENSOR
         async with AsyncSubtensor(ARCHIVE_SUBTENSOR) as st:
-            await run_forever(wallet, st, db_url, enable_dashboard_syndication)
+            await run_forever(wallet, db_url, st, patrol_metagraph, enable_dashboard_syndication)
 
 
-def start_process(wallet: Wallet, subtensor: AsyncSubtensor | None = None,
-                  db_url: str | None = None,
-                  enable_dashboard_syndication: bool = False) -> multiprocessing.Process:
+def start_process(
+        wallet: Wallet,
+        db_url: str,
+        enable_dashboard_syndication: bool,
+        subtensor: AsyncSubtensor | None = None,
+        patrol_metagraph: AsyncMetagraph | None = None,
+) -> multiprocessing.Process:
 
     def run_async():
-        from patrol.validation.config import DB_URL
-        asyncio.run(run(wallet, subtensor, db_url if db_url else DB_URL, enable_dashboard_syndication))
+        asyncio.run(run(wallet, db_url, subtensor, enable_dashboard_syndication, patrol_metagraph))
 
     process = multiprocessing.Process(target=run_async(), name="Hotkey Ownership Challenge", daemon=True)
     process.start()

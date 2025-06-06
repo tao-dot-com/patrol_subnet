@@ -9,7 +9,7 @@ from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet import Wallet
 
 from patrol.validation.predict_alpha_sell import alpha_sell_miner_challenge, alpha_sell_scoring, stake_event_collector, AlphaSellPrediction, TransactionType
-from patrol.validation.predict_alpha_sell.protocol import AlphaSellSynapse
+from patrol_common.protocol import AlphaSellSynapse
 
 DB_URL = "postgresql+asyncpg://patrol:password@localhost:5432/patrol"
 
@@ -46,8 +46,8 @@ def mock_subtensor():
 
 async def alpha_sell_synapse_handler(synapse: AlphaSellSynapse):
     synapse.predictions = [
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25.0),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 5.0),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 5),
     ]
     return synapse
 
@@ -70,7 +70,7 @@ def mock_miner():
 
 @pytest.fixture
 def challenge_process(mock_miner, validator_wallet: Wallet, mock_subtensor: AsyncSubtensor):
-    process = alpha_sell_miner_challenge.start_process(validator_wallet, mock_subtensor, DB_URL)
+    process = alpha_sell_miner_challenge.start_process(validator_wallet, DB_URL, False, mock_subtensor)
     yield process
     process.terminate()
     process.join()

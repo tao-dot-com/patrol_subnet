@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from patrol.validation.chain.chain_reader import ChainReader
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
-from patrol.validation.predict_alpha_sell import AlphaSellEventRepository, ChainStakeEvent
+from patrol.validation.predict_alpha_sell import AlphaSellEventRepository, ChainStakeEvent, AlphaSellChallengeRepository
 from patrol.validation.predict_alpha_sell.stake_event_collector import StakeEventCollector
 
 @pytest.mark.skip(reason="This test is not working yet.")
@@ -38,8 +38,12 @@ async def test_collect_events():
     chain_reader.get_last_finalized_block.return_value = 1000003
 
     event_repository = AsyncMock(AlphaSellEventRepository)
-    event_collector = StakeEventCollector(chain_reader, event_repository, AsyncMock())
-    event_repository.find_most_recent_block_collected.return_value = 1000000 - 500
+
+    challenge_repository = AsyncMock(AlphaSellChallengeRepository)
+    challenge_repository.find_earliest_prediction_block.return_value = 1000000 - 51
+
+    event_collector = StakeEventCollector(chain_reader, event_repository, challenge_repository)
+    event_repository.find_most_recent_block_collected.return_value = 1000000 - 50
 
     await event_collector.collect_events()
 

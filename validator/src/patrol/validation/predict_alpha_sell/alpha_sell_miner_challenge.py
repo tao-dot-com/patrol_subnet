@@ -141,7 +141,14 @@ class AlphaSellMinerChallengeProcess:
 
         await self.patrol_metagraph.sync()
         logger.info("Metagraph synced")
-        miners_to_challenge = [Miner(axon, idx) for idx, axon in enumerate(self.patrol_metagraph.axons) if axon.is_serving]
+
+        axons = self.patrol_metagraph.axons
+        uids = self.patrol_metagraph.uids.tolist()
+
+        miners_to_challenge = list(filter(
+            lambda m: m.axon_info.is_serving,
+            (Miner(axon, uids[idx]) for idx, axon in enumerate(axons))
+        ))
 
         subnets = await self.subtensor.get_subnets()
         batches = [await self._make_batch(prediction_interval, net_uid) for net_uid in subnets]
@@ -174,22 +181,23 @@ class AlphaSellMinerChallengeProcess:
         return AlphaSellChallengeBatch(batch_id, datetime.now(UTC), net_uid, prediction_interval, wallets)
 
 
-async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
+async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str, enable_dashboard_syndication: bool,
+                      patrol_metagraph: AsyncMetagraph | None):
 
     engine = create_async_engine(db_url)
     challenge_repository = DatabaseAlphaSellChallengeRepository(engine)
     dendrite = bt.Dendrite(wallet)
     miner_client = AlphaSellMinerClient(dendrite)
 
-    from patrol.validation.config import DASHBOARD_BASE_URL, ENABLE_DASHBOARD_SYNDICATION, PATROL_METAGRAPH, ALPHA_SELL_PREDICTION_WINDOW_BLOCKS, \
+    from patrol.validation.config import DASHBOARD_BASE_URL, ALPHA_SELL_PREDICTION_WINDOW_BLOCKS, \
         ALPHA_SELL_TASK_INTERVAL_SECONDS
 
-    dashboard_client = HttpDashboardClient(wallet, DASHBOARD_BASE_URL) if ENABLE_DASHBOARD_SYNDICATION else None
+    dashboard_client = HttpDashboardClient(wallet, DASHBOARD_BASE_URL) if enable_dashboard_syndication else None
 
     miner_challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
 
     process = await AlphaSellMinerChallengeProcess.create(
-        challenge_repository, miner_challenge, subtensor, PATROL_METAGRAPH,
+        challenge_repository, miner_challenge, subtensor, patrol_metagraph,
         interval_window_blocks=ALPHA_SELL_PREDICTION_WINDOW_BLOCKS
     )
 
@@ -201,20 +209,25 @@ async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
         finally:
             await asyncio.sleep(ALPHA_SELL_TASK_INTERVAL_SECONDS)
 
-async def run(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str):
+async def run(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str, enable_dashboard_syndication: bool,
+              patrol_metagraph: AsyncMetagraph):
     if subtensor:
-        await run_forever(wallet, subtensor, db_url)
+        await run_forever(wallet, subtensor, db_url, enable_dashboard_syndication, patrol_metagraph)
     else:
         from patrol.validation.config import ARCHIVE_SUBTENSOR
         async with AsyncSubtensor(ARCHIVE_SUBTENSOR) as st:
-            await run_forever(wallet, st, db_url)
+            await run_forever(wallet, st, db_url, enable_dashboard_syndication, patrol_metagraph)
 
 
-def start_process(wallet: Wallet, subtensor: AsyncSubtensor | None = None, db_url: str | None = None):
-
+def start_process(
+        wallet: Wallet,
+        db_url: str,
+        enable_dashboard_syndication: bool,
+        subtensor: AsyncSubtensor | None = None,
+        patrol_metagraph: AsyncMetagraph | None = None
+):
     def run_async():
-        from patrol.validation.config import DB_URL
-        asyncio.run(run(wallet, subtensor, db_url if db_url else DB_URL))
+        asyncio.run(run(wallet, subtensor, db_url, enable_dashboard_syndication, patrol_metagraph))
 
     process = multiprocessing.Process(target=run_async, name="Challenge", daemon=True)
     process.start()

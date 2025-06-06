@@ -9,16 +9,14 @@ from multiprocessing import Process
 
 import numpy
 import pytest
+from async_substrate_interface import AsyncSubstrateInterface
 from bittensor import AsyncSubtensor, AxonInfo
 from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet.bittensor_wallet import Wallet
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from patrol.chain_data.patrol_websocket import PatrolWebsocket
-from patrol.chain_data.substrate_client import SubstrateClient
-from patrol.mining.miner import Miner
+from patrol_mining.miner import Miner
 from patrol.validation.chain.chain_reader import ChainReader
-from patrol.validation.chain.runtime_versions import RuntimeVersions
 from patrol.validation.hotkey_ownership.hotkey_ownership_batch import HotkeyOwnershipBatch
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, \
     HotkeyOwnershipValidator
@@ -79,7 +77,7 @@ async def batch(vali_wallet, miner_wallet):
     dendrite = bt.Dendrite(vali_wallet)
     miner_client = HotkeyOwnershipMinerClient(dendrite)
 
-    runtime_versions = RuntimeVersions()
+    #runtime_versions = RuntimeVersions()
     # runtime_versions = RuntimeVersions({"261": {
     #     "block_number_min": 5328896,
     #     "block_hash_min": "0xd68c6fdc8bfbaf374f38200c93f3ad581606919e6ee208410ffb3e6b911ca9ef",
@@ -87,16 +85,18 @@ async def batch(vali_wallet, miner_wallet):
     #     "block_hash_max": "0x063e166ea94adf9d9267bf6a902864f6196a96ad1d085f0df87a012c73e85b48"
     # }})
     scoring = HotkeyOwnershipScoring()
-    substrate_client = SubstrateClient(runtime_versions.versions, ARCHIVE_NODE, PatrolWebsocket(ARCHIVE_NODE))
-    await substrate_client.initialize()
+    #substrate_client = SubstrateClient(runtime_versions.versions, ARCHIVE_NODE, PatrolWebsocket(ARCHIVE_NODE))
+    #await substrate_client.initialize()
 
-    chain_reader = ChainReader(substrate_client, runtime_versions)
+    substrate = AsyncSubstrateInterface(ARCHIVE_NODE)
+    await substrate.initialize()
+    chain_reader = ChainReader(substrate)
     validator = HotkeyOwnershipValidator(chain_reader)
 
     engine = create_async_engine("postgresql+asyncpg://patrol:password@localhost:5432/patrol")
     score_repository = DatabaseMinerScoreRepository(engine)
 
-    target_generator = HotkeyTargetGenerator(substrate_client)
+    target_generator = HotkeyTargetGenerator(substrate)
     mock_metagraph = AsyncMock(AsyncMetagraph)
     mock_metagraph.axons = [AxonInfo(0, "127.0.0.1", 8002, 4, miner_wallet.hotkey.ss58_address, miner_wallet.coldkeypub.ss58_address)]
     mock_metagraph.uids = numpy.array([1])
