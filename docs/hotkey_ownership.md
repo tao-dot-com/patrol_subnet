@@ -54,8 +54,9 @@ be 0.5. It is set to 2.0.
 Overall score is calculated as follows:
 $$`s_{overall} = \frac{1 + s_{response} w_{response}}{w_{validity} + w_{response}}`$$
 
-where $`s_{response}`$ is the response time score, $`w_{response}`$ and $`w_{validity}`$ are the weightings given 
-to responsive score and validity scoire respectively. 
+where $`s_{response}`$ is the response time score,
+$`w_{response}`$ (50) and $`w_{validity}`$ (50) are the relative weightings given 
+to responsive score and validity score respectively.  
 
 ```python
 def score(self, is_valid: bool, response_time_seconds: float):

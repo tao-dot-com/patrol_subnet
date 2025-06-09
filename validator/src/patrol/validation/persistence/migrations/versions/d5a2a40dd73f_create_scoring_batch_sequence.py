@@ -22,10 +22,12 @@ def upgrade() -> None:
     """Upgrade schema."""
     op.execute(sa.schema.CreateSequence(sa.Sequence("scoring_batch")))
     op.add_column("miner_score", sa.Column("scoring_batch", sa.BigInteger, nullable=True))
+    op.create_index("idx_miner_score_scoring_batch", "miner_score", [sa.Column("scoring_batch")])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     op.execute(sa.schema.DropSequence(sa.Sequence("scoring_batch")))
     op.drop_column("miner_score", "scoring_batch")
+    op.drop_index("idx_miner_score_scoring_batch", "miner_score")
 
