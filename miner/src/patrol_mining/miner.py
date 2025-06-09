@@ -10,7 +10,7 @@ import bittensor as bt
 from bittensor import AsyncSubtensor
 from bittensor.utils.networking import get_external_ip
 
-from patrol_common.protocol import PatrolSynapse, HotkeyOwnershipSynapse
+from patrol_common.protocol import PatrolSynapse, HotkeyOwnershipSynapse, AlphaSellSynapse
 from patrol_mining.chain_data.event_fetcher import EventFetcher
 from patrol_mining.chain_data.coldkey_finder import ColdkeyFinder
 from patrol_mining.chain_data.event_processor import EventProcessor
@@ -18,6 +18,7 @@ from patrol_mining.subgraph_generator import SubgraphGenerator
 from patrol_mining.chain_data.substrate_client import SubstrateClient
 from patrol_mining.hotkey_owner_finder import HotkeyOwnerFinder
 from patrol_mining.chain_data.runtime_groupings import load_versions
+from patrol_mining.alpha_sell_predictor import AlphaSellPredictor
 
 def get_event_loop():
     loop = asyncio.new_event_loop()
@@ -43,6 +44,7 @@ class Miner:
         self.subgraph_loop = get_event_loop()
         self.subgraph_generator = None
         self.hotkey_owner_finder = None
+        self.alpha_sell_predictor = None
 
     async def setup_bittensor_objects(self):
         bt.logging.info("Setting up Bittensor objects.")
@@ -81,6 +83,9 @@ class Miner:
     
     async def blacklist_hotkey_ownership_search(self, synapse: HotkeyOwnershipSynapse) -> Tuple[bool, str]:
         return await self.blacklist(synapse)
+    
+    async def blacklist_alpha_sell_prediction(self, synapse: AlphaSellSynapse) -> Tuple[bool, str]:
+        return await self.blacklist(synapse)
 
     async def coldkey_search(self, synapse: PatrolSynapse) -> PatrolSynapse:
         bt.logging.info(f"Received coldkey search request: {synapse.target}, with block number: {synapse.target_block_number}")
@@ -106,11 +111,24 @@ class Miner:
         volume = len(synapse.subgraph_output.nodes) + len(synapse.subgraph_output.edges)
         bt.logging.info(f"Returning a graph of {volume} in {round(time.time() - start_time, 2)} seconds.")
         return synapse
+    
+    async def process_alpha_sell_prediction(self, synapse: AlphaSellSynapse) -> AlphaSellSynapse:
+        bt.logging.info(f"Received alpha sell request netuid: {synapse.subnet_uid}, interval: {synapse.prediction_interval}")
+        start_time = time.time()
+        future = run_coroutine_threadsafe(
+            self.alpha_sell_predictor.predict_constant_value(synapse.wallets),
+            self.subgraph_loop
+        )
+        synapse.predictions = future.result()
+        volume = len(synapse.predictions)
+        bt.logging.info(f"Returning {volume} predictions in {round(time.time() - start_time, 2)} seconds.")
+        return synapse
 
     async def setup_axon(self):
         self.axon = bt.axon(wallet=self.wallet, port=self.port, external_ip=self.external_ip)
         self.axon.attach(forward_fn=self.coldkey_search, blacklist_fn=self.blacklist_coldkey_search)
         self.axon.attach(forward_fn=self.hotkey_ownership_search, blacklist_fn=self.blacklist_hotkey_ownership_search)
+        self.axon.attach(forward_fn=self.process_alpha_sell_prediction, blacklist_fn=self.blacklist_alpha_sell_prediction)
         
         if not self.dev_flag:
             await self.subtensor.serve_axon(
@@ -129,7 +147,8 @@ class Miner:
             event_fetcher = EventFetcher(substrate_client=client)
             coldkey_finder = ColdkeyFinder(substrate_client=client)
             event_processor = EventProcessor(coldkey_finder=coldkey_finder)
-
+            
+            self.alpha_sell_predictor = AlphaSellPredictor()
             self.subgraph_generator = SubgraphGenerator(
                 event_fetcher=event_fetcher,
                 event_processor=event_processor,
