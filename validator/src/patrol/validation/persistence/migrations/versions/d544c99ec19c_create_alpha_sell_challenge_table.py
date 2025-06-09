@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column('wallets_json', sa.JSON, nullable=False),
         sa.Column('prediction_interval_start', sa.Integer, nullable=False),
         sa.Column('prediction_interval_end', sa.Integer, nullable=False),
+        sa.Column("scoring_batch", sa.Integer, nullable=False)
     )
     op.create_table("alpha_sell_challenge_task",
         sa.Column('id', sa.String, primary_key=True),

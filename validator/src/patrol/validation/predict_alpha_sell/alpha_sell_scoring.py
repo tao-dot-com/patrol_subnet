@@ -1,8 +1,10 @@
 import asyncio
 import dataclasses
 import logging
+import math
 import multiprocessing
 from datetime import datetime, UTC
+from multiprocessing import Semaphore
 
 from async_substrate_interface import AsyncSubstrateInterface
 from bittensor_wallet import Wallet
@@ -23,7 +25,7 @@ from patrol.validation.scoring import MinerScore, MinerScoreRepository
 logger = logging.getLogger(__name__)
 
 
-def make_miner_score(task: AlphaSellChallengeTask, accuracy: float) -> MinerScore:
+def make_miner_score(task: AlphaSellChallengeTask, accuracy: float, scoring_batch: int) -> MinerScore:
     #responsiveness_score = 2 / (2 + task.response_time_seconds)
     accuracy_score = accuracy # FIXME: this is wrong
 
@@ -45,13 +47,15 @@ def make_miner_score(task: AlphaSellChallengeTask, accuracy: float) -> MinerScor
         task_type=TaskType.PREDICT_ALPHA_SELL,
         overall_score=overall_score,
         overall_score_moving_average=0.0,
+        scoring_batch=scoring_batch,
     )
 
 
 class AlphaSellValidator:
 
-    def __init__(self, noise_floor: float = 1):
+    def __init__(self, noise_floor: float = 1.0, steepness = 2.0):
         self.noise_floor = noise_floor
+        self.steepness = steepness
 
     def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[str, int]) -> float:
         if task.has_error:
@@ -59,27 +63,26 @@ class AlphaSellValidator:
 
         predictions_by_hotkey = {p.wallet_hotkey_ss58: p.amount for p in task.predictions}
 
-        all_hotkeys = set(predictions_by_hotkey.keys() | stake_removals.keys())
+        accuracies = []
 
-        square_deltas = []
-
-        for hk in all_hotkeys:
-            predicted_rao = predictions_by_hotkey.get(hk, 0)
+        for hk in predictions_by_hotkey.keys():
+            predicted_rao = predictions_by_hotkey[hk]
             predicted_tao = predicted_rao / 1e9
 
             actual_rao = stake_removals.get(hk, 0)
             actual_tao = actual_rao / 1e9
 
-            relative_delta = ((predicted_tao - actual_tao) / (actual_tao + self.noise_floor)) ** 2
-            square_deltas.append(relative_delta)
+            relative_delta = (self.steepness * (predicted_tao - actual_tao) / (actual_tao + self.noise_floor)) ** 2
 
-        if len(square_deltas) == 0:
+            movement_size_factor = 1 + math.log10(actual_tao + self.noise_floor)
+
+            accuracy = movement_size_factor * max(0.0, 1.0 - relative_delta)
+            accuracies.append(accuracy)
+
+        if len(accuracies) == 0:
             return 0.0
 
-        mean_square_deltas = sum(square_deltas) / len(square_deltas)
-
-        accuracy = max(0.0, 1.0 - mean_square_deltas)
-        return accuracy
+        return sum(accuracies)
 
 
 class AlphaSellScoring:
@@ -122,16 +125,16 @@ class AlphaSellScoring:
         scorable_tasks = await self.challenge_repository.find_tasks(batch.batch_id)
 
         for task in scorable_tasks:
-            await self._score_task(task, stake_removals)
+            await self._score_task(task, stake_removals, batch.scoring_batch)
 
         await self.challenge_repository.remove_if_fully_scored(batch.batch_id)
 
-    async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict):
+    async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict, scoring_batch: int):
         miner_log_context = dataclasses.asdict(task.miner)
 
         logger.info("Scoring task [%s]", task.task_id, extra=miner_log_context)
-        accuracy = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-        miner_score = make_miner_score(task, accuracy)
+        accuracy_sum = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+        miner_score = make_miner_score(task, accuracy_sum, scoring_batch)
 
         async def add_score(session):
             await self.miner_score_repository.add(miner_score, session)
@@ -148,7 +151,7 @@ class AlphaSellScoring:
                 logger.exception("Error sending score to dashboard")
 
 
-def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool):
+def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool, semaphore: Semaphore):
 
     async def start_scoring_async():
         from patrol.validation.config import DASHBOARD_BASE_URL, ARCHIVE_SUBTENSOR, SCORING_INTERVAL_SECONDS
@@ -176,7 +179,8 @@ def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: boo
             go = True
             while go:
                 try:
-                    await scoring.score_miners()
+                    with semaphore:
+                        await scoring.score_miners()
                     await asyncio.sleep(SCORING_INTERVAL_SECONDS)
                 except KeyboardInterrupt:
                     logger.info("Stopping alpha-sell scoring process")
@@ -188,7 +192,7 @@ def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: boo
 
     asyncio.run(start_scoring_async())
 
-def start_scoring_process(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool = False):
-    process = multiprocessing.Process(target=start_scoring, name="Scoring", args=[wallet, db_url, enable_dashboard_syndication], daemon=True)
+def start_scoring_process(wallet: Wallet, db_url: str, semaphore: Semaphore, enable_dashboard_syndication: bool = False):
+    process = multiprocessing.Process(target=start_scoring, name="Scoring", args=[wallet, db_url, enable_dashboard_syndication, semaphore], daemon=True)
     process.start()
     return process

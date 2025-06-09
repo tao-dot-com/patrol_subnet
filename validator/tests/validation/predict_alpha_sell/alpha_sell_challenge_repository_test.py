@@ -40,6 +40,7 @@ async def test_add_challenge(clean_pgsql_engine):
         now,
         42, PredictionInterval(100, 120),
         [WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")],
+        100
     )
 
     await repository.add(batch)
@@ -55,6 +56,7 @@ async def test_add_challenge(clean_pgsql_engine):
     assert challenge_result["prediction_interval_start"] == batch.prediction_interval.start_block
     assert challenge_result["prediction_interval_end"] == batch.prediction_interval.end_block
     assert challenge_result["wallets_json"] == [dataclasses.asdict(it) for it in batch.wallets]
+    assert challenge_result["scoring_batch"] == 100
 
 
 
@@ -67,6 +69,7 @@ async def test_add_challenge_task(clean_pgsql_engine):
         now,
         42, PredictionInterval(100, 120),
         [WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")],
+        100
     )
     await repository.add(batch)
 
@@ -118,13 +121,13 @@ async def test_find_tasks_for_batch(clean_pgsql_engine):
 
     repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
     batch_1 = AlphaSellChallengeBatch(batch_id_1, datetime.now(UTC), 42, PredictionInterval(100, 120), [
-        WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")
-    ])
+        WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol"),
+    ], 100)
     await repository.add(batch_1)
 
     batch_2 = AlphaSellChallengeBatch(batch_id_2, datetime.now(UTC), 42, PredictionInterval(100, 120), [
-        WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")
-    ])
+        WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol"),
+    ], 100)
     await repository.add(batch_2)
 
     task_1_a = AlphaSellChallengeTask(
@@ -163,12 +166,12 @@ async def test_find_scorable_challenge_batches(clean_pgsql_engine):
     repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
     batch_1 = AlphaSellChallengeBatch(batch_id_1, datetime.now(UTC), 42, PredictionInterval(111, 120), [
         WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")
-    ])
+    ], 100)
     await repository.add(batch_1)
 
     batch_2 = AlphaSellChallengeBatch(batch_id_2, datetime.now(UTC), 42, PredictionInterval(121, 130), [
         WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")
-    ])
+    ], 100)
     await repository.add(batch_2)
 
     challenges = await repository.find_scorable_challenges(130)
@@ -193,12 +196,14 @@ async def test_find_earliest_prediction_block(clean_pgsql_engine):
         datetime.now(UTC),
         42, PredictionInterval(100, 120),
         [WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")],
+        100
     ))
     await repository.add(AlphaSellChallengeBatch(
         uuid.uuid4(),
         datetime.now(UTC),
         42, PredictionInterval(115, 125),
         [WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")],
+        100
     ))
 
     earliest_block = await repository.find_earliest_prediction_block()
@@ -209,10 +214,9 @@ async def test_mark_task_scored(clean_pgsql_engine):
 
     batch_id = uuid.uuid4()
 
-    repository = DatabaseAlphaSellChallengeRepository(clean_pgsql_engine)
     batch_1 = AlphaSellChallengeBatch(batch_id, datetime.now(UTC), 42, PredictionInterval(100, 120), [
         WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob"), WalletIdentifier("c", "carol")
-    ])
+    ], 100)
     await repository.add(batch_1)
 
     task_1 = AlphaSellChallengeTask(

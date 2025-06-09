@@ -18,6 +18,7 @@ def batch():
         subnet_uid=12, prediction_interval=PredictionInterval(100, 120),
         wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
         created_at=datetime.now(UTC),
+        scoring_batch=100
     )
 
 def make_task(batch_id: uuid.UUID, predictions: list[AlphaSellPrediction], has_error: bool = False):
@@ -30,84 +31,124 @@ def make_task(batch_id: uuid.UUID, predictions: list[AlphaSellPrediction], has_e
         has_error=has_error,
     )
 
-async def test_validate_exact_predictions(batch):
+async def test_validate_exact_predictions_with_wallet_values_of_0_tao(batch):
 
     predictions=[
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(100E9)),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(200E9)),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 0),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, 0),
     ]
     task = make_task(batch.batch_id, predictions)
 
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(100E9), "bob": int(200E9)}
+    stake_removals = {"alice": 0, "bob": 0}
 
     alpha_sell_validator = AlphaSellValidator()
 
-    mean_square = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-    assert mean_square == 1.0
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    assert total_score == approx(2.0, 0.0001)
 
-async def test_validate_predictions_off_by_99_percent(batch):
+
+async def test_validate_exact_predictions_with_wallet_values_of_1_tao(batch):
 
     predictions=[
         AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(1E9)),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(398E9)),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(1E9)),
     ]
     task = make_task(batch.batch_id, predictions)
 
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(100E9), "bob": int(200E9)}
+    stake_removals = {"alice": int(1E9), "bob": int(1E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
-    mean_square = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-    assert 0.01 < mean_square < 0.04
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    assert total_score == approx(2.6, 0.05)
 
 
-async def test_validate_predictions_off_by_100_percent(batch):
+async def test_validate_exact_predictions_with_wallet_values_of_10_tao(batch):
 
     predictions=[
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(0E9)),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(400E9)),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(10E9)),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(10E9)),
     ]
     task = make_task(batch.batch_id, predictions)
 
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(100E9), "bob": int(200E9)}
+    stake_removals = {"alice": int(10E9), "bob": int(10E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
-    mean_square = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-    assert mean_square == approx(0.0, abs=0.02)
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    assert total_score == approx(4.0, 0.05)
 
-async def test_validate_predictions_off_by_105_percent(batch):
+
+async def test_validate_exact_predictions_with_wallet_values_of_1000_tao(batch):
 
     predictions=[
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(0E9)),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(410E9)),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(1000E9)),
+        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(1000E9)),
     ]
     task = make_task(batch.batch_id, predictions)
 
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(100E9), "bob": int(200E9)}
+    stake_removals = {"alice": int(1000E9), "bob": int(1000E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
-    mean_square = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-    assert mean_square == 0.0
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    assert total_score == approx(8.0, 0.05)
+
+
+@pytest.mark.parametrize("predicted", [int(49E9),int(151E9)])
+async def test_validate_predictions_off_by_just_greater_than_50_percent(batch, predicted):
+
+    predictions=[
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, predicted),
+    ]
+    task = make_task(batch.batch_id, predictions)
+
+    score_repo = AsyncMock(MinerScoreRepository)
+    score_repo.find_latest_overall_scores.return_value = []
+
+    stake_removals = {"alice": int(100E9)}
+
+    alpha_sell_validator = AlphaSellValidator()
+
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    assert total_score == 0.0
+
+
+@pytest.mark.parametrize("predicted", [int(51E9),int(149E9)])
+async def test_validate_predictions_off_by_just_less_than_50_percent(batch, predicted):
+
+    predictions=[
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, predicted),
+    ]
+    task = make_task(batch.batch_id, predictions)
+
+    score_repo = AsyncMock(MinerScoreRepository)
+    score_repo.find_latest_overall_scores.return_value = []
+
+    stake_removals = {"alice": int(100E9)}
+
+    alpha_sell_validator = AlphaSellValidator()
+
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    assert 0.0 < total_score < 0.2
+
 
 async def test_validate_where_no_movements_exist(batch):
 
     predictions=[
-        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(0.5E9)),
-        AlphaSellPrediction("bob", "bob_ck", TransactionType.STAKE_REMOVED, int(1E9)),
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, int(0.25E9)),
     ]
     task = make_task(batch.batch_id, predictions)
 
@@ -119,7 +160,7 @@ async def test_validate_where_no_movements_exist(batch):
     alpha_sell_validator = AlphaSellValidator()
 
     accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-    assert accuracy == 0.375
+    assert accuracy == 0.75
 
 async def test_validate_where_no_predictions_made(batch):
 
@@ -134,7 +175,7 @@ async def test_validate_where_no_predictions_made(batch):
     alpha_sell_validator = AlphaSellValidator()
 
     accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-    assert accuracy == approx(0.63, rel=0.05)
+    assert accuracy == 0.0
 
 async def test_validate_failed_task(batch):
 

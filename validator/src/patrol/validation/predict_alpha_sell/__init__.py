@@ -21,6 +21,7 @@ class AlphaSellChallengeBatch:
     subnet_uid: int
     prediction_interval: PredictionInterval
     wallets: list[WalletIdentifier]
+    scoring_batch: int
 
 @dataclass(frozen=True)
 class AlphaSellChallengeTask:
@@ -65,6 +66,9 @@ class AlphaSellChallengeRepository(ABC):
     async def mark_batches_ready_for_scoring(self, batch_ids: list[UUID]):
         pass
 
+    @abstractmethod
+    async def get_next_scoring_sequence(self):
+        pass
 
 @dataclass(frozen=True)
 class ChainStakeEvent:

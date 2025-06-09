@@ -1,3 +1,6 @@
+import multiprocessing
+from multiprocessing.synchronize import Semaphore
+
 import bittensor as bt
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -30,7 +33,7 @@ class Validator:
             await self.weight_setter.set_weights(weights)
 
 
-async def start():
+async def start(semaphore: Semaphore):
 
     from patrol.validation.config import (NETWORK, NET_UID, WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH,
                                           ENABLE_WEIGHT_SETTING, WEIGHT_SETTING_INTERVAL_SECONDS,
@@ -59,12 +62,13 @@ async def start():
     update_available = False
     while not update_available:
         try:
-            update_available = ENABLE_AUTO_UPDATE and await auto_update.is_update_available()
-            if update_available:
-                break
+            with semaphore:
+                update_available = ENABLE_AUTO_UPDATE and await auto_update.is_update_available()
+                if update_available:
+                    break
 
-            if ENABLE_WEIGHT_SETTING:
-                await validator.set_weights()
+                if ENABLE_WEIGHT_SETTING:
+                    await validator.set_weights()
         except Exception as ex:
             logger.exception("Error!")
         finally:
@@ -80,19 +84,22 @@ def boot():
 
         wallet = btw.Wallet(WALLET_NAME, HOTKEY_NAME, BITTENSOR_PATH)
 
+        mp_ctx = multiprocessing.get_context('fork')
+        semaphore = Semaphore(ctx=mp_ctx)
+
         if ENABLE_ALPHA_SELL_TASK:
             from patrol.validation.predict_alpha_sell import stake_event_collector, alpha_sell_miner_challenge, alpha_sell_scoring
             stake_event_collector.start_process(DB_URL)
             alpha_sell_miner_challenge.start_process(wallet, db_url=DB_URL, enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION,
                                                      patrol_metagraph=PATROL_METAGRAPH)
-            alpha_sell_scoring.start_scoring_process(wallet, DB_URL, ENABLE_DASHBOARD_SYNDICATION)
+            alpha_sell_scoring.start_scoring_process(wallet, DB_URL, semaphore, ENABLE_DASHBOARD_SYNDICATION)
 
         if ENABLE_HOTKEY_OWNERSHIP_TASK:
             from patrol.validation.hotkey_ownership import hotkey_ownership_batch
             hotkey_ownership_batch.start_process(wallet, db_url=DB_URL, enable_dashboard_syndication=ENABLE_DASHBOARD_SYNDICATION,
                                                  patrol_metagraph=PATROL_METAGRAPH)
 
-        asyncio.run(start())
+        asyncio.run(start(semaphore))
         logger.info("Service Terminated.")
 
     except KeyboardInterrupt as ex:

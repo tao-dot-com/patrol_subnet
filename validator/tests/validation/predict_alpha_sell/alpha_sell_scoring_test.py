@@ -35,6 +35,7 @@ async def test_score_miner_tasks(mock_datetime: datetime):
             batch_id=batch_id, created_at=task_created_at, subnet_uid=42,
             prediction_interval=PredictionInterval(100, 120),
             wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
+            scoring_batch=100
         )
     ]
 
@@ -102,7 +103,7 @@ def test_failed_task_score():
         has_error=True, error_message="Nope"
     )
 
-    score = make_miner_score(task, 0)
+    score = make_miner_score(task, 0, scoring_batch=100)
     assert score.overall_score == 0
     assert score.accuracy_score == 0
     assert not score.validation_passed

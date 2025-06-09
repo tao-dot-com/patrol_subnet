@@ -12,17 +12,10 @@ import numpy as np
 async def test_skip_weights():
     pass
 
-async def test_calculate_weights():
+async def test_calculate_weights_with_hotkey_ownership_scores_only():
 
     mock_score_repository = AsyncMock(MinerScoreRepository)
 
-    coldkey_search_scores = {
-        ("alice", 1): 10.0,
-        ("bob", 2): 3.0,
-        ("carol", 2): 2.0,
-        ("dave", 4): 12.0,
-        ("emily", 6): 7.0
-    }
     hotkey_ownership_scores = {
         ("alice", 1): 5.0,
         ("bob", 2): 1.5,
@@ -30,10 +23,8 @@ async def test_calculate_weights():
         ("dave", 4): 6.0,
     }
 
-    def last_average_overall_scores(task_type: TaskType):
-        return coldkey_search_scores if task_type == TaskType.COLDKEY_SEARCH else hotkey_ownership_scores
-
-    mock_score_repository.find_last_average_overall_scores = AsyncMock(side_effect=last_average_overall_scores)
+    mock_score_repository.find_last_average_overall_scores.return_value = hotkey_ownership_scores
+    mock_score_repository.find_latest_stake_prediction_overall_scores.return_value = {}
 
     mock_subtensor = AsyncMock(AsyncSubtensor)
     mock_metagraph = AsyncMock(AsyncMetagraph)
@@ -43,11 +34,12 @@ async def test_calculate_weights():
 
     mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
 
-    sum_of_scores_weighted = (80 * (sum(coldkey_search_scores.values()) - 3.0)) + (20 * (sum(hotkey_ownership_scores.values()) - 1.5)) # No Bob!
+    sum_of_scores_weighted = (60 * (sum(hotkey_ownership_scores.values()) - 1.5)) # No Bob!
 
     task_weights = {
-        TaskType.COLDKEY_SEARCH: 80,
-        TaskType.HOTKEY_OWNERSHIP: 20,
+        #TaskType.COLDKEY_SEARCH: 50,
+        TaskType.HOTKEY_OWNERSHIP: 60,
+        TaskType.PREDICT_ALPHA_SELL: 40,
     }
 
     weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81, task_weights)
@@ -56,17 +48,110 @@ async def test_calculate_weights():
 
     assert sum(weights.values()) == 1
     assert weights == {
-        ("alice", 1): (10.0 * 80 + 5.0 * 20) / sum_of_scores_weighted,
-        ("carol", 2): (2.0 * 80 + 1.0 * 20)  / sum_of_scores_weighted,
-        ("dave", 4):  (12.0 * 80 + 6.0 * 20) / sum_of_scores_weighted,
-        ("emily", 6): (7.0 * 80)  / sum_of_scores_weighted
+        ("alice", 1): (5.0 * 60) / sum_of_scores_weighted,
+        ("carol", 2): (1.0 * 60)  / sum_of_scores_weighted,
+        ("dave", 4):  (6.0 * 60) / sum_of_scores_weighted,
     }
+
+
+async def test_calculate_weights_with_stake_prediction_scores_only():
+
+    mock_score_repository = AsyncMock(MinerScoreRepository)
+
+    stake_prediction_scores = {
+        ("alice", 1): 5.0,
+        ("bob", 2): 1.5,
+        ("carol", 2): 1.0,
+        ("dave", 4): 6.0,
+    }
+
+    mock_score_repository.find_last_average_overall_scores.return_value = {}
+    mock_score_repository.find_latest_stake_prediction_overall_scores.return_value = stake_prediction_scores
+
+    mock_subtensor = AsyncMock(AsyncSubtensor)
+    mock_metagraph = AsyncMock(AsyncMetagraph)
+    mock_subtensor.metagraph.return_value = mock_metagraph
+
+    mock_metagraph.uids = np.array([1, 2, 4, 6])
+
+    mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
+
+    sum_of_scores_weighted = (40 * (sum(stake_prediction_scores.values()) - 1.5)) # No Bob!
+
+    task_weights = {
+        #TaskType.COLDKEY_SEARCH: 50,
+        TaskType.HOTKEY_OWNERSHIP: 60,
+        TaskType.PREDICT_ALPHA_SELL: 40,
+    }
+
+    weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81, task_weights)
+
+    weights = await weights.calculate_weights()
+
+    assert sum(weights.values()) == 1
+    assert weights == {
+        ("alice", 1): (5.0 * 40) / sum_of_scores_weighted,
+        ("carol", 2): (1.0 * 40)  / sum_of_scores_weighted,
+        ("dave", 4):  (6.0 * 40) / sum_of_scores_weighted,
+    }
+
+
+async def test_calculate_weights_with_scores_for_both_tasks():
+
+    mock_score_repository = AsyncMock(MinerScoreRepository)
+
+    stake_prediction_scores = {
+        ("alice", 1): 500,
+        ("bob", 2): 150,
+        ("carol", 2): 100,
+        ("dave", 4): 600,
+    }
+
+    hotkey_ownership_scores = {
+        ("alice", 1): 1,
+        ("bob", 2): 1,
+        ("carol", 2): 1,
+        ("dave", 4): 1,
+    }
+
+    mock_score_repository.find_last_average_overall_scores.return_value = hotkey_ownership_scores
+    mock_score_repository.find_latest_stake_prediction_overall_scores.return_value = stake_prediction_scores
+
+    mock_subtensor = AsyncMock(AsyncSubtensor)
+    mock_metagraph = AsyncMock(AsyncMetagraph)
+    mock_subtensor.metagraph.return_value = mock_metagraph
+
+    mock_metagraph.uids = np.array([1, 2, 4, 6])
+
+    mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
+
+    sum_of_prediction_scores = sum(stake_prediction_scores.values()) - 150 # No Bob!
+    sum_of_hotkey_ownership_scores = sum(hotkey_ownership_scores.values()) - 1 # No Bob!
+
+    task_weights = {
+        #TaskType.COLDKEY_SEARCH: 50,
+        TaskType.HOTKEY_OWNERSHIP: 60,
+        TaskType.PREDICT_ALPHA_SELL: 40,
+    }
+
+    weights = WeightSetter(mock_score_repository, mock_subtensor, MagicMock(Wallet), 81, task_weights)
+
+    weights = await weights.calculate_weights()
+
+    assert sum(weights.values()) == 1
+    assert weights == {
+        ("alice", 1): ((40 * 500 / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
+        ("carol", 2): ((40 * 100 / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
+        ("dave", 4):  ((40 * 600 / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
+    }
+
 
 async def test_calculate_weights_with_no_existing_scores():
 
     mock_score_repository = AsyncMock(MinerScoreRepository)
 
     mock_score_repository.find_last_average_overall_scores.return_value = {}
+    mock_score_repository.find_latest_stake_prediction_overall_scores.return_value = {}
 
     mock_subtensor = AsyncMock(AsyncSubtensor)
     mock_metagraph = AsyncMock(AsyncMetagraph)

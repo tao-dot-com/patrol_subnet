@@ -29,6 +29,7 @@ class _MinerScore(Base, MappedAsDataclass):
     error_message: Mapped[Optional[str]]
     task_type: Mapped[Optional[str]]
     accuracy_score: Mapped[Optional[float]]
+    scoring_batch: Mapped[Optional[int]]
 
     @classmethod
     def from_miner_score(cls, miner_score: MinerScore):
@@ -50,6 +51,7 @@ class _MinerScore(Base, MappedAsDataclass):
             error_message=miner_score.error_message,
             task_type=str(miner_score.task_type.value),
             accuracy_score=miner_score.accuracy_score,
+            scoring_batch=miner_score.scoring_batch
         )
 
     @staticmethod
@@ -78,7 +80,8 @@ class _MinerScore(Base, MappedAsDataclass):
             validation_passed=self.validation_passed,
             error_message=self.error_message,
             task_type=TaskType[self.task_type] if self.task_type else TaskType.COLDKEY_SEARCH,
-            accuracy_score=self.accuracy_score
+            accuracy_score=self.accuracy_score,
+            scoring_batch=self.scoring_batch
         )
 
 
@@ -125,3 +128,26 @@ class DatabaseMinerScoreRepository(MinerScoreRepository):
             results = await session.execute(select(ranked).filter(ranked.c.rnk == 1))
             scores = results.mappings().all()
             return {(it['hotkey'], it['uid']): it['overall_score_moving_average'] for it in scores}
+
+
+    async def find_latest_stake_prediction_overall_scores(self) -> dict[tuple[str, int], float]:
+        async with self.LocalAsyncSession() as session:
+            # Find latest scoring batch
+            latest_batch_query = select(func.max(_MinerScore.scoring_batch))
+            latest_scoring_batch = await session.scalar(latest_batch_query)
+
+            aggregate_scores = select(
+                _MinerScore.hotkey,
+                _MinerScore.uid,
+                func.sum(_MinerScore.overall_score).label("aggregate_score")
+            ).filter(
+                _MinerScore.task_type == TaskType.PREDICT_ALPHA_SELL.name,
+                _MinerScore.scoring_batch == latest_scoring_batch
+            ).group_by(
+                _MinerScore.hotkey,
+                _MinerScore.uid,
+            )
+
+            results = await session.execute(aggregate_scores)
+            scores = results.mappings().all()
+            return {(it['hotkey'], it['uid']): it['aggregate_score'] for it in scores}

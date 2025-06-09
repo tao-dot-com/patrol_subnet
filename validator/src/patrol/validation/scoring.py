@@ -32,6 +32,7 @@ class MinerScore:
     task_type: TaskType
     error_message: Optional[str] = None
     accuracy_score: Optional[float] = None
+    scoring_batch: Optional[int] = None
 
     @property
     def miner(self) -> tuple[str, int]:
@@ -50,4 +51,8 @@ class MinerScoreRepository(ABC):
 
     @abstractmethod
     async def find_last_average_overall_scores(self, task_type: TaskType) -> dict[tuple[str, int], float]:
+        pass
+
+    @abstractmethod
+    async def find_latest_stake_prediction_overall_scores(self) -> dict[tuple[str, int], float]:
         pass

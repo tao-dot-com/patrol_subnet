@@ -33,6 +33,7 @@ async def test_challenge_sends_correct_synapse(mock_uuid):
         prediction_interval=PredictionInterval(5_000_000, 5_000_7200),
         wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
         created_at=datetime.now(UTC),
+        scoring_batch=100
     )
 
     challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
@@ -68,6 +69,7 @@ async def test_challenge_sends_failed_score_to_dashboard(mock_uuid):
         prediction_interval=PredictionInterval(5_000_000, 5_000_7200),
         wallets=[WalletIdentifier("a", "alice"), WalletIdentifier("b", "bob")],
         created_at=datetime.now(UTC),
+        scoring_batch=100
     )
 
     miner_client.execute_tasks.return_value = [MinerTaskException("Nope!", task_id, batch_id)]
@@ -116,7 +118,7 @@ async def test_challenge_miner(mock_uuid, mock_datetime):
     axon = AxonInfo(version=0, ip="0.0.0.0", port=8000, hotkey="miner_hk", coldkey="miner_ck", ip_type=4)
     miner = Miner(axon, 123)
 
-    batch = AlphaSellChallengeBatch(batch_id, now, subnet_uid, prediction_interval, hotkeys)
+    batch = AlphaSellChallengeBatch(batch_id, now, subnet_uid, prediction_interval, hotkeys, 100)
 
     challenge = AlphaSellMinerChallenge(miner_client, dashboard_client)
     tasks = [it async for it in challenge.execute_challenge(miner, [batch])]

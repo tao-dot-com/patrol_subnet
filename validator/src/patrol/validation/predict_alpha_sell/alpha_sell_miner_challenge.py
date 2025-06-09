@@ -151,7 +151,8 @@ class AlphaSellMinerChallengeProcess:
         ))
 
         subnets = await self.subtensor.get_subnets()
-        batches = [await self._make_batch(prediction_interval, net_uid) for net_uid in subnets]
+        scoring_sequence = await self.challenge_repository.get_next_scoring_sequence()
+        batches = [await self._make_batch(prediction_interval, net_uid, scoring_sequence) for net_uid in subnets]
 
         logger.info("Challenge batch preparation for %s subnets", len(batches))
         for batch in batches:
@@ -173,12 +174,12 @@ class AlphaSellMinerChallengeProcess:
 
         logger.info("Miner Challenges complete.")
 
-    async def _make_batch(self, prediction_interval: PredictionInterval, net_uid: int):
+    async def _make_batch(self, prediction_interval: PredictionInterval, net_uid: int, scoring_sequence: int):
         metagraph = await self.subtensor.metagraph(net_uid)
         wallets = [WalletIdentifier(i.coldkey, i.hotkey) for i in metagraph.axons]
 
         batch_id = uuid.uuid4()
-        return AlphaSellChallengeBatch(batch_id, datetime.now(UTC), net_uid, prediction_interval, wallets)
+        return AlphaSellChallengeBatch(batch_id, datetime.now(UTC), net_uid, prediction_interval, wallets, scoring_sequence)
 
 
 async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str, enable_dashboard_syndication: bool,

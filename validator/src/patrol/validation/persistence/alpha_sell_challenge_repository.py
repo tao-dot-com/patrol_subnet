@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update, delete
+from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update, delete, Sequence
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
 
@@ -28,6 +28,7 @@ class _AlphaSellChallengeBatch(Base):
         PredictionInterval,
         prediction_interval_start, prediction_interval_end
     )
+    scoring_batch: Mapped[int]
 
     @classmethod
     def from_batch(cls, batch: AlphaSellChallengeBatch):
@@ -37,6 +38,7 @@ class _AlphaSellChallengeBatch(Base):
             subnet_uid=batch.subnet_uid,
             wallets_json=[dataclasses.asdict(it) for it in batch.wallets],
             prediction_interval=batch.prediction_interval,
+            scoring_batch=batch.scoring_batch
         )
 
     @property
@@ -44,6 +46,7 @@ class _AlphaSellChallengeBatch(Base):
         return AlphaSellChallengeBatch(
             UUID(self.id), self.created_at, self.subnet_uid, self.prediction_interval,
             [WalletIdentifier(**data) for data in self.wallets_json],
+            self.scoring_batch
         )
 
 class _AlphaSellChallengeTask(Base):
@@ -191,3 +194,8 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
             await session.execute(query)
             await session.commit()
 
+    async def get_next_scoring_sequence(self) -> int:
+        async with self.LocalSession() as session:
+            query = select(Sequence("scoring_batch").next_value())
+            next_val = await session.scalar(query)
+            return int(next_val)
