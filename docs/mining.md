@@ -31,6 +31,7 @@ HARDWARE REQUIREMENTS:
    python3 -m venv venv
    source venv/bin/activate
    pip install -e .
+   pip install -e common/
    ```
 
 4. Run the miner script to start mining data:
@@ -38,11 +39,22 @@ HARDWARE REQUIREMENTS:
   - TESTNET UID: 275
    
    ```sh
-   pm2 start src/patrol/mining/miner.py --interpreter python3 --name patrol-miner -- --netuid <UID> --wallet_path <your_wallet_path> --coldkey <your_wallet_name>  --hotkey <your_wallet_hotkey_name> --subtensor_address <network address for (test | finney | local)> --archive_node_address <your archive node for data collection (always has to be mainnet)> --external_ip <your_external_ip address> --port <your_port | 8091> --max_future_events <number of event blocks to collect into the future> --max_past_events <number of event blocks to collect into the past> --event_batch_size <number of event blocks to query at the same time>
+   pm2 start miner/src/patrol_mining/miner.py --interpreter python3 --name patrol-miner -- \
+  --netuid <UID> \
+  --wallet_path <your_wallet_path> \
+  --coldkey <your_wallet_name> \
+  --hotkey <your_wallet_hotkey_name> \
+  --subtensor_address <network address for (test | finney | local)> \
+  --archive_node_address <your archive node for data collection (always has to be mainnet)> \
+  --external_ip <your_external_ip address> \
+  --port <your_port | 8000> \
+  --max_future_events <number of event blocks to collect into the future> \
+  --max_past_events <number of event blocks to collect into the past> \
+  --event_batch_size <number of event blocks to query at the same time>
    ```
    This script will:
    - Initialize the miner with the specified wallet name and network
-   - Start the primary miner script that will process requests from the validators and submit subgraphs gathered from the archive node
+   - Start the primary miner script that will process requests from the validators and submit responses for the tasks outlined below
 
 > [!NOTE]
 > If you are attempting to run a miner on testnet, you will need to change '--subtensor_address' to the testnet network, but '--archive_node_address' always needs to point toward an archive node synced for mainnet, as regardless of testnet/mainnet, the data collected is always live.
