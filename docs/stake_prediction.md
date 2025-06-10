@@ -37,3 +37,37 @@ Overall accuracy score for a task is the sum of accuracies over all wallets pred
 Overall accuracy is normalized and used to set weights once per epoch.
 This task contributes 40% of the weights.
 
+### Sample Synapse request
+```json
+{
+  "batch_id": "a1877105-bd97-46af-b749-416b2f4d7cf3",
+  "task_id": "130dea16-9843-4b3a-97c8-0ab845178165",
+  "prediction_interval": {
+    "start_block": 5500000,
+    "end_block": 5507200
+  },
+  "subnet_uid": 42,
+  "wallets": [
+    { "hotkey": "5GYnKhRwkRN78ZREMhohMvCRQBoc6sFwkTskYVjrQWWDVnZp", "coldkey": "5DLr6vrZqmCQBxH9H9UNJbErTtoDBrSkMJZu1xZwWsKCz1ig"},
+    { "hotkey": "5GxqhbNg9gTfZUdcKji4pMDQdhqcVCTNWon9VyuqKdoWCsuH", "coldkey": "5FEo31ujEdvDjKPwS5p54ek5HksjJgcwk3FrEfxtikLcm2U1"},
+    ...
+  ]
+}
+```
+
+### Sample Synapse response
+```json
+{
+  "batch_id": "a1877105-bd97-46af-b749-416b2f4d7cf3",
+  "task_id": "130dea16-9843-4b3a-97c8-0ab845178165",
+  "subnet_uid": 42,
+  "predictions": [
+    { "amount": 12000000000, "transaction_type": "StakeRemoved", "wallet_hotkey_ss58": "5GYnKhRwkRN78ZREMhohMvCRQBoc6sFwkTskYVjrQWWDVnZp", "wallet_coldkey_ss58": "5DLr6vrZqmCQBxH9H9UNJbErTtoDBrSkMJZu1xZwWsKCz1ig"},
+    { "amount": 0, "transaction_type": "StakeRemoved", "wallet_hotkey_ss58": "5GxqhbNg9gTfZUdcKji4pMDQdhqcVCTNWon9VyuqKdoWCsuH", "wallet_coldkey_ss58": "5FEo31ujEdvDjKPwS5p54ek5HksjJgcwk3FrEfxtikLcm2U1"},
+    ...
+  ]
+}
+```
+- All predicted amounts will be in RAO.
+- Predictions for wallets not present in the request will be ignored.
+- Duplicate wallet predictions (same hotkey) will be rejected, and the entire task will score 0.0)
