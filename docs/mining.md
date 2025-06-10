@@ -2,7 +2,7 @@
 
 REQUIREMENTS:
 - Ubuntu 22.04+
-- Python 3.10+
+- Python 3.12+
 
 HARDWARE REQUIREMENTS:
 - 8gb Ram
@@ -24,7 +24,7 @@ HARDWARE REQUIREMENTS:
    npm i -g pm2
    ```
    
-3. Create a virtual environtment and install prerequisite packages:
+3. Create a virtual environment and install prerequisite packages:
    ```sh
    git clone https://github.com/tao_dot_com/patrol_subnet
    cd patrol_subnet
@@ -47,23 +47,21 @@ HARDWARE REQUIREMENTS:
 > [!NOTE]
 > If you are attempting to run a miner on testnet, you will need to change '--subtensor_address' to the testnet network, but '--archive_node_address' always needs to point toward an archive node synced for mainnet, as regardless of testnet/mainnet, the data collected is always live.
 
+### Tasks
+
+Miners should implement both of the following tasks:
+
+- [Hotkey Ownership Task](hotkey_ownership.md)  
+There are no standard hyperparamters for changing the performance of your miner on this task. You will likely find benefits from pursuing caching in some form.
+
+
+- [Stake Prediction Task](stake_prediction.md)  
+The reference miner will predict zero stake movement by default. It is completely up to miners to
+optimize the prediction mechanism to improve accuracy.
+
 ### Optimising your miner
 
 For both tasks, we strongly suggest setting up your own archive node, which will allow you to avoid any rate limits and/or competing for resources when querying the opentensor archive node. A guide to help you set up your own archive node can be found [here](https://docs.bittensor.com/subtensor-nodes/).
 
 To aid with optimizing for both tasks, we have provided some local_dev resource, which allow you to test your miner offline (without the need for testnet). Please see [here](../src/miner/local_dev/local_development.md).
 
-#### Task 1: Coldkey Search
-
-You will at the very least need to optimize your miner's performance by adjusting the *max_future_events*, *max_past_events* and *event_batch_size* parameters.
-
-As the subnet gets more competitive, you will need to enhance and optimize the miner code, so that it can fetch larger subgraphs in less time. Here is an in depth overview of the [incentive](coldkey_search.md#incentive-mechanism) mechanism to help.
-
-#### Task 2: Hotkey Ownership Search
-
-There are no standard hyperparamters for changing the performance of your miner on this task. You will likely find benefits from pursuing caching in some form. 
-
-#### Task 3: Stake Prediction
-
-The reference miner will predict zero stake movement by default. It is completely up to miners to
-optimize the prediction mechanism to improve accuracy.

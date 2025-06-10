@@ -73,11 +73,17 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "patrol"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   validator:
     init: true
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     image: public.ecr.aws/c9f7n4n0/patrol/validator:latest
     pull_policy: always
     restart: unless-stopped
