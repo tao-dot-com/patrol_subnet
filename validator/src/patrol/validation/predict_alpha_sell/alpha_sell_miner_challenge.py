@@ -150,7 +150,7 @@ class AlphaSellMinerChallengeProcess:
             (Miner(axon, uids[idx]) for idx, axon in enumerate(axons))
         ))
 
-        subnets = await self.subtensor.get_subnets()
+        subnets = [sn for sn in await self.subtensor.get_subnets() if sn not in {0, 81}]
         scoring_sequence = await self.challenge_repository.get_next_scoring_sequence()
         batches = [await self._make_batch(prediction_interval, net_uid, scoring_sequence) for net_uid in subnets]
 

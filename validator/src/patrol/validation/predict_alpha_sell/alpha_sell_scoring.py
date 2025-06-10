@@ -16,7 +16,7 @@ from patrol.validation.dashboard import DashboardClient
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
-from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
+from patrol.validation.persistence.miner_score_repository import DatabaseMinerScoreRepository
 from patrol.validation.persistence.transaction_helper import TransactionHelper
 from patrol.validation.predict_alpha_sell import AlphaSellChallengeTask, AlphaSellChallengeRepository, \
     AlphaSellEventRepository, AlphaSellChallengeBatch, TransactionType
@@ -26,18 +26,13 @@ logger = logging.getLogger(__name__)
 
 
 def make_miner_score(task: AlphaSellChallengeTask, accuracy: float, scoring_batch: int) -> MinerScore:
-    #responsiveness_score = 2 / (2 + task.response_time_seconds)
-    accuracy_score = accuracy # FIXME: this is wrong
-
-    overall_score = accuracy_score # + responsiveness_score) / 10
-
     return MinerScore(
         id=task.task_id, batch_id=task.batch_id, created_at=datetime.now(UTC),
         uid=task.miner.uid,
         coldkey=task.miner.coldkey,
         hotkey=task.miner.hotkey,
         responsiveness_score=0.0,
-        accuracy_score=accuracy_score,
+        accuracy_score=accuracy,
         volume=0,
         volume_score=0.0,
         response_time_seconds=0.0,
@@ -45,7 +40,7 @@ def make_miner_score(task: AlphaSellChallengeTask, accuracy: float, scoring_batc
         validation_passed=not task.has_error,
         error_message=task.error_message,
         task_type=TaskType.PREDICT_ALPHA_SELL,
-        overall_score=overall_score,
+        overall_score=accuracy,
         overall_score_moving_average=0.0,
         scoring_batch=scoring_batch,
     )
@@ -125,14 +120,15 @@ class AlphaSellScoring:
         scorable_tasks = await self.challenge_repository.find_tasks(batch.batch_id)
 
         for task in scorable_tasks:
+            miner_log_context = dataclasses.asdict(task.miner)
+            logger.info("Scoring task id [%s] in subnet [%s] with [%s] predictions",
+                        task.task_id, batch.subnet_uid, len(task.predictions), extra=miner_log_context)
             await self._score_task(task, stake_removals, batch.scoring_batch)
 
         await self.challenge_repository.remove_if_fully_scored(batch.batch_id)
 
     async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict, scoring_batch: int):
-        miner_log_context = dataclasses.asdict(task.miner)
 
-        logger.info("Scoring task [%s]", task.task_id, extra=miner_log_context)
         accuracy_sum = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
         miner_score = make_miner_score(task, accuracy_sum, scoring_batch)
 

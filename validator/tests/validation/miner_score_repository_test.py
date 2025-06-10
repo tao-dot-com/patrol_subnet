@@ -7,7 +7,7 @@ import pytest
 
 from patrol.validation import TaskType
 from patrol.validation.persistence import migrate_db
-from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository, _MinerScore
+from patrol.validation.persistence.miner_score_repository import DatabaseMinerScoreRepository, _MinerScore
 from patrol.validation.scoring import MinerScore
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import select, text

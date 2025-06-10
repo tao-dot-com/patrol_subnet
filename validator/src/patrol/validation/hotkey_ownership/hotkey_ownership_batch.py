@@ -17,7 +17,7 @@ from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import Hot
 from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
 from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
-from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
+from patrol.validation.persistence.miner_score_repository import DatabaseMinerScoreRepository
 
 logger = logging.getLogger(__name__)
 

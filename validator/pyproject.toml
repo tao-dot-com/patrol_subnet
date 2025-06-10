@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "flake8", "pytest-aiohttp"]
+test = ["pytest", "pytest_asyncio", "pytest-mock", "httpx", "flake8", "pytest-aiohttp", "aioresponses"]
 
 [build-system]
 requires = ["setuptools>=57", "wheel", "setuptools-scm"]

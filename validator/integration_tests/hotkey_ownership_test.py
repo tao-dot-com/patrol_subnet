@@ -23,7 +23,7 @@ from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Hotkey
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
 from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
-from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
+from patrol.validation.persistence.miner_score_repository import DatabaseMinerScoreRepository
 
 ARCHIVE_NODE = os.environ['ARCHIVE_NODE']
 

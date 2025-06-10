@@ -2,6 +2,8 @@ import bittensor as bt
 from dataclasses import dataclass, field
 from typing import Optional, Union, List
 
+from pydantic import field_validator, model_validator
+
 from patrol_common import WalletIdentifier, PredictionInterval, AlphaSellPrediction
 
 
@@ -76,6 +78,29 @@ class AlphaSellSynapse(bt.Synapse):
     batch_id: str
     task_id: str
     subnet_uid: int
-    wallets: Optional[list[WalletIdentifier]] = None
+    wallets: Optional[List[WalletIdentifier]] = None
     prediction_interval: Optional[PredictionInterval] = None
+
     predictions: Optional[list[AlphaSellPrediction]] = None
+
+    @model_validator(mode="after")
+    def validate_predictions(self):
+        if self.predictions is None or len(self.predictions) == 0:
+            return self
+
+        seen = set()
+        duplicates = set()
+        for item in self.predictions:
+            hotkey = item.wallet_hotkey_ss58
+            if hotkey in seen:
+                duplicates.add(hotkey)
+            else:
+                seen.add(hotkey)
+
+        if len(duplicates) > 0:
+            raise ValueError(f"Duplicate hotkeys found in prediction {duplicates}")
+
+        return self
+
+
+
