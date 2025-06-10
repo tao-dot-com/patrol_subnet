@@ -1,4 +1,5 @@
 import asyncio
+from multiprocessing import Semaphore
 from tempfile import TemporaryDirectory
 from unittest.mock import AsyncMock
 
@@ -77,7 +78,7 @@ def challenge_process(mock_miner, validator_wallet: Wallet, mock_subtensor: Asyn
 
 @pytest.fixture
 def scoring_process(validator_wallet: Wallet):
-    process = alpha_sell_scoring.start_scoring_process(validator_wallet, DB_URL, enable_dashboard_syndication=False)
+    process = alpha_sell_scoring.start_scoring_process(validator_wallet, DB_URL, Semaphore(), enable_dashboard_syndication=False)
     yield process
     process.terminate()
     process.join()

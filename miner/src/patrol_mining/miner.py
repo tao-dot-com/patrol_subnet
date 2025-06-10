@@ -44,7 +44,7 @@ class Miner:
         self.subgraph_loop = get_event_loop()
         self.subgraph_generator = None
         self.hotkey_owner_finder = None
-        self.alpha_sell_predictor = None
+        self.alpha_sell_predictor = AlphaSellPredictor()
 
     async def setup_bittensor_objects(self):
         bt.logging.info("Setting up Bittensor objects.")
