@@ -10,8 +10,7 @@ from patrol.validation import TaskType
 NETWORK = os.getenv('NETWORK', "finney")
 NET_UID = int(os.getenv('NET_UID', "81"))
 
-DB_DIR = os.getenv('DB_DIR', "/var/patrol/sqlite")
-DB_URL = os.getenv("DB_URL", f"sqlite+aiosqlite:///{DB_DIR}/patrol.db")
+DB_URL = os.getenv("DB_URL", f"postgresql+asyncpg://patrol:password@localhost:5432/patrol")
 
 WALLET_NAME = os.getenv('WALLET_NAME', "default")
 HOTKEY_NAME = os.getenv('HOTKEY_NAME', "default")
