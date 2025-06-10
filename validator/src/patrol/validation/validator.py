@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from patrol.validation import auto_update, hooks
 from patrol.validation.hooks import HookType
 from patrol.validation.persistence import migrate_db
-from patrol.validation.persistence.miner_score_respository import DatabaseMinerScoreRepository
+from patrol.validation.persistence.miner_score_repository import DatabaseMinerScoreRepository
 import asyncio
 import logging
 
