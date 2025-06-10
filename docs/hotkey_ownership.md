@@ -85,3 +85,5 @@ it is set to 2 seconds).
 - Slower responses are still scored, but with diminishing value
 
 This rewards both speed and reliability while allowing some flexibility for slower miners.
+
+This task contributes 60% of the weights.

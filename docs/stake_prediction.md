@@ -12,14 +12,15 @@ THere is no incentive to respond quicker than time-out. All responses received w
 
 ## Scoring
 
-The predictions for each wallet are compared against the actual **StakeRemoved** events recorded on the chain during
+The predictions for each subnet are compared against the actual **StakeRemoved** events recorded on the chain during
 the prediction interval according to the formula:
 
-$$`accuracy = 1 - \left(\frac{2.0 \times error}{1 + actual}\right) ^ 2`$$
+$$`score = \sum_{n=0}^{N-1} \Bigg[\big(1 + log_{10}(actual_n + 1)\big) \times max(0, 1 - \left(\frac{2.0 \times error_n}{1 + actual_n}\right) ^ 2\Bigg]`$$
 
 where:
 - ***error*** is the difference between the predicted amount and actual amount of stake removed during the interval;  
 - ***actual*** is the actual stake removed during the interval.
+- ***n*** is the subnet index
 
 Both these values are TAO, converted from the RAO amounts in the predictions and actual data.
 
@@ -28,5 +29,5 @@ Overall accuracy is calculated as the mean accuracy of all the tasks in a batch.
 ## Weights
 
 Overall accuracy is normalized and used to set weights once per epoch.
-This task contributes 50% of the weights.
+This task contributes 40% of the weights.
 
