@@ -112,6 +112,8 @@ async def run_forever(wallet: Wallet, db_url: str, patrol_subtensor: AsyncSubten
     while True:
         try:
             await batch.challenge_miners()
+        except Exception as ex:
+            logger.exception("Unexpected error")
         finally:
             await asyncio.sleep(600)
 
