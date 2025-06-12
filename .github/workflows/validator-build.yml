@@ -29,7 +29,8 @@ jobs:
       - name: Build
         uses: docker/build-push-action@v6
         with:
-          file: validator/Dockerfile
+          context: .
+          file: ./validator/Dockerfile
           build-args: |
             TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
             ARCHIVE_NODE=${{ secrets.ARCHIVE_NODE }}
