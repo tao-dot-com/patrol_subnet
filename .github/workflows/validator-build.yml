@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - develop
+      - feature/predict_stake_remove
 
 jobs:
   build:
