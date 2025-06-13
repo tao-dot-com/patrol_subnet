@@ -33,7 +33,9 @@ class WeightSetter:
         hotkey_weighting = self.task_weights[TaskType.HOTKEY_OWNERSHIP] if total_hotkey_ownership_scores else 0
 
         overall_stake_predict_scores = await self.miner_score_repository.find_latest_stake_prediction_overall_scores()
-        registered_overall_stake_predict_scores = {k: v for k, v in overall_stake_predict_scores.items() if k in miners}
+        lowest_stake_predict_score = min((v for k, v in overall_stake_predict_scores.items() if k in miners), default=0) * 0.9
+        registered_overall_stake_predict_scores = {k: v - lowest_stake_predict_score for k, v in overall_stake_predict_scores.items() if k in miners}
+
         total_stake_predict_scores = sum(registered_overall_stake_predict_scores.values())
         prediction_weighting = self.task_weights[TaskType.PREDICT_ALPHA_SELL] if total_stake_predict_scores else 0
 

@@ -8,6 +8,7 @@ from patrol.validation.scoring import MinerScoreRepository
 from patrol.validation.weight_setter import WeightSetter
 from bittensor.core.async_subtensor import AsyncSubtensor
 import numpy as np
+from pytest import approx
 
 async def test_skip_weights():
     pass
@@ -76,7 +77,8 @@ async def test_calculate_weights_with_stake_prediction_scores_only():
 
     mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
 
-    sum_of_scores_weighted = (40 * (sum(stake_prediction_scores.values()) - 1.5)) # No Bob!
+    score_to_subtract = 1.0 * 0.9
+    sum_of_scores_weighted = sum((sc - score_to_subtract) for sc in [5.0, 1.0, 6.0]) # No Bob!
 
     task_weights = {
         #TaskType.COLDKEY_SEARCH: 50,
@@ -89,11 +91,10 @@ async def test_calculate_weights_with_stake_prediction_scores_only():
     weights = await weights.calculate_weights()
 
     assert sum(weights.values()) == 1
-    assert weights == {
-        ("alice", 1): (5.0 * 40) / sum_of_scores_weighted,
-        ("carol", 2): (1.0 * 40)  / sum_of_scores_weighted,
-        ("dave", 4):  (6.0 * 40) / sum_of_scores_weighted,
-    }
+    assert len(weights) == 3
+    assert weights[("alice", 1)] == approx(((5.0 - score_to_subtract) * 40) / (40 * sum_of_scores_weighted))
+    assert weights[("carol", 2)] == approx(((1.0 - score_to_subtract) * 40) / (40 * sum_of_scores_weighted))
+    assert weights[("dave", 4)]  == approx(((6.0 - score_to_subtract) * 40) / (40 *sum_of_scores_weighted))
 
 
 async def test_calculate_weights_with_scores_for_both_tasks():
@@ -125,7 +126,9 @@ async def test_calculate_weights_with_scores_for_both_tasks():
 
     mock_metagraph.hotkeys = ["alice", "carol", "dave", "emily"]
 
-    sum_of_prediction_scores = sum(stake_prediction_scores.values()) - 150 # No Bob!
+    score_to_subtract = 100 * 0.9
+    sum_of_prediction_scores = sum((sc - score_to_subtract) for sc in [500, 100, 600]) # No Bob!
+
     sum_of_hotkey_ownership_scores = sum(hotkey_ownership_scores.values()) - 1 # No Bob!
 
     task_weights = {
@@ -140,9 +143,9 @@ async def test_calculate_weights_with_scores_for_both_tasks():
 
     assert sum(weights.values()) == 1
     assert weights == {
-        ("alice", 1): ((40 * 500 / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
-        ("carol", 2): ((40 * 100 / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
-        ("dave", 4):  ((40 * 600 / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
+        ("alice", 1): (40 * ((500 - score_to_subtract) / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
+        ("carol", 2): (40 * ((100 - score_to_subtract) / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
+        ("dave", 4):  (40 * ((600 - score_to_subtract) / sum_of_prediction_scores) + (60 * 1.0 / sum_of_hotkey_ownership_scores)) / 100,
     }
 
 
