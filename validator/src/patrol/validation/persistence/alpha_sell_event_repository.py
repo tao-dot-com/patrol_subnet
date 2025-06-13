@@ -77,7 +77,7 @@ class DataBaseAlphaSellEventRepository(AlphaSellEventRepository):
             ).group_by(*group_by)
 
             results = (await session.execute(query)).all()
-            return {WalletIdentifier(row[0], row[1]): row[2] for row in results}
+            return {WalletIdentifier(row[0], row[1]): int(row[2]) for row in results}
 
     async def find_most_recent_block_collected(self) -> int:
         async with self.LocalSession() as session:

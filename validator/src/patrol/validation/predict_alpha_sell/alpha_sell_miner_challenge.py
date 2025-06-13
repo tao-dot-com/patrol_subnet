@@ -176,6 +176,7 @@ class AlphaSellMinerChallengeProcess:
 
     async def _make_batch(self, prediction_interval: PredictionInterval, net_uid: int, scoring_sequence: int):
         metagraph = await self.subtensor.metagraph(net_uid)
+        logger.info("Metagraph for subnet %s loaded", net_uid)
         wallets = [WalletIdentifier(i.coldkey, i.hotkey) for i in metagraph.axons]
 
         batch_id = uuid.uuid4()
