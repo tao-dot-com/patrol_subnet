@@ -250,8 +250,8 @@ class EventProcessor:
 if __name__ == "__main__":
 
     import json
-    from patrol.chain_data.substrate_client import SubstrateClient
-    from patrol.chain_data.runtime_groupings import load_versions
+    from patrol_mining.chain_data.substrate_client import SubstrateClient
+    from patrol_mining.chain_data.runtime_groupings import load_versions
 
     network_url = "wss://archive.chain.opentensor.ai:443/"
     versions = load_versions()

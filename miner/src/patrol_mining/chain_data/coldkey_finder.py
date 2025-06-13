@@ -30,8 +30,8 @@ class ColdkeyFinder:
 if __name__ == "__main__":
     import asyncio
     import time
-    from patrol.chain_data.substrate_client import SubstrateClient
-    from patrol.chain_data.runtime_groupings import load_versions
+    from patrol_mining.chain_data.substrate_client import SubstrateClient
+    from patrol_mining.chain_data.runtime_groupings import load_versions
     
     hotkey = "5F4tQyWrhfGVcNhoqeiNsR6KjD4wMZ2kfhLj4oHYuyHbZAc3"
 

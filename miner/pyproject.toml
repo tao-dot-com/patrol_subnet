@@ -5,6 +5,7 @@ description = "Patrol Subnet Miner"
 requires-python = ">=3.12"
 dependencies = [
     "bittensor",
+    "async_substrate_interface==1.2.0",
     "aiochclient[aiohttp]",
     "aiohttp",
     "sqlalchemy",

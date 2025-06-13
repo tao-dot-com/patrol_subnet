@@ -92,7 +92,7 @@ class SubstrateClient:
 
 if __name__ == "__main__":
 
-    from patrol.chain_data.runtime_groupings import load_versions, get_version_for_block
+    from patrol_mining.chain_data.runtime_groupings import load_versions, get_version_for_block
 
     async def example():
     
