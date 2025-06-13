@@ -4,15 +4,15 @@ import uuid
 import json
 from datetime import datetime
 from collections import namedtuple
-from patrol.chain_data.substrate_client import SubstrateClient
-from patrol.chain_data.runtime_groupings import load_versions
-from patrol.validation.chain.runtime_versions import RuntimeVersions
+from patrol_mining.chain_data.substrate_client import SubstrateClient
+from patrol_mining.chain_data.runtime_groupings import load_versions
 from patrol.validation.chain.chain_reader import ChainReader
 
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, HotkeyOwnershipValidator
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient
 from patrol.validation.hotkey_ownership.hotkey_ownership_scoring import HotkeyOwnershipScoring
 from patrol.validation.hotkey_ownership.hotkey_target_generation import HotkeyTargetGenerator
+from async_substrate_interface import AsyncSubstrateInterface
 
 class MockMinerScoreRepo:
 
@@ -22,8 +22,7 @@ class MockMinerScoreRepo:
     async def add(self, miner_score):
         self.scores.append(miner_score)
 
-    async def find_latest_overall_scores(self, miner, batch):
-
+    async def find_latest_overall_scores(self, miner, batch, limit=None):
         return [1]
 
     def return_scores(self):
@@ -43,17 +42,12 @@ async def test_miner(requests):
     bt.debug()
 
     network_url = "wss://archive.chain.opentensor.ai:443/"
-    versions = load_versions()
+    
+    async_substrate_interface = AsyncSubstrateInterface(network_url)
 
-    # Create an instance of SubstrateClient with a shorter keepalive interval.
-    client = SubstrateClient(runtime_mappings=versions, network_url=network_url)
+    chain_reader = ChainReader(async_substrate_interface)
 
-    # Initialize substrate connections for all groups.
-    await client.initialize()
-
-    chain_reader = ChainReader(client, RuntimeVersions())
-
-    target_generator = HotkeyTargetGenerator(substrate_client=client)
+    target_generator = HotkeyTargetGenerator(async_substrate_interface)
     hotkey_addresses = await target_generator.generate_targets(num_targets=10, max_block_number=5551978)  
 
     wallet_vali = bt.wallet(name="validator", hotkey="vali_1")

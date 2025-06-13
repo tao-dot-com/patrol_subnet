@@ -28,9 +28,9 @@ HARDWARE REQUIREMENTS:
    ```sh
    git clone https://github.com/tao_dot_com/patrol_subnet
    cd patrol_subnet
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -e .
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e miner/
    pip install -e common/
    ```
 
