@@ -129,7 +129,7 @@ class AlphaSellEventRepository(ABC):
         pass
 
     @abstractmethod
-    async def find_aggregate_stake_movement_by_hotkey(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> dict[str, int]:
+    async def find_aggregate_stake_movement_by_wallet(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> dict[WalletIdentifier, int]:
         pass
 
     @abstractmethod

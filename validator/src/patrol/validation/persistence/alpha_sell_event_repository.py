@@ -7,6 +7,9 @@ from sqlalchemy import DateTime, select, between, func
 from datetime import datetime
 from typing import Optional
 
+from patrol_common import WalletIdentifier
+
+
 class _ChainStakeEvent(Base):
     __tablename__ = "alpha_sell_event"
 
@@ -47,22 +50,34 @@ class DataBaseAlphaSellEventRepository(AlphaSellEventRepository):
             session.add_all([_ChainStakeEvent.from_event(event) for event in events])
             await session.commit()
 
-    async def find_aggregate_stake_movement_by_hotkey(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> dict[str, int]:
-        group_by = _ChainStakeEvent.from_hotkey if transaction_type != TransactionType.STAKE_ADDED else _ChainStakeEvent.to_hotkey
+    async def find_aggregate_stake_movement_by_wallet(self, subnet_id, lower_block, upper_block, transaction_type: TransactionType) -> dict[WalletIdentifier, int]:
+
+        if transaction_type == TransactionType.STAKE_REMOVED:
+            selects = [
+                _ChainStakeEvent.coldkey,
+                _ChainStakeEvent.from_hotkey,
+                func.sum(_ChainStakeEvent.rao_amount).label("rao_amount"),
+            ]
+            group_by = [_ChainStakeEvent.from_hotkey, _ChainStakeEvent.coldkey]
+        else:
+            selects = [
+                _ChainStakeEvent.coldkey,
+                _ChainStakeEvent.to_hotkey,
+                func.sum(_ChainStakeEvent.rao_amount).label("rao_amount"),
+            ]
+            group_by = [_ChainStakeEvent.to_hotkey, _ChainStakeEvent.coldkey]
 
         async with self.LocalSession() as session:
             query = select(
-                group_by,
-                func.sum(_ChainStakeEvent.rao_amount).label("rao_amount"),
+                *selects
             ).filter(
                 _ChainStakeEvent.from_net_uid == subnet_id,
                 _ChainStakeEvent.event_type == transaction_type.name,
                 _ChainStakeEvent.block_number.between(lower_block, upper_block)
-            ).group_by(group_by)
+            ).group_by(*group_by)
 
             results = (await session.execute(query)).all()
-            results_dict = dict(results)
-            return {k: int(v) for k, v in results_dict.items()}
+            return {WalletIdentifier(row[0], row[1]): row[2] for row in results}
 
     async def find_most_recent_block_collected(self) -> int:
         async with self.LocalSession() as session:

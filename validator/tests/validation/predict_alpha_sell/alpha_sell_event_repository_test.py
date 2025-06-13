@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from patrol.validation.persistence import migrate_db
 from patrol.validation.predict_alpha_sell import ChainStakeEvent, TransactionType
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
+from patrol_common import WalletIdentifier
+
 
 @pytest.fixture
 def pgsql_engine():
@@ -66,10 +68,10 @@ async def test_find_aggregate_stake_movement_by_hotkey(clean_pgsql_engine):
     repository = DataBaseAlphaSellEventRepository(clean_pgsql_engine)
     await repository.add(events)
 
-    stake_removed_events = await repository.find_aggregate_stake_movement_by_hotkey(72, 5000000, 5000001, TransactionType.STAKE_REMOVED)
-    assert stake_removed_events.keys() == {"hotkey1", "hotkey2"}
-    assert stake_removed_events['hotkey1'] == 400 + 500
-    assert stake_removed_events['hotkey2'] == 600
+    stake_removed_events = await repository.find_aggregate_stake_movement_by_wallet(72, 5000000, 5000001, TransactionType.STAKE_REMOVED)
+    assert stake_removed_events.keys() == {WalletIdentifier('coldkey1', 'hotkey1'), WalletIdentifier('coldkey1', 'hotkey2')}
+    assert stake_removed_events[WalletIdentifier('coldkey1', 'hotkey1')] == 400 + 500
+    assert stake_removed_events[WalletIdentifier('coldkey1', 'hotkey2')] == 600
 
 
 async def test_find_most_recent_block(clean_pgsql_engine):

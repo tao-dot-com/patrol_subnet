@@ -42,7 +42,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_0_tao(batch):
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": 0, "bob": 0}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): 0, WalletIdentifier("bob_ck", "bob"): 0}
 
     alpha_sell_validator = AlphaSellValidator()
 
@@ -61,7 +61,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_1_tao(batch):
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(1E9), "bob": int(1E9)}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): int(1E9), WalletIdentifier("bob_ck", "bob"): int(1E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
@@ -80,7 +80,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_10_tao(batch):
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(10E9), "bob": int(10E9)}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): int(10E9), WalletIdentifier("bob_ck", "bob"): int(10E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
@@ -99,7 +99,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_1000_tao(batch):
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(1000E9), "bob": int(1000E9)}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): int(1000E9), WalletIdentifier("bob_ck", "bob"): int(1000E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
@@ -118,7 +118,7 @@ async def test_validate_predictions_off_by_just_greater_than_50_percent(batch, p
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(100E9)}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): int(100E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
@@ -137,7 +137,7 @@ async def test_validate_predictions_off_by_just_less_than_50_percent(batch, pred
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(100E9)}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): int(100E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
@@ -170,7 +170,7 @@ async def test_validate_where_no_predictions_made(batch):
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": int(1E9), "bob": int(2E9)}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): int(1E9), WalletIdentifier("bob_ck", "bob"): int(2E9)}
 
     alpha_sell_validator = AlphaSellValidator()
 
@@ -185,7 +185,7 @@ async def test_validate_failed_task(batch):
     score_repo = AsyncMock(MinerScoreRepository)
     score_repo.find_latest_overall_scores.return_value = []
 
-    stake_removals = {"alice": 100, "bob": 200}
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): 100, WalletIdentifier("bob_ck", "bob"): 200}
 
     alpha_sell_validator = AlphaSellValidator()
 

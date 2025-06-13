@@ -50,8 +50,8 @@ async def test_score_miner_tasks(mock_datetime: datetime):
         )]
 
     chain_reader.get_current_block.return_value = 120
-    event_repository.find_aggregate_stake_movement_by_hotkey.return_value = {
-        "alice": 400
+    event_repository.find_aggregate_stake_movement_by_wallet.return_value = {
+        ("alice_ck", "alice"): 400
     }
 
     validator = AsyncMock(AlphaSellValidator)
