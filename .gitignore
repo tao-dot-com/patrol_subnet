@@ -18,7 +18,7 @@ env.local
 !example_subgraph_output.json
 !runtime_versions.json
 
-publish.sh
+validator/publish.sh
 main.py
 exploit
 
