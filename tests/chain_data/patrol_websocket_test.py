@@ -56,6 +56,10 @@ async def websocket(websocket_server):
         yield ws
 
 
+# async def test_reconnect(websocket):
+#     await websocket.connect()
+#     await websocket.connect(force=True)
+
 async def test_handle_concurrent_messages_at_volume(websocket_server, websocket):
 
     async def receive(id):

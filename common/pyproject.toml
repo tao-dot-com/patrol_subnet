@@ -1,0 +1,33 @@
+[project]
+name = "patrol-common"
+dynamic = ["version"]
+description = "Patrol Subnet Commmon"
+requires-python = ">=3.12"
+dependencies = [
+    "bittensor",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest_asyncio", "pytest-mock", "flake8", "pytest-aiohttp"]
+
+[build-system]
+requires = ["setuptools>=57", "wheel", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope="function"
+addopts = "--capture=no"
+log_cli = false
+#log_cli_level = "DEBUG"
+#log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+#log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+pythonpath = ['src/']
+testpaths = ['test']
+#addopts = ['--strict-config', '-ra']
+
+[tool.setuptools_scm]
+root = "../"
+version_scheme = "no-guess-dev"
+local_scheme = "node-and-date"
