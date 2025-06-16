@@ -3,7 +3,11 @@ import logging
 
 from async_substrate_interface import AsyncSubstrateInterface
 from sqlalchemy.ext.asyncio import create_async_engine
+
+from patrol.validation import hooks
+from patrol.validation.aws_rds import consume_db_engine
 from patrol.validation.chain.chain_reader import ChainReader
+from patrol.validation.hooks import HookType
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
 from patrol.validation.persistence.alpha_sell_event_repository import DataBaseAlphaSellEventRepository
 from patrol.validation.predict_alpha_sell import AlphaSellEventRepository, AlphaSellChallengeRepository
@@ -76,10 +80,14 @@ class StakeEventCollector:
 
 
 async def start(db_url: str):
-    from patrol.validation.config import ARCHIVE_SUBTENSOR
+    from patrol.validation.config import ARCHIVE_SUBTENSOR, ENABLE_AWS_RDS_IAM
+
+    if ENABLE_AWS_RDS_IAM:
+        hooks.add_on_create_db_engine(consume_db_engine)
 
     async with AsyncSubstrateInterface(ARCHIVE_SUBTENSOR) as substrate:
         engine = create_async_engine(db_url)
+        hooks.invoke(HookType.ON_CREATE_DB_ENGINE, engine)
         event_repository = DataBaseAlphaSellEventRepository(engine)
         chain_reader = ChainReader(substrate)
 

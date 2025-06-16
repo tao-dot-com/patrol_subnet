@@ -9,8 +9,10 @@ from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet import Wallet
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from patrol.validation import Miner
+from patrol.validation import Miner, hooks
+from patrol.validation.aws_rds import consume_db_engine
 from patrol.validation.chain.chain_reader import ChainReader
+from patrol.validation.hooks import HookType
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import HotkeyOwnershipChallenge, \
     HotkeyOwnershipValidator
 from patrol.validation.hotkey_ownership.hotkey_ownership_miner_client import HotkeyOwnershipMinerClient
@@ -80,6 +82,8 @@ async def run_forever(wallet: Wallet, db_url: str, patrol_subtensor: AsyncSubten
     from patrol.validation.config import DASHBOARD_BASE_URL, NET_UID, BATCH_CONCURRENCY, ARCHIVE_SUBTENSOR
 
     engine = create_async_engine(db_url)
+    hooks.invoke(HookType.ON_CREATE_DB_ENGINE, engine)
+
     archive_subtensor = AsyncSubtensor(ARCHIVE_SUBTENSOR)
     chain_reader = ChainReader(archive_subtensor.substrate)
 
@@ -120,6 +124,11 @@ async def run_forever(wallet: Wallet, db_url: str, patrol_subtensor: AsyncSubten
 
 async def run(wallet: Wallet, db_url: str, subtensor: AsyncSubtensor, enable_dashboard_syndication: bool,
               patrol_metagraph: AsyncMetagraph | None):
+
+    from patrol.validation.config import ENABLE_AWS_RDS_IAM
+    if ENABLE_AWS_RDS_IAM:
+        hooks.add_on_create_db_engine(consume_db_engine)
+
     if subtensor:
         await run_forever(wallet, db_url, subtensor, patrol_metagraph, enable_dashboard_syndication)
     else:

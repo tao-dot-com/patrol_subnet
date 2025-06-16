@@ -16,7 +16,8 @@ dependencies = [
     "async_lru",
     "greenlet>=3.2.1",
     "networkx",
-    "patrol_common"
+    "patrol_common",
+    "boto3",
 ]
 
 [project.optional-dependencies]

@@ -11,9 +11,11 @@ from bittensor.core.metagraph import AsyncMetagraph
 from bittensor_wallet import Wallet
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from patrol.validation import TaskType
+from patrol.validation import TaskType, hooks
+from patrol.validation.aws_rds import consume_db_engine
 from patrol.validation.dashboard import DashboardClient
 from patrol.validation.error import MinerTaskException
+from patrol.validation.hooks import HookType
 from patrol.validation.hotkey_ownership.hotkey_ownership_challenge import Miner
 from patrol.validation.http_.HttpDashboardClient import HttpDashboardClient
 from patrol.validation.persistence.alpha_sell_challenge_repository import DatabaseAlphaSellChallengeRepository
@@ -186,7 +188,13 @@ class AlphaSellMinerChallengeProcess:
 async def run_forever(wallet: Wallet, subtensor: AsyncSubtensor, db_url: str, enable_dashboard_syndication: bool,
                       patrol_metagraph: AsyncMetagraph | None):
 
+    from patrol.validation.config import ENABLE_AWS_RDS_IAM
+    if ENABLE_AWS_RDS_IAM:
+        hooks.add_on_create_db_engine(consume_db_engine)
+
     engine = create_async_engine(db_url)
+    hooks.invoke(HookType.ON_CREATE_DB_ENGINE, engine)
+
     challenge_repository = DatabaseAlphaSellChallengeRepository(engine)
     dendrite = bt.Dendrite(wallet)
     miner_client = AlphaSellMinerClient(dendrite)
