@@ -57,7 +57,7 @@ jobs:
       - name: Build & Release
         uses: docker/build-push-action@v6
         with:
-          file: ./validator.dockerfile
+          file: validator/Dockerfile
           build-args: |
             SETUPTOOLS_SCM_PRETEND_VERSION=${{ env.VERSION }}
             TEST_POSTGRESQL_URL=postgresql+asyncpg://patrol:password@localhost:5432/patrol
