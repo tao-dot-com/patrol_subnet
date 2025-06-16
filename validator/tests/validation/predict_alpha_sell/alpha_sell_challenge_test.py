@@ -50,7 +50,7 @@ async def test_challenge_sends_correct_synapse(mock_uuid):
     miner_client.execute_tasks.assert_awaited_once_with(axon_info, [expected_synapse])
     miner_client.execute_tasks.assert_awaited_once_with(axon_info, [expected_synapse])
 
-    dashboard_client.send_score.assert_not_awaited()
+    dashboard_client.send_scores.assert_not_awaited()
 
 @patch("patrol.validation.predict_alpha_sell.alpha_sell_miner_challenge.uuid")
 async def test_challenge_sends_failed_score_to_dashboard(mock_uuid):
@@ -79,8 +79,8 @@ async def test_challenge_sends_failed_score_to_dashboard(mock_uuid):
     async for _ in challenge.execute_challenge(miner, [batch]):
         pass
 
-    dashboard_client.send_score.assert_awaited_once()
-    score: MinerScore = dashboard_client.send_score.mock_calls[0][1][0]
+    dashboard_client.send_scores.assert_awaited_once()
+    score: MinerScore = dashboard_client.send_scores.mock_calls[0][1][0][0]
     assert score.accuracy_score == 0
     assert not score.validation_passed
     assert "Nope!" in score.error_message

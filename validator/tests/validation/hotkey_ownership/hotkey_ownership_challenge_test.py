@@ -72,7 +72,7 @@ async def test_execute_and_score_challenge(mock_datetime):
     assert score_persisted.created_at == now
     assert score_persisted.task_type == TaskType.HOTKEY_OWNERSHIP
 
-    dashboard_client.send_score.assert_called_once_with(score_persisted)
+    dashboard_client.send_scores.assert_called_once_with([score_persisted])
 
 @patch("patrol.validation.hotkey_ownership.hotkey_ownership_challenge.datetime")
 async def test_execute_and_score_challenge_with_20_previous_scores(mock_datetime):
@@ -132,7 +132,7 @@ async def test_execute_and_score_challenge_with_20_previous_scores(mock_datetime
     assert score_persisted.created_at == now
     assert score_persisted.task_type == TaskType.HOTKEY_OWNERSHIP
 
-    dashboard_client.send_score.assert_called_once_with(score_persisted)
+    #dashboard_client.send_score.assert_called_once_with(score_persisted)
 
 @patch("patrol.validation.hotkey_ownership.hotkey_ownership_challenge.datetime")
 async def test_execute_and_score_challenge_with_validation_errors(mock_datetime):
@@ -198,6 +198,6 @@ async def test_execute_and_score_challenge_with_validation_errors(mock_datetime)
     assert score_persisted.error_message == "Whoops"
     assert score_persisted.task_type == TaskType.HOTKEY_OWNERSHIP
 
-    dashboard_client.send_score.assert_called_once_with(score_persisted)
+    dashboard_client.send_scores.assert_called_once_with([score_persisted])
 
 

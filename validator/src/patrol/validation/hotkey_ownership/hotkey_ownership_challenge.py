@@ -137,7 +137,7 @@ class HotkeyOwnershipChallenge:
 
         if self.dashboard_client:
             try:
-                await self.dashboard_client.send_score(score)
+                await self.dashboard_client.send_scores([score])
             except Exception as ex:
                 logger.exception("Failed to send scores tpo dashboard: %s", ex)
 

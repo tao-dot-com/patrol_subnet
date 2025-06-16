@@ -42,7 +42,7 @@ def mock_wallet():
         wallet.create_if_non_existent(coldkey_use_password=False, hotkey_use_password=False, suppress=True)
         yield wallet
 
-async def test_send_score(mock_dashboard, mock_wallet):
+async def test_send_scores(mock_dashboard, mock_wallet):
 
     endpoint, captured_requests = mock_dashboard
 
@@ -66,7 +66,7 @@ async def test_send_score(mock_dashboard, mock_wallet):
     )
 
     dashboard_client = HttpDashboardClient(mock_wallet, f"http://{endpoint.host}:{endpoint.port}")
-    await dashboard_client.send_score(miner_score)
+    await dashboard_client.send_scores([miner_score])
 
     assert len(captured_requests) == 1
     assert captured_requests[0]["method"] == "PUT"

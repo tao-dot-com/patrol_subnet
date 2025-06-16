@@ -119,16 +119,24 @@ class AlphaSellScoring:
         )
 
         scorable_tasks = await self.challenge_repository.find_tasks(batch.batch_id)
+        scores = []
 
         for task in scorable_tasks:
             miner_log_context = dataclasses.asdict(task.miner)
             logger.info("Scoring task id [%s] in subnet [%s] with [%s] predictions",
                         task.task_id, batch.subnet_uid, len(task.predictions), extra=miner_log_context)
-            await self._score_task(task, stake_removals, batch.scoring_batch)
+            score = await self._score_task(task, stake_removals, batch.scoring_batch)
+            scores.append(score)
 
         await self.challenge_repository.remove_if_fully_scored(batch.batch_id)
+        if self.dashboard_client:
+            try:
+                await self.dashboard_client.send_scores(scores)
+            except Exception:
+                logger.exception("Error sending scores to dashboard")
 
-    async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict[WalletIdentifier, int], scoring_batch: int):
+
+    async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict[WalletIdentifier, int], scoring_batch: int) -> MinerScore:
 
         accuracy_sum = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
         miner_score = make_miner_score(task, accuracy_sum, scoring_batch)
@@ -140,12 +148,7 @@ class AlphaSellScoring:
         await self.transaction_helper.do_in_transaction(add_score)
 
         logger.info("Scored miner", extra=dataclasses.asdict(miner_score))
-
-        if self.dashboard_client:
-            try:
-                await self.dashboard_client.send_score(miner_score)
-            except Exception:
-                logger.exception("Error sending score to dashboard")
+        return miner_score
 
 
 def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: bool, semaphore: Semaphore):

@@ -79,7 +79,7 @@ class AlphaSellMinerChallenge:
             yield task
 
     async def send_zero_score_to_dashboard(self, task: AlphaSellChallengeTask):
-        await self.dashboard_client.send_score(MinerScore(
+        await self.dashboard_client.send_scores([MinerScore(
             id=task.task_id,
             batch_id=task.batch_id,
             created_at=datetime.now(UTC),
@@ -97,7 +97,7 @@ class AlphaSellMinerChallenge:
             error_message=task.error_message,
             accuracy_score=0,
             task_type=TaskType.PREDICT_ALPHA_SELL
-        ))
+        )])
 
 class AlphaSellMinerChallengeProcess:
 

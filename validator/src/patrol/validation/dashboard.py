@@ -3,5 +3,5 @@ from patrol.validation.scoring import MinerScore
 
 class DashboardClient(ABC):
     @abstractmethod
-    async def send_score(self, score: MinerScore):
+    async def send_scores(self, score: list[MinerScore]):
         pass

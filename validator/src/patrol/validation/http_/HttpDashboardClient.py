@@ -60,7 +60,7 @@ class HttpDashboardClient(DashboardClient):
         self._wallet = wallet
         self._dashboard_score_base_url = dashboard_score_base_url
 
-    async def send_score(self, score: MinerScore):
+    async def send_scores(self, scores: list[MinerScore]):
 
         nonce = int(time.time())
         signature = self._wallet.hotkey.sign(str(nonce).encode())
@@ -68,13 +68,14 @@ class HttpDashboardClient(DashboardClient):
         token = f"{self._wallet.hotkey.ss58_address}:{nonce}:{signature.hex()}"
 
 
-        async with aiohttp.ClientSession() as session:
-            async with session.put(
-                    url=f"{self._dashboard_score_base_url}/patrol/dashboard/api/miner-scores/{score.id}",
-                    data=_MinerScore.from_score(score).model_dump_json(exclude_none=False),
-                    headers={"Content-Type": "application/json", "authorization": f"Bearer {token}"}
-            ) as response:
-                if response.ok:
-                    logger.info("Sent score OK", extra=asdict(score))
-                else:
-                    logger.warning("Failed to send score %s", response.status, extra=asdict(score))
+        async with aiohttp.ClientSession(base_url=self._dashboard_score_base_url) as session:
+            for score in scores:
+                async with session.put(
+                        url=f"/patrol/dashboard/api/miner-scores/{score.id}",
+                        data=_MinerScore.from_score(score).model_dump_json(exclude_none=False),
+                        headers={"Content-Type": "application/json", "authorization": f"Bearer {token}"}
+                ) as response:
+                    if response.ok:
+                        logger.info("Sent score OK", extra=asdict(score))
+                    else:
+                        logger.warning("Failed to send score %s", response.status, extra=asdict(score))
