@@ -79,7 +79,7 @@ async def test_add_challenge_task(clean_pgsql_engine):
         created_at=now,
         miner=AlphaSellChallengeMiner("miner_hk", "miner_ck", 1),
         predictions=[
-            AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 25),
+            AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_REMOVED, 2345113114),
             AlphaSellPrediction("carol", "carol_ck", TransactionType.STAKE_REMOVED, 15),
         ],
     )
@@ -107,7 +107,7 @@ async def test_add_challenge_task(clean_pgsql_engine):
         carol_prediction_result = all_results[1]
 
     assert alice_prediction_result["task_id"] == str(task.task_id)
-    assert alice_prediction_result["amount"] == 25.0
+    assert alice_prediction_result["amount"] == 2345113114
     assert alice_prediction_result["hotkey"] == "alice"
 
     assert carol_prediction_result["task_id"] == str(task.task_id)

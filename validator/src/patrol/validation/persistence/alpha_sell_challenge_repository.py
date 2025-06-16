@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update, delete, Sequence
+from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update, delete, Sequence, BigInteger
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
 
@@ -97,7 +97,7 @@ class _AlphaSellPrediction(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     task_id: Mapped[str] = mapped_column(ForeignKey(_AlphaSellChallengeTask.id, ondelete="CASCADE"))
     transaction_type: Mapped[str]
-    amount: Mapped[int]
+    amount: Mapped[int] = mapped_column(BigInteger)
     hotkey: Mapped[str]
     coldkey: Mapped[str]
     task: Mapped[_AlphaSellChallengeTask] = relationship(back_populates="predictions")
