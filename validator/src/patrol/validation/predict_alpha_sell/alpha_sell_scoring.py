@@ -119,8 +119,10 @@ class AlphaSellScoring:
             lower_block=batch.prediction_interval.start_block, upper_block=batch.prediction_interval.end_block,
             transaction_type=TransactionType.STAKE_REMOVED
         )
+        logger.info("Found %s stake removals", len(stake_removals))
 
         scorable_tasks = await self.challenge_repository.find_tasks(batch.batch_id)
+        logger.info("Found %s scorable tasks in batch %s", len(scorable_tasks), batch.batch_id)
         scores = []
 
         for task in scorable_tasks:

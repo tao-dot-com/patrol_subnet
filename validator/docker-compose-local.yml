@@ -32,6 +32,7 @@ services:
       ENABLE_DASHBOARD_SYNDICATION: 0
       ENABLE_ALPHA_SELL_TASK: 1
       ALPHA_SELL_PREDICTION_WINDOW_BLOCKS: 20
+      NETWORK: wss://subtensor.app.minesight.co.uk
       PATROL_AXONS_JSON: '[{"version":0,"ip":"13.248.136.93","port":5081,"hotkey":"5FEc1TfRxmvKbMwQ8UpbszLa2AdXzTbcjK1ACXQBrhgGA9EF","coldkey":"5GeiR6w3ad5JxpwdUS3ADPLexL5SDrbav3k8J5D7WfHTh1Q5","ip_type":4},   {"version":0,"ip":"13.248.136.93","port":5081,"hotkey":"5DCrsirhNuoNnW5urMbpV2arpvfuVhByrHYY22dQVgpQhKoD","coldkey":"5GeiR6w3ad5JxpwdUS3ADPLexL5SDrbav3k8J5D7WfHTh1Q5","ip_type":4},   {"version":0,"ip":"13.248.136.93","port":5081,"hotkey":"5HRMfR5ka1TfAMTHEA3r9yvkKLVth3344h3UmZv9UoX4QDmh","coldkey":"5GeiR6w3ad5JxpwdUS3ADPLexL5SDrbav3k8J5D7WfHTh1Q5","ip_type":4},   {"version":0,"ip":"13.248.136.93","port":5081,"hotkey":"5CZtRuBN6wRgWM86b3kA4oE5P26RcubhzkGR6bmjV82h5GPm","coldkey":"5GeiR6w3ad5JxpwdUS3ADPLexL5SDrbav3k8J5D7WfHTh1Q5","ip_type":4},   {"version":0,"ip":"13.248.136.93","port":5081,"hotkey":"5CDQeRjLrgV1kK92uSQjdWLoSoPSoubE6fzL1TEsJKERLw6w","coldkey":"5GeiR6w3ad5JxpwdUS3ADPLexL5SDrbav3k8J5D7WfHTh1Q5","ip_type":4}]'
       WALLET_NAME: default
       HOTKEY_NAME: default

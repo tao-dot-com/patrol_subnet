@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import JSON, DateTime, ForeignKey, select, func, update, delete, Sequence, BigInteger
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
-from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload
+from sqlalchemy.orm import mapped_column, Mapped, composite, relationship, joinedload, contains_eager
 
 from patrol.validation.persistence import Base
 from patrol.validation.predict_alpha_sell import (AlphaSellChallengeRepository,
@@ -144,15 +144,15 @@ class DatabaseAlphaSellChallengeRepository(AlphaSellChallengeRepository):
     async def find_tasks(self, batch_id: UUID) -> list[AlphaSellChallengeTask]:
         async with self.LocalSession() as session:
             query = (select(_AlphaSellChallengeTask)
+                     .outerjoin(_AlphaSellChallengeTask.predictions)
+                     .options(contains_eager(_AlphaSellChallengeTask.predictions))
                      .filter(
                         _AlphaSellChallengeTask.batch_id == str(batch_id),
                         _AlphaSellChallengeTask.is_scored == False
                      )
-                     .outerjoin(_AlphaSellChallengeTask.predictions)
-                     .options(joinedload(_AlphaSellChallengeTask.predictions))
             )
-            results = await session.scalars(query)
-            tasks = [it.task for it in results.unique().all()]
+            results = await session.execute(query)
+            tasks = [it.task for it in results.unique().scalars().all()]
             return tasks
 
     async def find_earliest_prediction_block(self) -> int:
