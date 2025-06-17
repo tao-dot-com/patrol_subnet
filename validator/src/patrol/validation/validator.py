@@ -64,22 +64,24 @@ async def start(semaphore: Semaphore):
     logger.info(f"Validator initialized.")
 
     update_available = False
+    loop = asyncio.get_running_loop()
     while not update_available:
+        logger.info("Processing updates & weights - waiting for semaphore...")
+        await loop.run_in_executor(None, semaphore.acquire)
         try:
-            logger.info("Processing updates & weights - waiting for semaphore...")
-            with semaphore:
-                logger.info("Processing updates & weights.")
-                update_available = ENABLE_AUTO_UPDATE and await auto_update.is_update_available()
-                if update_available:
-                    logger.info("Update available - service will restart")
-                    break
+            logger.info("Processing updates & weights.")
+            update_available = ENABLE_AUTO_UPDATE and await auto_update.is_update_available()
+            if update_available:
+                logger.info("Update available - service will restart")
+                break
 
-                if ENABLE_WEIGHT_SETTING:
-                    logger.info("Weight setting is enabled. Checking due time...")
-                    await validator.set_weights()
+            if ENABLE_WEIGHT_SETTING:
+                logger.info("Weight setting is enabled. Checking due time...")
+                await validator.set_weights()
         except Exception as ex:
             logger.exception("Error!")
         finally:
+            await loop.run_in_executor(None, semaphore.release)
             await asyncio.sleep(WEIGHT_SETTING_INTERVAL_SECONDS)
 
 def boot():

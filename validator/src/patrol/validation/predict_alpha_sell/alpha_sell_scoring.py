@@ -183,17 +183,20 @@ def start_scoring(wallet: Wallet, db_url: str, enable_dashboard_syndication: boo
                 transaction_helper
             )
 
+            loop = asyncio.get_running_loop()
             go = True
             while go:
+                await loop.run_in_executor(None, semaphore.acquire)
                 try:
-                    with semaphore:
-                        await scoring.score_miners()
-                    await asyncio.sleep(SCORING_INTERVAL_SECONDS)
+                    await scoring.score_miners()
                 except KeyboardInterrupt:
                     logger.info("Stopping alpha-sell scoring process")
                     go = False
                 except Exception as ex:
                     logger.exception("Unexpected error")
+                finally:
+                    await loop.run_in_executor(None, semaphore.release)
+                    await asyncio.sleep(SCORING_INTERVAL_SECONDS)
 
             logger.info("Stopped alpha-sell scoring process")
 
