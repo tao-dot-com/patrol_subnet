@@ -148,7 +148,7 @@ def start_process(
     def run_async():
         asyncio.run(run(wallet, db_url, subtensor, enable_dashboard_syndication, patrol_metagraph))
 
-    process = multiprocessing.Process(target=run_async(), name="Hotkey Ownership Challenge", daemon=True)
+    process = multiprocessing.Process(target=run_async, name="Hotkey Ownership Challenge", daemon=True)
     process.start()
     return process
 
