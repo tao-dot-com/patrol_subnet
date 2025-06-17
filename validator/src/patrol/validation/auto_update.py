@@ -39,7 +39,7 @@ async def is_update_available():
         )
         token = (await auth_res.json())['token']
 
-        package_version = version("patrol-subnet")
+        package_version = version("patrol-validator")
         docker_tag = package_version.replace("+", "_")
 
         logger.info(f"Fetching digest for tag  %s",docker_tag)
