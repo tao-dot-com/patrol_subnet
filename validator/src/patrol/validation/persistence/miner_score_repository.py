@@ -30,6 +30,8 @@ class _MinerScore(Base, MappedAsDataclass):
     task_type: Mapped[Optional[str]]
     accuracy_score: Mapped[Optional[float]]
     scoring_batch: Mapped[Optional[int]]
+    stake_removal_score: Mapped[Optional[float]]
+    stake_addition_score: Mapped[Optional[float]]
 
     @classmethod
     def from_miner_score(cls, miner_score: MinerScore):
@@ -51,7 +53,9 @@ class _MinerScore(Base, MappedAsDataclass):
             error_message=miner_score.error_message,
             task_type=str(miner_score.task_type.value),
             accuracy_score=miner_score.accuracy_score,
-            scoring_batch=miner_score.scoring_batch
+            scoring_batch=miner_score.scoring_batch,
+            stake_removal_score=miner_score.stake_removal_score,
+            stake_addition_score=miner_score.stake_addition_score
         )
 
     @staticmethod
@@ -81,7 +85,9 @@ class _MinerScore(Base, MappedAsDataclass):
             error_message=self.error_message,
             task_type=TaskType[self.task_type] if self.task_type else TaskType.COLDKEY_SEARCH,
             accuracy_score=self.accuracy_score,
-            scoring_batch=self.scoring_batch
+            scoring_batch=self.scoring_batch,
+            stake_removal_score=self.stake_removal_score,
+            stake_addition_score=self.stake_addition_score
         )
 
 

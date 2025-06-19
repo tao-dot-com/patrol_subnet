@@ -33,6 +33,8 @@ class MinerScore:
     error_message: Optional[str] = None
     accuracy_score: Optional[float] = None
     scoring_batch: Optional[int] = None
+    stake_removal_score: Optional[float] = None
+    stake_addition_score: Optional[float] = None
 
     @property
     def miner(self) -> tuple[str, int]:

@@ -28,14 +28,15 @@ from patrol_common import WalletIdentifier
 logger = logging.getLogger(__name__)
 
 
-def make_miner_score(task: AlphaSellChallengeTask, accuracy: float, scoring_batch: int) -> MinerScore:
+def make_miner_score(task: AlphaSellChallengeTask, stake_removal_score: float, stake_addition_score: float, scoring_batch: int) -> MinerScore:
+    overall_score = stake_removal_score + stake_addition_score
     return MinerScore(
         id=task.task_id, batch_id=task.batch_id, created_at=datetime.now(UTC),
         uid=task.miner.uid,
         coldkey=task.miner.coldkey,
         hotkey=task.miner.hotkey,
         responsiveness_score=0.0,
-        accuracy_score=accuracy,
+        accuracy_score=overall_score,
         volume=0,
         volume_score=0.0,
         response_time_seconds=0.0,
@@ -43,9 +44,11 @@ def make_miner_score(task: AlphaSellChallengeTask, accuracy: float, scoring_batc
         validation_passed=not task.has_error,
         error_message=task.error_message,
         task_type=TaskType.PREDICT_ALPHA_SELL,
-        overall_score=accuracy,
+        overall_score=overall_score,
         overall_score_moving_average=0.0,
         scoring_batch=scoring_batch,
+        stake_removal_score=stake_removal_score,
+        stake_addition_score=stake_addition_score,
     )
 
 
@@ -55,11 +58,11 @@ class AlphaSellValidator:
         self.noise_floor = noise_floor
         self.steepness = steepness
 
-    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[WalletIdentifier, int]) -> float:
+    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[WalletIdentifier, int], transaction_type: TransactionType) -> float:
         if task.has_error:
             return 0.0
 
-        predictions_by_wallet = {WalletIdentifier(p.wallet_coldkey_ss58, p.wallet_hotkey_ss58): p.amount for p in task.predictions}
+        predictions_by_wallet = {WalletIdentifier(p.wallet_coldkey_ss58, p.wallet_hotkey_ss58): p.amount for p in task.predictions if p.transaction_type == transaction_type}
 
         accuracies = []
 
@@ -119,7 +122,13 @@ class AlphaSellScoring:
             lower_block=batch.prediction_interval.start_block, upper_block=batch.prediction_interval.end_block,
             transaction_type=TransactionType.STAKE_REMOVED
         )
+        stake_additions = await self.alpha_sell_event_repository.find_aggregate_stake_movement_by_wallet(
+            subnet_id=batch.subnet_uid,
+            lower_block=batch.prediction_interval.start_block, upper_block=batch.prediction_interval.end_block,
+            transaction_type=TransactionType.STAKE_ADDED
+        )
         logger.info("Found %s stake removals", len(stake_removals))
+        logger.info("Found %s stake additions", len(stake_additions))
 
         scorable_tasks = await self.challenge_repository.find_tasks(batch.batch_id)
         logger.info("Found %s scorable tasks in batch %s", len(scorable_tasks), batch.batch_id)
@@ -129,8 +138,8 @@ class AlphaSellScoring:
             miner_log_context = dataclasses.asdict(task.miner)
             logger.info("Scoring task id [%s] in subnet [%s] with [%s] predictions",
                         task.task_id, batch.subnet_uid, len(task.predictions), extra=miner_log_context)
-            score = await self._score_task(task, stake_removals, batch.scoring_batch)
-            scores.append(score)
+            miner_score = await self._score_task(task, stake_removals, stake_additions, batch.scoring_batch)
+            scores.append(miner_score)
 
         await self.challenge_repository.remove_if_fully_scored(batch.batch_id)
         if self.dashboard_client:
@@ -140,10 +149,11 @@ class AlphaSellScoring:
                 logger.exception("Error sending scores to dashboard")
 
 
-    async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict[WalletIdentifier, int], scoring_batch: int) -> MinerScore:
+    async def _score_task(self, task: AlphaSellChallengeTask, stake_removals: dict[WalletIdentifier, int], stake_additions: dict[WalletIdentifier, int], scoring_batch: int) -> MinerScore:
 
-        accuracy_sum = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals)
-        miner_score = make_miner_score(task, accuracy_sum, scoring_batch)
+        stake_removal_score = self.alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
+        stake_addition_score = self.alpha_sell_validator.score_miner_accuracy(task, stake_additions, TransactionType.STAKE_ADDED)
+        miner_score = make_miner_score(task, stake_removal_score, stake_addition_score, scoring_batch)
 
         async def add_score(session):
             await self.miner_score_repository.add(miner_score, session)
