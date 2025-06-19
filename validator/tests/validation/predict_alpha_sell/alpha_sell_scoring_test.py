@@ -57,6 +57,15 @@ async def test_score_miner_tasks(mock_datetime: datetime):
     validator = AsyncMock(AlphaSellValidator)
     validator.score_miner_accuracy.return_value = 0.8
 
+    def mock_score_miner_accuracy(task, stake_movements, transaction_type):
+        if transaction_type == TransactionType.STAKE_REMOVED:
+            return 0.8
+        elif transaction_type == TransactionType.STAKE_ADDED:
+            return 0.0
+        return 0.0
+
+    validator.score_miner_accuracy.side_effect = mock_score_miner_accuracy
+
     transaction_helper = AsyncMock(TransactionHelper)
     mock_session = AsyncMock(AsyncSession)
     async def side_effect(func):
@@ -103,7 +112,7 @@ def test_failed_task_score():
         has_error=True, error_message="Nope"
     )
 
-    score = make_miner_score(task, 0, scoring_batch=100)
+    score = make_miner_score(task, 0, 0, scoring_batch=100)
     assert score.overall_score == 0
     assert score.accuracy_score == 0
     assert not score.validation_passed

@@ -46,7 +46,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_0_tao(batch):
 
     alpha_sell_validator = AlphaSellValidator()
 
-    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert total_score == approx(2.0, 0.0001)
 
 
@@ -65,7 +65,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_1_tao(batch):
 
     alpha_sell_validator = AlphaSellValidator()
 
-    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert total_score == approx(2.6, 0.05)
 
 
@@ -84,7 +84,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_10_tao(batch):
 
     alpha_sell_validator = AlphaSellValidator()
 
-    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert total_score == approx(4.0, 0.05)
 
 
@@ -103,7 +103,7 @@ async def test_validate_exact_predictions_with_wallet_values_of_1000_tao(batch):
 
     alpha_sell_validator = AlphaSellValidator()
 
-    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert total_score == approx(8.0, 0.05)
 
 
@@ -122,7 +122,7 @@ async def test_validate_predictions_off_by_just_greater_than_50_percent(batch, p
 
     alpha_sell_validator = AlphaSellValidator()
 
-    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert total_score == 0.0
 
 
@@ -141,7 +141,7 @@ async def test_validate_predictions_off_by_just_less_than_50_percent(batch, pred
 
     alpha_sell_validator = AlphaSellValidator()
 
-    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    total_score = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert 0.0 < total_score < 0.2
 
 
@@ -159,7 +159,7 @@ async def test_validate_where_no_movements_exist(batch):
 
     alpha_sell_validator = AlphaSellValidator()
 
-    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert accuracy == 0.75
 
 async def test_validate_where_no_predictions_made(batch):
@@ -174,7 +174,7 @@ async def test_validate_where_no_predictions_made(batch):
 
     alpha_sell_validator = AlphaSellValidator()
 
-    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert accuracy == 0.0
 
 async def test_validate_failed_task(batch):
@@ -189,5 +189,26 @@ async def test_validate_failed_task(batch):
 
     alpha_sell_validator = AlphaSellValidator()
 
-    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals)
+    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
     assert accuracy == 0.0
+
+async def test_validate_where_only_stake_added_predicted(batch):
+
+    predictions=[
+        AlphaSellPrediction("alice", "alice_ck", TransactionType.STAKE_ADDED, int(0.25E9)),
+    ]
+    task = make_task(batch.batch_id, predictions)
+
+    score_repo = AsyncMock(MinerScoreRepository)
+    score_repo.find_latest_overall_scores.return_value = []
+
+    stake_additions = {WalletIdentifier("alice_ck", "alice"): int(0.25E9)}
+
+    alpha_sell_validator = AlphaSellValidator()
+
+    accuracy = alpha_sell_validator.score_miner_accuracy(task, stake_additions, TransactionType.STAKE_ADDED)
+    assert accuracy > 0.0
+
+    stake_removals = {WalletIdentifier("alice_ck", "alice"): int(1E9), WalletIdentifier("bob_ck", "bob"): int(2E9)}
+    accuracy_removal = alpha_sell_validator.score_miner_accuracy(task, stake_removals, TransactionType.STAKE_REMOVED)
+    assert accuracy_removal == 0.0

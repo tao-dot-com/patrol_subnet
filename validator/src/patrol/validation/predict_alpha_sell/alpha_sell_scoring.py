@@ -58,7 +58,7 @@ class AlphaSellValidator:
         self.noise_floor = noise_floor
         self.steepness = steepness
 
-    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_removals: dict[WalletIdentifier, int], transaction_type: TransactionType) -> float:
+    def score_miner_accuracy(self, task: AlphaSellChallengeTask, stake_movements: dict[WalletIdentifier, int], transaction_type: TransactionType) -> float:
         if task.has_error:
             return 0.0
 
@@ -70,7 +70,7 @@ class AlphaSellValidator:
             predicted_rao = predictions_by_wallet[hk]
             predicted_tao = predicted_rao / 1e9
 
-            actual_rao = stake_removals.get(hk, 0)
+            actual_rao = stake_movements.get(hk, 0)
             actual_tao = actual_rao / 1e9
 
             relative_delta = (self.steepness * (predicted_tao - actual_tao) / (actual_tao + self.noise_floor)) ** 2

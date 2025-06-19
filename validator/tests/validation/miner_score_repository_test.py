@@ -56,7 +56,9 @@ async def test_add_score_postgres(clean_pgsql_engine):
         validation_passed=False,
         error_message="Oh dear",
         task_type=TaskType.HOTKEY_OWNERSHIP,
-        accuracy_score=0.8
+        accuracy_score=0.8,
+        stake_removal_score=7.0,
+        stake_addition_score=3.0,
     )
 
     await repository.add(miner_score)
@@ -84,6 +86,8 @@ async def test_add_score_postgres(clean_pgsql_engine):
     assert score.task_type == 'HOTKEY_OWNERSHIP'
     assert score.accuracy_score == 0.8
     assert score.scoring_batch is None
+    assert score.stake_removal_score == 7.0
+    assert score.stake_addition_score == 3.0
 
 async def test_add_score_with_batch(clean_pgsql_engine):
 
