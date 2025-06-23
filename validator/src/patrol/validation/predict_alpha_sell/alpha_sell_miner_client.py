@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from uuid import UUID
 
 import aiohttp
@@ -8,6 +9,7 @@ from patrol.validation.error import MinerTaskException
 from patrol.validation.predict_alpha_sell import WalletIdentifier
 from patrol_common.protocol import AlphaSellSynapse
 
+logger = logging.getLogger(__name__)
 
 class AlphaSellMinerClient:
     def __init__(self, dendrite: Dendrite, timeout_seconds: float=16.0):
@@ -37,6 +39,19 @@ class AlphaSellMinerClient:
                     UUID(synapse.batch_id)
                 )
             response_synapse = AlphaSellSynapse.model_validate_json(await response.text())
+            
+            if response_synapse.predictions and synapse.wallets:
+                expected_count = len(synapse.wallets)
+                actual_count = len(response_synapse.predictions)
+                if actual_count > expected_count:
+                    logger.warning(
+                        "Miner returned more predictions than expected wallets. "
+                        "Expected %d wallets, got %d predictions for task %s, batch %s. "
+                        "Miner info: hotkey=%s, coldkey=%s, ip=%s, port=%d",
+                        expected_count, actual_count, synapse.task_id, synapse.batch_id,
+                        miner.hotkey, miner.coldkey, miner.ip, miner.port
+                    )
+            
             self._remove_unrequested_hotkey_predictions(response_synapse, synapse.wallets)
             return UUID(synapse.batch_id), UUID(synapse.task_id), response_synapse
         except TimeoutError:
