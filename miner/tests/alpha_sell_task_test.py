@@ -82,6 +82,8 @@ async def test_alpha_sell_task(validator_wallet: Wallet, miner_service: multipro
     assert response.is_success == True
     assert response.batch_id == synapse.batch_id
     assert response.task_id == synapse.task_id
-    assert len(response.predictions) == 2
+    assert len(response.predictions) == 4
     assert AlphaSellPrediction("alice_1", "alice", TransactionType.STAKE_REMOVED, 0) in response.predictions
+    assert AlphaSellPrediction("alice_1", "alice", TransactionType.STAKE_ADDED, 0) in response.predictions
     assert AlphaSellPrediction("bob_1", "bob", TransactionType.STAKE_REMOVED, 0) in response.predictions
+    assert AlphaSellPrediction("bob_1", "bob", TransactionType.STAKE_ADDED, 0) in response.predictions

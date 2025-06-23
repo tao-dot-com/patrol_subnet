@@ -14,4 +14,12 @@ class AlphaSellPredictor:
                     amount=0
                 )
             )
+            predictions.append(
+                AlphaSellPrediction(
+                    wallet_hotkey_ss58=wallet.hotkey,
+                    wallet_coldkey_ss58=wallet.coldkey,
+                    transaction_type=TransactionType.STAKE_ADDED,
+                    amount=0
+                )
+            )
         return predictions
