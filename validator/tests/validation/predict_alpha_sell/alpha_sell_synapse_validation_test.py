@@ -47,6 +47,6 @@ async def test_reject_duplicate_predictions(dendrite_wallet):
 
         error = (await miner_client.execute_tasks(miner, [request]))[0]
         assert isinstance(error, MinerTaskException)
-
-        assert "Duplicate hotkeys found in prediction {'alice_1'}" in str(error)
+        
+        assert "Duplicate hotkey+transaction_type combinations found in prediction {'alice_1:TransactionType.STAKE_REMOVED'}" in str(error)
 
