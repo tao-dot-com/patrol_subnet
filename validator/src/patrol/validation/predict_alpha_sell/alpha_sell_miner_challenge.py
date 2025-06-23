@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import multiprocessing
+import random
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, UTC
@@ -161,9 +162,13 @@ class AlphaSellMinerChallengeProcess:
             await self.challenge_repository.add(batch)
 
         logger.info("Executing Miner Challenges for prediction window: %s blocks", self.interval_window_blocks)
-        for miner in miners_to_challenge:
-            #tasks_to_syndicate = []
-            async for task in self.miner_challenge.execute_challenge(miner, batches):
+        
+        shuffled_miners = random.sample(miners_to_challenge, len(miners_to_challenge))
+        
+        for miner in shuffled_miners:
+            shuffled_batches = random.sample(batches, len(batches))
+
+            async for task in self.miner_challenge.execute_challenge(miner, shuffled_batches):
                 # TODO tolerate a failure to persist?
                 await self.challenge_repository.add_task(task)
                 logger.info("Received task response from miner", extra={'miner': miner.axon_info})
