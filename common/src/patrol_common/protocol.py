@@ -91,14 +91,15 @@ class AlphaSellSynapse(bt.Synapse):
         seen = set()
         duplicates = set()
         for item in self.predictions:
-            hotkey = item.wallet_hotkey_ss58
-            if hotkey in seen:
-                duplicates.add(hotkey)
+            # Create a unique key combining hotkey and transaction type
+            prediction_key = (item.wallet_hotkey_ss58, item.transaction_type)
+            if prediction_key in seen:
+                duplicates.add(f"{item.wallet_hotkey_ss58}:{item.transaction_type}")
             else:
-                seen.add(hotkey)
+                seen.add(prediction_key)
 
         if len(duplicates) > 0:
-            raise ValueError(f"Duplicate hotkeys found in prediction {duplicates}")
+            raise ValueError(f"Duplicate hotkey+transaction_type combinations found in prediction {duplicates}")
 
         return self
 
