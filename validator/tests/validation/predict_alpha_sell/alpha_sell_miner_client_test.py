@@ -113,3 +113,26 @@ async def test_challenge_miner_with_timeout(dendrite_wallet, miner_wallet, mock_
     responses = await task.execute_tasks(miner.info(), [synapse])
     assert isinstance(responses[0], MinerTaskException)
     assert "Timeout" in str(responses[0])
+
+
+async def test_challenge_miner_with_fewer_wallets_than_predictions(dendrite_wallet, miner_wallet, mock_miner):
+
+    miner_ip, miner_port = mock_miner
+
+    dendrite = Dendrite(dendrite_wallet)
+    synapse = AlphaSellSynapse(
+        batch_id=str(uuid.uuid4()),
+        task_id=str(uuid.uuid4()),
+        subnet_uid=42,
+        prediction_interval=PredictionInterval(5000000, 50007200),
+        wallets=[WalletIdentifier("a", "alice")],
+    )
+
+    task = AlphaSellMinerClient(dendrite)
+
+    miner = Axon(port=miner_port, ip=miner_ip, external_ip=miner_ip, wallet=miner_wallet)
+
+    responses = await task.execute_tasks(miner.info(), [synapse])
+    assert len(responses[0][2].predictions) == 1
+    assert responses[0][2].predictions[0] == AlphaSellPrediction("alice", "a", TransactionType.STAKE_REMOVED, 25)
+

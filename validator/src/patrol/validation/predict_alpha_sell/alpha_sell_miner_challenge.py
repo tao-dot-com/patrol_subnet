@@ -29,6 +29,10 @@ from patrol_common.protocol import AlphaSellSynapse
 logger = logging.getLogger(__name__)
 
 
+def shuffle(list_to_shuffle: list):
+    return random.sample(list_to_shuffle, k=len(list_to_shuffle))
+
+
 class AlphaSellMinerChallenge:
 
     def __init__(self,
@@ -163,10 +167,10 @@ class AlphaSellMinerChallengeProcess:
 
         logger.info("Executing Miner Challenges for prediction window: %s blocks", self.interval_window_blocks)
         
-        shuffled_miners = random.sample(miners_to_challenge, len(miners_to_challenge))
+        shuffled_miners = shuffle(miners_to_challenge)
         
         for miner in shuffled_miners:
-            shuffled_batches = random.sample(batches, len(batches))
+            shuffled_batches = shuffle(batches)
 
             async for task in self.miner_challenge.execute_challenge(miner, shuffled_batches):
                 # TODO tolerate a failure to persist?

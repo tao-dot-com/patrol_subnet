@@ -3,6 +3,7 @@ import logging
 from uuid import UUID
 
 import aiohttp
+from aiohttp import TCPConnector
 from bittensor import AxonInfo, Dendrite
 
 from patrol.validation.error import MinerTaskException
@@ -18,7 +19,8 @@ class AlphaSellMinerClient:
 
     async def execute_tasks(self, miner: AxonInfo, synapses: list[AlphaSellSynapse]) -> list[tuple[UUID, UUID, AlphaSellSynapse]]:
 
-        async with aiohttp.ClientSession(base_url=f"http://{miner.ip}:{miner.port}") as session:
+        conn = TCPConnector(limit=len(synapses))
+        async with aiohttp.ClientSession(base_url=f"http://{miner.ip}:{miner.port}", connector=conn) as session:
             tasks = [self._execute_task(session, miner, synapse) for synapse in synapses]
             return await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -39,26 +41,26 @@ class AlphaSellMinerClient:
                     UUID(synapse.batch_id)
                 )
             response_synapse = AlphaSellSynapse.model_validate_json(await response.text())
-            
-            if response_synapse.predictions and synapse.wallets:
-                expected_count = len(synapse.wallets)
-                actual_count = len(response_synapse.predictions)
-                if actual_count > expected_count:
-                    logger.warning(
-                        "Miner returned more predictions than expected wallets. "
-                        "Expected %d wallets, got %d predictions for task %s, batch %s. "
-                        "Miner info: hotkey=%s, coldkey=%s, ip=%s, port=%d",
-                        expected_count, actual_count, synapse.task_id, synapse.batch_id,
-                        miner.hotkey, miner.coldkey, miner.ip, miner.port
-                    )
-            
-            self._remove_unrequested_hotkey_predictions(response_synapse, synapse.wallets)
+
+            self._remove_unrequested_hotkey_predictions(response_synapse, synapse.wallets, miner)
             return UUID(synapse.batch_id), UUID(synapse.task_id), response_synapse
         except TimeoutError:
             raise MinerTaskException("Timeout", UUID(synapse.task_id), UUID(synapse.batch_id))
         except Exception as ex:
             raise MinerTaskException(str(ex), UUID(synapse.task_id), UUID(synapse.batch_id))
 
-    def _remove_unrequested_hotkey_predictions(self, synapse: AlphaSellSynapse, wallets: list[WalletIdentifier]):
+    def _remove_unrequested_hotkey_predictions(self, synapse: AlphaSellSynapse, wallets: list[WalletIdentifier], miner: AxonInfo):
+
+        if synapse.predictions and synapse.wallets:
+            expected_count = len(synapse.wallets)
+            actual_count = len(synapse.predictions)
+            if actual_count > expected_count:
+                logger.warning(
+                    "Miner returned more predictions than expected wallets. "
+                    "Expected %d wallets, got %d predictions.",
+                    expected_count, actual_count,
+                    extra={'batch_id': synapse.batch_id, 'task_id': synapse.task_id, 'miner': miner}
+                )
+
         predictions = [p for p in synapse.predictions if WalletIdentifier(p.wallet_coldkey_ss58, p.wallet_hotkey_ss58) in wallets]
         synapse.predictions = predictions
