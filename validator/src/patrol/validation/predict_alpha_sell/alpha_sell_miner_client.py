@@ -52,7 +52,7 @@ class AlphaSellMinerClient:
     def _remove_unrequested_hotkey_predictions(self, synapse: AlphaSellSynapse, wallets: list[WalletIdentifier], miner: AxonInfo):
 
         if synapse.predictions and synapse.wallets:
-            expected_count = len(synapse.wallets)
+            expected_count = 2 * len(synapse.wallets)
             actual_count = len(synapse.predictions)
             if actual_count > expected_count:
                 logger.warning(
