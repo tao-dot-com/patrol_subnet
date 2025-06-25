@@ -61,7 +61,7 @@ HARDWARE REQUIREMENTS:
 
 ### Tasks
 
-Miners should implement both of the following tasks:
+Miners should implement the following task:
 
 - [Stake Prediction Task](stake_prediction.md)  
 The reference miner will predict zero stake movement by default. It is completely up to miners to

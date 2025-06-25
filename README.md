@@ -31,11 +31,11 @@ Each layer sharpens the next. By connecting actions to intent and intent to envi
 Patrol supports three categories of mining tasks — each offering a distinct lens on behavior and contributing to a fuller understanding of the network:
 
 1. **Historical Pattern Analysis**  
-   **Status:** Live  
+   **Status:** Not Yet Available  
    Miners identify and label behaviors that have already occurred — such as emission dumping, alpha hoarding, validator churn, or cold key swaps. These signatures help define the behavioral history of wallets and subnets.
 
 2. **Predictive Forecasting**  
-   **Status:** Launching Soon  
+   **Status:** Live  
    Miners will analyze recent activity to forecast what might happen next — projecting sell pressure, anticipating post-ownership actions, or detecting early signs of rising risk.
 
 3. **LLM-Based Chain Reasoning**  
@@ -47,125 +47,20 @@ Each task type builds on the last — from raw observation to interpretation to 
 ## Accessing Patrol's Data
 In the near future we plan to provide a Public API for developers interested in consuming the data collected by the Patrol subnet.
 
-## How Patrol Works
-
-### Coldkey search task
-
-#### Validator selects target wallet to cover
-The flow of the subnet begins with validators selecting target wallets to submit to miners.  These targets are randomly selected from the chain. The [validator](validator/src/patrol/validation/validator.py) then sends a target to each [miner](src/patrol/mining/miner.py). 
-[See full target selection code here](validator/src/patrol/validation/target_generation.py)
-
-#### Miner builds subgraph for target wallet
-[Miners](src/patrol/mining/miner.py) receive the target from the validator and begin their search for related data.  Miners construct a *subgraph* of relational data for the target, and follow the data trace to expand their subgraph to N degrees of separation from the original target. 
-
-Example:
-```python
-  target = "5GWzwBegYVwZdRjQwaGAvktpGuYaeUYXnMaoaC5PPcqEBuW2"
-  target_block = 5100341
-
-  subgraph_generator = SubgraphGenerator(event_fetcher=fetcher, event_processor=event_processor, max_future_events=50, max_past_events=50, batch_size=50)
-  subgraph = await subgraph_generator.run(target, target_block)
-
-  print(subgraph)
-```
-[See the full miner processing class here](src/patrol/mining/subgraph_generator.py).
-
-The subgraph that miners submit is composed of:
-
-- **Nodes**: Representing the entities in the subgraph (wallets, etc)
-- **Edges**: Representing relationships between nodes like transactions and staking (exapnding to include parent-child relationships as part of the roadmap).
-- **Evidence**: Supporting data to verify the nodes and edges
-
-These subgraphs are then submitted to the validator for evaluation.
-
-
-#### Validator verifies miner’s subgraph
-
-Once miners submit their subgraphs, [Validators](validator/src/patrol/validation/validator.py) will [verify](validator/src/patrol/validation/graph_validation/bittensor_validation_mechanism.py) the data by checking the *evidence* against the *node* and *edge* data submitted by the miners. This validation is pass/fail, failing will result in a score of 0 for that submission. This verification process currently supports the following node and edges types:
-
-Nodes:
-- Wallet nodes: Contains wallet addresses and types.
-
-Edges:
-- Transaction edges: Direct token transfers between wallets
-- Staking edges: Staking relationships between wallets
-
-See [here](src/patrol/protocol.py) for more details on the supported node and edge types.
-
-#### Validator scores subgraph
-
-Once the data has been verified, validators will calculate a *score* for the miner based on the following criteria:
-- **Volume** (90%): Amount of valid data submitted, with reasonable caps
-- **Responsiveness** (10%): How quickly the miner can submit data
-- **Novelty** (will be implemented soon) : How unique the data returned by the miner is.
-
-```python
-   volume = len(payload.nodes) + len(payload.edges)
-        volume_score = self.calculate_volume_score(payload)
-        responsiveness_score = self.calculate_responsiveness_score(response_time)
-
-        overall_score = sum([
-            volume_score * self.importance["volume"],
-            responsiveness_score * self.importance["responsiveness"]
-        ])
-
-```
-[View detailed overview of incentive mechanism here](docs/incentive.md).
-
-Ultimately, the mission for each miner is to achieve the highest coverage score by delivering data that is high quality, high quantity, and novel. By doing so, miners ensure that only top-tier data is presented to validators, fortifying a comprehensive and dynamic knowledge graph. This invaluable resource is pivotal for a wide array of security applications, driving the future of digital asset protection and intelligence.
-
-### Hotkey ownership task
-
-This task challenges miners to discover changes in the ownership of a hotkey.
-
-1. The validator selects a set of random hotkeys, and sends one to each miner as a **target_hotkey**
-2. The miner finds the coldkeys that have owned the target_hotkey and responds with a graph where the nodes are coldkeys and the edges contain the block number where the hotkey ownership change became effective.
-
-Example Request:
-```json
-{
-     "target_hotkey_ss58": "5E4JBpbx3p3BchvJF2RQ4CLqAF5ECZNYuPbCg8u9T8Y5jtgi"
-}
-```
-Example Response:
-
-```json
-{
-     "subgraph_output": {
-          "nodes": [
-               { "id": "5CMEwRYLefRmtJg8zzRyJtcXrQqmspr9B1r1nKySDReA37Z1", "type": "wallet", "origin": "bittensor" },
-               { "id": "5G694c15wAu1LKb9rpSQqJjpBfg4K1oiBxEm5QSVdVZAfp9f", "type": "wallet", "origin": "bittensor" }
-          ],
-          "edges": [
-               { 
-                    "category": "coldkey_swap",
-                    "type": "hotkey_ownership",
-                    "coldkey_source": "5CMEwRYLefRmtJg8zzRyJtcXrQqmspr9B1r1nKySDReA37Z1",
-                    "coldkey_destination": "5G694c15wAu1LKb9rpSQqJjpBfg4K1oiBxEm5QSVdVZAfp9f",
-                    "evidence": {
-                         "effective_block_number": 5070010 
-                    }
-               }
-          ]
-     }
-}
-```
-3. The validator ensures that the response is syntactically correct, and that the asserted changes of ownership(s) are genuine.
-4. The validator scores the response according to the [incentive mechanism](docs/incentive.md).
-
 ## Documentation and Resources
+
+Documentation on how each task works and is scored can be found in the Mining Guide.
 
 <table style="border: none !important; width: 100% !important; border-collapse: collapse !important; margin: 0 auto !important;">
   <tbody>
     <tr>
-      <td><b>Docs</b></td>
-      <td><b>Resources</b></td>
+      <td><b>Subnet Documentation</b></td>
+      <td><b>General Resources</b></td>
     </tr>
     <tr style="vertical-align: top !important">
       <td>
         ⛏️ <a href="docs/mining.md">Mining Guide</a><br>
         🔧 <a href="docs/validating.md">Validator Guide</a><br>
-        📈 <a href="docs/incentive.md">Incentive Mechanism</a><br>
       <td>
         <a href="https://docs.bittensor.com/learn/bittensor-building-blocks">🧠 Bittensor Introduction</a><br> 
       </td>
