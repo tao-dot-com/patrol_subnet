@@ -1,6 +1,7 @@
 # Stake Prediction
 
 This task incentivizes miners to accurately predict staking movements for wallets in a subnet.
+Predictions for **StakeAdded** and **StakeRemoved** will be scored against the chain data for each wallet on a subnet.
 Miners will receive a batch of tasks indicating the subnet, a set of wallets currently active in that subnet, and a block prediction interval.
 
 Miners have 16 seconds to respond to each task. Missing responses or time-outs will score zero.
@@ -64,6 +65,8 @@ This task contributes 40% of the weights.
   "predictions": [
     { "amount": 12000000000, "transaction_type": "StakeRemoved", "wallet_hotkey_ss58": "5GYnKhRwkRN78ZREMhohMvCRQBoc6sFwkTskYVjrQWWDVnZp", "wallet_coldkey_ss58": "5DLr6vrZqmCQBxH9H9UNJbErTtoDBrSkMJZu1xZwWsKCz1ig"},
     { "amount": 0, "transaction_type": "StakeRemoved", "wallet_hotkey_ss58": "5GxqhbNg9gTfZUdcKji4pMDQdhqcVCTNWon9VyuqKdoWCsuH", "wallet_coldkey_ss58": "5FEo31ujEdvDjKPwS5p54ek5HksjJgcwk3FrEfxtikLcm2U1"},
+    { "amount": 50000000000, "transaction_type": "StakeAdded", "wallet_hotkey_ss58": "5GYnKhRwkRN78ZREMhohMvCRQBoc6sFwkTskYVjrQWWDVnZp", "wallet_coldkey_ss58": "5DLr6vrZqmCQBxH9H9UNJbErTtoDBrSkMJZu1xZwWsKCz1ig"},
+    { "amount": 0, "transaction_type": "StakeAdded", "wallet_hotkey_ss58": "5GxqhbNg9gTfZUdcKji4pMDQdhqcVCTNWon9VyuqKdoWCsuH", "wallet_coldkey_ss58": "5FEo31ujEdvDjKPwS5p54ek5HksjJgcwk3FrEfxtikLcm2U1"},
     ...
   ]
 }

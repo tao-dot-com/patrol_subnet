@@ -63,10 +63,6 @@ HARDWARE REQUIREMENTS:
 
 Miners should implement both of the following tasks:
 
-- [Hotkey Ownership Task](hotkey_ownership.md)  
-There are no standard hyperparamters for changing the performance of your miner on this task. You will likely find benefits from pursuing caching in some form.
-
-
 - [Stake Prediction Task](stake_prediction.md)  
 The reference miner will predict zero stake movement by default. It is completely up to miners to
 optimize the prediction mechanism to improve accuracy.
