@@ -32,6 +32,7 @@ async def synapse_handler(request: AlphaSellSynapse):
     await asyncio.sleep(0.2)
     request.predictions=[
         AlphaSellPrediction("alice", "a", TransactionType.STAKE_REMOVED, 25),
+        AlphaSellPrediction("alice", "a", TransactionType.STAKE_ADDED, 25),
         AlphaSellPrediction("bob", "b",  TransactionType.STAKE_REMOVED, 15)
     ]
     return request
@@ -133,6 +134,7 @@ async def test_challenge_miner_with_fewer_wallets_than_predictions(dendrite_wall
     miner = Axon(port=miner_port, ip=miner_ip, external_ip=miner_ip, wallet=miner_wallet)
 
     responses = await task.execute_tasks(miner.info(), [synapse])
-    assert len(responses[0][2].predictions) == 1
+    assert len(responses[0][2].predictions) == 2
     assert responses[0][2].predictions[0] == AlphaSellPrediction("alice", "a", TransactionType.STAKE_REMOVED, 25)
+    assert responses[0][2].predictions[1] == AlphaSellPrediction("alice", "a", TransactionType.STAKE_ADDED, 25)
 
