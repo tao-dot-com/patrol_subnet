@@ -49,13 +49,15 @@ async def is_update_available():
         latest_digest = await get_digest(session, "latest", token)
         logger.info("Latest digest: %s", latest_digest)
 
-    if current_digest != latest_digest:
-        logger.info("New version available: %s. Service will terminate.", latest_digest)
-        return True
-    else:
+    if current_digest is None or latest_digest is None:
+        logger.warning("Failed to fetch digests; assuming latest.")
+        return False
+    elif current_digest == latest_digest:
         logger.info("Current version is latest.")
         return False
-
+    else:
+        logger.info("New version available: %s. Service will terminate.", latest_digest)
+        return True
 
 if __name__ == "__main__":
     import sys
