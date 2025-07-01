@@ -53,16 +53,18 @@ async def test_send_scores(mock_dashboard, mock_wallet):
         uid=100,
         coldkey="foo",
         hotkey="foobar",
-        volume=1000,
-        volume_score=0.5,
-        response_time_seconds=1.2,
-        responsiveness_score=0.8,
+        responsiveness_score=0,
+        stake_addition_score=100.5,
+        stake_removal_score=112.5,
         overall_score=0.6,
         overall_score_moving_average=0.65,
-        novelty_score=0,
         validation_passed=False,
-        task_type=TaskType.HOTKEY_OWNERSHIP,
-        error_message="nope"
+        task_type=TaskType.PREDICT_ALPHA_SELL,
+        error_message="nope",
+        response_time_seconds=1.2,
+        novelty_score=None,
+        volume_score=0.5,
+        volume=0
     )
 
     dashboard_client = HttpDashboardClient(mock_wallet, f"http://{endpoint.host}:{endpoint.port}")
@@ -88,12 +90,10 @@ async def test_send_scores(mock_dashboard, mock_wallet):
     assert body["uid"] == miner_score.uid
     assert body["coldkey"] == "foo"
     assert body["hotkey"] == "foobar"
-    assert body["volume"] == 1000
-    assert body["volume_score"] == 0.5
-    assert body["response_time_seconds"] == 1.2
-    assert body["response_time_score"] == 0.8
+    assert body["stake_added_score"] == 100.5
+    assert body["stake_removed_score"] == 112.5
     assert body["overall_score"] == 0.6
     assert body["overall_moving_average_score"] == 0.65
     assert body["is_valid"] == False
-    assert body['task_type'] == "HOTKEY_OWNERSHIP"
+    assert body['task_type'] == "PREDICT_ALPHA_SELL"
     assert body["error_message"] == "nope"

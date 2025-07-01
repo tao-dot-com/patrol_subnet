@@ -22,10 +22,8 @@ class _MinerScore(BaseModel):
     uid: int
     hotkey: str
     coldkey: str
-    volume: int
-    volume_score: float
-    response_time_seconds: float
-    response_time_score: float
+    stake_added_score: float
+    stake_removed_score: float
     overall_score: float
     overall_moving_average_score: float
     is_valid: bool
@@ -46,9 +44,10 @@ class _MinerScore(BaseModel):
             created_at=score.created_at,
             coldkey=score.coldkey,
             hotkey=score.hotkey,
-            volume=score.volume, volume_score=score.volume_score,
-            response_time_seconds=score.response_time_seconds, response_time_score=score.responsiveness_score,
-            overall_score=score.overall_score, overall_moving_average_score=score.overall_score_moving_average,
+            stake_added_score=score.stake_addition_score,
+            stake_removed_score=score.stake_removal_score,
+            overall_score=score.overall_score,
+            overall_moving_average_score=score.overall_score_moving_average,
             is_valid=score.validation_passed,
             task_type=score.task_type,
             error_message=score.error_message
